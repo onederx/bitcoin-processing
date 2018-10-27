@@ -1,9 +1,17 @@
 package wallet
 
+import (
+	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
+)
+
 type Account struct {
 	Address string
 }
 
 func GenerateNewAddress(account Account) string {
-	return "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
+	address, err := nodeapi.CreateNewAddress()
+	if err != nil {
+		panic(err)
+	}
+	return address.EncodeAddress()
 }

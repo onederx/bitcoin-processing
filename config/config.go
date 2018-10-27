@@ -34,6 +34,7 @@ func initConfig() {
 	// defaults
 	viper.SetDefault("http-host", "127.0.0.1")
 	viper.SetDefault("http-port", 8000)
+	viper.SetDefault("bitcoin.node.tls", false)
 }
 
 func GetString(key string) string {
@@ -42,6 +43,10 @@ func GetString(key string) string {
 
 func GetInt(key string) int {
 	return viper.GetInt(key)
+}
+
+func GetBool(key string) bool {
+	return viper.GetBool(key)
 }
 
 func GetURL(key string) string {
@@ -54,4 +59,13 @@ func GetURL(key string) string {
 		)
 	}
 	return urlValue
+}
+
+func GetStringMandatory(key string) string {
+	value := viper.GetString(key)
+
+	if value == "" {
+		log.Fatalf("Setting %s is required", key)
+	}
+	return value
 }
