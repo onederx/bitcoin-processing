@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 )
@@ -46,11 +45,6 @@ func handle(urlPattern, method string, handler func(http.ResponseWriter, *http.R
 	})
 }
 
-func RunHTTPAPIServer(host string, port int) {
-	bindAddress := host + ":" + strconv.Itoa(port)
-	log.Printf("Starting HTTP API server on %s", bindAddress)
-
+func initHTTPAPIServer() {
 	handle("/new-address", "", newBitcoinAddress)
-
-	log.Fatal(http.ListenAndServe(bindAddress, nil))
 }

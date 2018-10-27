@@ -28,12 +28,10 @@ func initConfig() {
 
 	// let CLI args override config params
 	viper.BindPFlag("tx-callback", cli.Flags().Lookup("tx-callback"))
-	viper.BindPFlag("http-host", cli.Flags().Lookup("http-host"))
-	viper.BindPFlag("http-port", cli.Flags().Lookup("http-port"))
+	viper.BindPFlag("http.address", cli.Flags().Lookup("http-address"))
 
 	// defaults
-	viper.SetDefault("http-host", "127.0.0.1")
-	viper.SetDefault("http-port", 8000)
+	viper.SetDefault("http.address", "127.0.0.1:8000")
 	viper.SetDefault("bitcoin.node.tls", false)
 }
 

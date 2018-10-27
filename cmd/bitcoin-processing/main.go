@@ -15,9 +15,6 @@ func main() {
 
 		log.Printf("Using tx callback %#v", config.GetURL("tx-callback"))
 
-		api.RunHTTPAPIServer(
-			config.GetString("http-host"),
-			config.GetInt("http-port"),
-		)
+		api.RunAPIServer(config.GetString("api.http.address"))
 	})
 }
