@@ -28,7 +28,7 @@ func initConfig() {
 
 	// let CLI args override config params
 	viper.BindPFlag("tx-callback", cli.Flags().Lookup("tx-callback"))
-	viper.BindPFlag("http.address", cli.Flags().Lookup("http-address"))
+	viper.BindPFlag("api.http.address", cli.Flags().Lookup("http-address"))
 
 	// defaults
 	viper.SetDefault("http.address", "127.0.0.1:8000")
