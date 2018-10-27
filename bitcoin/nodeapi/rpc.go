@@ -5,7 +5,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"log"
 
-	"github.com/onederx/bitcoin-processing/config"
+	"github.com/onederx/bitcoin-processing/settings"
 )
 
 var (
@@ -20,11 +20,11 @@ func InitBTCRPC() {
 	// prepare bitcoind RPC connection
 	// Connect to remote bitcoin core RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
-		Host:         config.GetStringMandatory("bitcoin.node.address"),
-		User:         config.GetStringMandatory("bitcoin.node.user"),
-		Pass:         config.GetStringMandatory("bitcoin.node.password"),
+		Host:         settings.GetStringMandatory("bitcoin.node.address"),
+		User:         settings.GetStringMandatory("bitcoin.node.user"),
+		Pass:         settings.GetStringMandatory("bitcoin.node.password"),
 		HTTPPostMode: true,                                // Bitcoin core only supports HTTP POST mode
-		DisableTLS:   !config.GetBool("bitcoin.node.tls"), // Bitcoin core can use TLS if it's behind a TLS proxy like nginx
+		DisableTLS:   !settings.GetBool("bitcoin.node.tls"), // Bitcoin core can use TLS if it's behind a TLS proxy like nginx
 	}
 	// Notice the notification parameter is nil since notifications are
 	// not supported in HTTP POST mode.

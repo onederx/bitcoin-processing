@@ -5,16 +5,16 @@ import (
 
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
-	"github.com/onederx/bitcoin-processing/config"
+	"github.com/onederx/bitcoin-processing/settings"
 )
 
 func main() {
-	config.ReadSettingsAndRun(func() {
+	settings.ReadSettingsAndRun(func() {
 
 		nodeapi.InitBTCRPC()
 
-		log.Printf("Using tx callback %#v", config.GetURL("tx-callback"))
+		log.Printf("Using tx callback %#v", settings.GetURL("tx-callback"))
 
-		api.RunAPIServer(config.GetString("api.http.address"))
+		api.RunAPIServer(settings.GetString("api.http.address"))
 	})
 }
