@@ -11,7 +11,7 @@ func main() {
 	settings.ReadSettingsAndRun(func() {
 
 		nodeapi.InitBTCRPC()
-		wallet.StartWatchingWalletUpdates()
+		wallet.Start()
 
 		api.RunAPIServer(settings.GetString("api.http.address"))
 	})

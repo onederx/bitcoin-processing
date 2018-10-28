@@ -20,7 +20,8 @@ func ReadSettingsAndRun(funcToRun func()) {
 
 	cli.Flags().StringVarP(&cfgFile, "config-file", "c", "", "config file (default is ./bitcoin-processing.yaml)")
 	cli.Flags().StringP("tx-callback", "t", "", "callback url for tx events")
-	cli.Flags().StringP("http-address", "H", "", "host for HTTP API to listen on")
+	cli.Flags().StringP("http-address", "a", "", "host for HTTP API to listen on")
+	cli.Flags().StringP("storage-type", "s", "", "type of storage to use")
 
 	if err := cli.Execute(); err != nil {
 		log.Println(err)

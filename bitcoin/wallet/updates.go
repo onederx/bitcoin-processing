@@ -23,6 +23,6 @@ func pollWalletUpdates() {
 	}
 }
 
-func StartWatchingWalletUpdates() {
+func startWatchingWalletUpdates() {
 	go pollWalletUpdates()
 }

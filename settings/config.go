@@ -29,6 +29,7 @@ func initConfig() {
 	// let CLI args override config params
 	viper.BindPFlag("tx-callback", cli.Flags().Lookup("tx-callback"))
 	viper.BindPFlag("api.http.address", cli.Flags().Lookup("http-address"))
+	viper.BindPFlag("storage.type", cli.Flags().Lookup("storage-type"))
 
 	// defaults
 	viper.SetDefault("http.address", "127.0.0.1:8000")
@@ -64,7 +65,7 @@ func GetStringMandatory(key string) string {
 	value := viper.GetString(key)
 
 	if value == "" {
-		log.Fatalf("Setting %s is required", key)
+		log.Fatalf("Error: setting %s is required", key)
 	}
 	return value
 }
