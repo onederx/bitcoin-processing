@@ -23,7 +23,7 @@ func InitBTCRPC() {
 		Host:         settings.GetStringMandatory("bitcoin.node.address"),
 		User:         settings.GetStringMandatory("bitcoin.node.user"),
 		Pass:         settings.GetStringMandatory("bitcoin.node.password"),
-		HTTPPostMode: true,                                // Bitcoin core only supports HTTP POST mode
+		HTTPPostMode: true,                                  // Bitcoin core only supports HTTP POST mode
 		DisableTLS:   !settings.GetBool("bitcoin.node.tls"), // Bitcoin core can use TLS if it's behind a TLS proxy like nginx
 	}
 	// Notice the notification parameter is nil since notifications are
