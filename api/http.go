@@ -12,20 +12,24 @@ import (
 )
 
 func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
-	var account wallet.Account
+	var metainfo map[string]interface{}
 	var body, responseBody []byte
 	var err error
 
 	if body, err = ioutil.ReadAll(request.Body); err != nil {
 		panic(err)
 	}
-	if err = json.Unmarshal(body, &account); err != nil {
+	if err = json.Unmarshal(body, &metainfo); err != nil {
 		panic(err)
 	}
-	account.Address = wallet.GenerateNewAddress(account)
+	account := wallet.Account{
+		Address:  wallet.GenerateNewAddress(),
+		Metainfo: metainfo,
+	}
 	if responseBody, err = json.Marshal(account); err != nil {
 		panic(err)
 	}
+	events.Notify(events.EVENT_NEW_ADDRESS, account)
 	response.Write(responseBody)
 }
 
