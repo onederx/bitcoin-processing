@@ -35,17 +35,7 @@ func ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult
 		}
 	}
 
-	result, err := btcrpc.ListSinceBlock(blockHashInChainhashFormat)
-
-	if err != nil {
-		if err != nil {
-			return nil, errors.New(
-				"Error: ListTransactionsSinceBlock: bitcoin node query " +
-					"failed: " + err.Error(),
-			)
-		}
-	}
-	return result, nil
+	return btcrpc.ListSinceBlock(blockHashInChainhashFormat)
 }
 
 func InitBTCRPC() {
