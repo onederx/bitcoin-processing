@@ -12,7 +12,8 @@ import (
 type EventType string
 
 const (
-	EVENT_NEW_ADDRESS EventType = "new-address"
+	EVENT_NEW_ADDRESS     EventType = "new-address"
+	EVENT_CHECK_TX_STATUS EventType = "check-tx-status"
 )
 
 type notification struct {
@@ -26,9 +27,11 @@ type notificationWithSeq struct {
 }
 
 var EventQueue chan []byte
+var ExternalTxNotifications chan string
 
 func init() {
 	EventQueue = make(chan []byte)
+	ExternalTxNotifications = make(chan string)
 }
 
 func notifyHTTPCallback(eventType EventType, data string) {
@@ -50,7 +53,18 @@ func notifyHTTPCallback(eventType EventType, data string) {
 	}
 }
 
+func notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
+	select {
+	case ExternalTxNotifications <- data:
+	default:
+	}
+}
+
 func Notify(eventType EventType, data string) {
+	if eventType == EVENT_CHECK_TX_STATUS {
+		notifyWalletMayHaveUpdatedWithoutBlocking(data)
+		return
+	}
 	notificationData := notificationWithSeq{
 		notification: notification{
 			Type: EVENT_NEW_ADDRESS,

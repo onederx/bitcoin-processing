@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
 func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
@@ -26,6 +27,10 @@ func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 		panic(err)
 	}
 	response.Write(responseBody)
+}
+
+func notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
+	events.Notify(events.EVENT_CHECK_TX_STATUS, "")
 }
 
 func handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
@@ -47,4 +52,5 @@ func handle(urlPattern, method string, handler func(http.ResponseWriter, *http.R
 
 func initHTTPAPIServer() {
 	handle("/new-address", "", newBitcoinAddress)
+	handle("/notify-wallet", "", notifyWalletTxStatusChanged)
 }
