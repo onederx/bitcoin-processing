@@ -17,8 +17,8 @@ const (
 )
 
 type notification struct {
-	Type EventType `json:"type"`
-	Data string    `json:"data"`
+	Type EventType   `json:"type"`
+	Data interface{} `json:"data"`
 }
 
 type notificationWithSeq struct {
@@ -60,9 +60,9 @@ func notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
 	}
 }
 
-func Notify(eventType EventType, data string) {
+func Notify(eventType EventType, data interface{}) {
 	if eventType == EVENT_CHECK_TX_STATUS {
-		notifyWalletMayHaveUpdatedWithoutBlocking(data)
+		notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}
 	notificationData := notificationWithSeq{
