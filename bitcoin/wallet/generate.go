@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
 type Account struct {
@@ -13,5 +14,7 @@ func GenerateNewAddress(account Account) string {
 	if err != nil {
 		panic(err)
 	}
-	return address.EncodeAddress()
+	addressStr := address.EncodeAddress()
+	events.Notify(events.EVENT_NEW_ADDRESS, addressStr)
+	return addressStr
 }
