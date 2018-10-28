@@ -1,6 +1,9 @@
 package nodeapi
 
 import (
+	"errors"
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
 	"log"
@@ -14,6 +17,35 @@ var (
 
 func CreateNewAddress() (btcutil.Address, error) {
 	return btcrpc.GetNewAddress("")
+}
+
+func ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error) {
+	var blockHashInChainhashFormat *chainhash.Hash
+	var err error
+
+	if blockHash == "" {
+		blockHashInChainhashFormat = nil
+	} else {
+		blockHashInChainhashFormat, err = chainhash.NewHashFromStr(blockHash)
+		if err != nil {
+			return nil, errors.New(
+				"Error: ListTransactionsSinceBlock: failed to convert block " +
+					"hash " + blockHash + " to chainhash format: " + err.Error(),
+			)
+		}
+	}
+
+	result, err := btcrpc.ListSinceBlock(blockHashInChainhashFormat)
+
+	if err != nil {
+		if err != nil {
+			return nil, errors.New(
+				"Error: ListTransactionsSinceBlock: bitcoin node query " +
+					"failed: " + err.Error(),
+			)
+		}
+	}
+	return result, nil
 }
 
 func InitBTCRPC() {
