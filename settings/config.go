@@ -27,7 +27,7 @@ func initConfig() {
 	locateAndReadConfigFile()
 
 	// let CLI args override config params
-	viper.BindPFlag("tx-callback", cli.Flags().Lookup("tx-callback"))
+	viper.BindPFlag("transaction.callback", cli.Flags().Lookup("transaction-callback"))
 	viper.BindPFlag("api.http.address", cli.Flags().Lookup("http-address"))
 	viper.BindPFlag("storage.type", cli.Flags().Lookup("storage-type"))
 

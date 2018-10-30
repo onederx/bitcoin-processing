@@ -19,7 +19,7 @@ func ReadSettingsAndRun(funcToRun func()) {
 	cobra.OnInitialize(initConfig)
 
 	cli.Flags().StringVarP(&cfgFile, "config-file", "c", "", "config file (default is ./bitcoin-processing.yaml)")
-	cli.Flags().StringP("tx-callback", "t", "", "callback url for tx events")
+	cli.Flags().StringP("transaction-callback", "t", "", "callback url for tx events")
 	cli.Flags().StringP("http-address", "a", "", "host for HTTP API to listen on")
 	cli.Flags().StringP("storage-type", "s", "", "type of storage to use")
 
