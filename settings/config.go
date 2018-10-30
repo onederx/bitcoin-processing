@@ -35,6 +35,7 @@ func initConfig() {
 	viper.SetDefault("http.address", "127.0.0.1:8000")
 	viper.SetDefault("bitcoin.node.tls", false)
 	viper.SetDefault("bitcoin.poll-interval", 3000)
+	viper.SetDefault("transaction.max-confirmations", 6)
 }
 
 func GetString(key string) string {
