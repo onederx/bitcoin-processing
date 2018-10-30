@@ -1,0 +1,13 @@
+transaction:
+  callback: http://127.0.0.1:9000/
+api:
+  http:
+    address: 127.0.0.1:8000
+storage:
+  type: memory
+bitcoin:
+  node:
+    # these are credentials for regtest node from test stand (stand is in tools/regtest)
+    address: 127.0.0.1:18443
+    user: bitcoinrpc
+    password: TEST_BITCOIN_NODE_PASSWORD
