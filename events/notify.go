@@ -69,7 +69,7 @@ func Notify(eventType EventType, data interface{}) {
 	}
 	notificationData := notificationWithSeq{
 		notification: notification{
-			Type: EVENT_NEW_ADDRESS,
+			Type: eventType,
 			Data: data,
 		},
 		Seq: 0, // not supported for now
