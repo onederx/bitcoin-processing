@@ -1,6 +1,7 @@
 package nodeapi
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -36,6 +37,34 @@ func ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult
 	}
 
 	return btcrpc.ListSinceBlock(blockHashInChainhashFormat)
+}
+
+func GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
+	var txHashInChainhashFormat *chainhash.Hash
+	var err error
+
+	txHashInChainhashFormat, err = chainhash.NewHashFromStr(hash)
+	if err != nil {
+		return nil, errors.New(
+			"Error: GetTransaction: failed to convert tx hash " + hash +
+				" to chainhash format: " + err.Error(),
+		)
+	}
+
+	return btcrpc.GetTransaction(txHashInChainhashFormat)
+}
+
+func GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
+	transaction, err := GetTransaction(hash)
+
+	if err != nil {
+		return nil, err
+	}
+	rawTxBytes, err := hex.DecodeString(transaction.Hex)
+	if err != nil {
+		return nil, err
+	}
+	return btcrpc.DecodeRawTransaction(rawTxBytes)
 }
 
 func InitBTCRPC() {
