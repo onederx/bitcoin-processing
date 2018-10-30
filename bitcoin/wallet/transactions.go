@@ -12,7 +12,7 @@ type Transaction struct {
 	Address       string
 }
 
-func (tx Transaction) update(other *Transaction) {
+func (tx *Transaction) update(other *Transaction) {
 	if tx.Hash != other.Hash {
 		panic("Tx update called for transaction with other hash")
 	}
