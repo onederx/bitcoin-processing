@@ -17,7 +17,7 @@ var storage WalletStorage
 
 type InMemoryWalletStorage struct {
 	lastSeenBlockHash string
-	accounts          []Account
+	accounts          []*Account
 	transactions      []*Transaction
 }
 
@@ -52,7 +52,7 @@ func initStorage() {
 
 	if storageType == "memory" {
 		storage = &InMemoryWalletStorage{
-			accounts:     make([]Account, 0),
+			accounts:     make([]*Account, 0),
 			transactions: make([]*Transaction, 0),
 		}
 	} else {
