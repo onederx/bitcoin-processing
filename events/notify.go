@@ -12,8 +12,10 @@ import (
 type EventType string
 
 const (
-	EVENT_NEW_ADDRESS     EventType = "new-address"
-	EVENT_CHECK_TX_STATUS EventType = "check-tx-status"
+	EVENT_NEW_ADDRESS           EventType = "new-address"
+	EVENT_CHECK_TX_STATUS                 = "check-tx-status"
+	EVENT_NEW_INCOMING_TX                 = "new-incoming-tx"
+	EVENT_INCOMING_TX_CONFIRMED           = "incoming-tx-confirmed"
 )
 
 type notification struct {
