@@ -4,16 +4,76 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/settings"
+	"github.com/onederx/bitcoin-processing/util"
 	"log"
 	"time"
 )
 
-func checkForWalletUpdates() {
+type transactionNotification struct {
+	Transaction
+	AccountMetainfo map[string]interface{} `json:"metainfo"`
+}
+
+var unknownAccountError = map[string]interface{}{
+	"error": "account not found",
+}
+
+var maxConfirmations int64
+
+func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
+	var eventType events.EventType
+	var accountMetainfo map[string]interface{}
+
+	for i := tx.reportedConfirmations + 1; i <= confirmationsToNotify; i++ {
+		if i == 0 {
+			eventType = events.EVENT_NEW_INCOMING_TX
+		} else {
+			eventType = events.EVENT_INCOMING_TX_CONFIRMED
+		}
+		account := storage.GetAccountByAddress(tx.Address)
+		if account == nil {
+			log.Printf(
+				"Error: failed to match account by address %s "+
+					"(transaction %s) for incoming payment",
+				tx.Address,
+				tx.Hash,
+			)
+			accountMetainfo = unknownAccountError
+		} else {
+			accountMetainfo = account.Metainfo
+		}
+		// make a copy of tx here, otherwise it may get modified while
+		// other goroutines process notification
+		notification := transactionNotification{
+			*tx,
+			accountMetainfo,
+		}
+		notification.Confirmations = i // Send confirmations sequentially
+
+		events.Notify(eventType, notification)
+		storage.updateReportedConfirmations(tx, i)
+	}
+
+}
+
+func notifyTransaction(tx *Transaction) {
+	confirmationsToNotify := util.Min64(tx.Confirmations, maxConfirmations)
+
+	if tx.Direction == DIRECTION_INCOMING {
+		notifyIncomingTransaction(tx, confirmationsToNotify)
+	}
+}
+
+func updateTxInfo(tx *Transaction) {
+	tx = storage.StoreTransaction(tx)
+	notifyTransaction(tx)
+}
+
+func checkForNewTransactions() {
 	lastSeenBlock := storage.GetLastSeenBlockHash()
-	log.Print("Last seen block hash ", lastSeenBlock)
 	lastTxData, err := nodeapi.ListTransactionsSinceBlock(lastSeenBlock)
 	if err != nil {
-		log.Print("Checking for wallet updates failed:", err)
+		log.Print("Error: Checking for wallet updates failed: ", err)
 		return
 	}
 
@@ -24,17 +84,36 @@ func checkForWalletUpdates() {
 			lastTxData.LastBlock,
 		)
 	}
-	for _, transaction := range lastTxData.Transactions {
-		log.Printf("Process tx %#v", transaction)
+	for _, btcNodeTransaction := range lastTxData.Transactions {
+		log.Printf("New tx %s", btcNodeTransaction.TxID)
 
-		storage.StoreTransaction(&Transaction{
-			Hash:          transaction.TxID,
-			BlockHash:     transaction.BlockHash,
-			Confirmations: transaction.Confirmations,
-			Address:       transaction.Address,
-		})
+		tx := newTransaction(&btcNodeTransaction)
+		updateTxInfo(tx)
 	}
 	storage.SetLastSeenBlockHash(lastTxData.LastBlock)
+}
+
+func checkForExistingTransactionUpdates() {
+	transactionsToCheck := storage.GetTransactionsWithLessConfirmations(maxConfirmations)
+
+	for _, tx := range transactionsToCheck {
+		fullTxInfo, err := nodeapi.GetTransaction(tx.Hash)
+
+		if err != nil {
+			log.Printf(
+				"Error: could not get tx %s from node for update",
+				tx.Hash,
+			)
+			continue
+		}
+		tx.updateFromFullTxInfo(fullTxInfo)
+		updateTxInfo(tx)
+	}
+}
+
+func checkForWalletUpdates() {
+	checkForNewTransactions()
+	checkForExistingTransactionUpdates()
 }
 
 func pollWalletUpdates() {
@@ -50,5 +129,6 @@ func pollWalletUpdates() {
 }
 
 func startWatchingWalletUpdates() {
+	maxConfirmations = int64(settings.GetInt("transaction.max-confirmations"))
 	pollWalletUpdates()
 }
