@@ -5,11 +5,12 @@ import (
 )
 
 type Transaction struct {
-	id            uuid.UUID
-	Hash          string
-	BlockHash     string
-	Confirmations int64
-	Address       string
+	Id            uuid.UUID            `json:"id"`
+	Hash          string               `json:"hash"`
+	BlockHash     string               `json:"blockhash"`
+	Confirmations int64                `json:"confirmations"`
+	Address       string               `json:"address"`
+	Direction     TransactionDirection `json:"direction"`
 }
 
 func (tx *Transaction) update(other *Transaction) {
