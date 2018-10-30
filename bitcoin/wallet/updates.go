@@ -50,5 +50,5 @@ func pollWalletUpdates() {
 }
 
 func startWatchingWalletUpdates() {
-	go pollWalletUpdates()
+	pollWalletUpdates()
 }
