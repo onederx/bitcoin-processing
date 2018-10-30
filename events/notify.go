@@ -67,17 +67,16 @@ func Notify(eventType EventType, data interface{}) {
 		notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}
-	notificationData := notificationWithSeq{
-		notification: notification{
-			Type: eventType,
-			Data: data,
-		},
-		Seq: 0, // not supported for now
-	}
+	notificationData := storage.StoreEvent(notification{eventType, data})
+
 	notificationJSON, err := json.Marshal(notificationData)
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for ws", err)
 		return
 	}
 	EventQueue <- notificationJSON
+}
+
+func Start() {
+	initStorage()
 }

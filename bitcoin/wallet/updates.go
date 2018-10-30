@@ -85,8 +85,6 @@ func checkForNewTransactions() {
 		)
 	}
 	for _, btcNodeTransaction := range lastTxData.Transactions {
-		log.Printf("New tx %s", btcNodeTransaction.TxID)
-
 		tx := newTransaction(&btcNodeTransaction)
 		updateTxInfo(tx)
 	}
