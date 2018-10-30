@@ -1,0 +1,18 @@
+version: '3'
+services:
+  node1:
+    image: kylemanna/bitcoind
+    ports:
+    - "127.0.0.1:18443:18443"
+    volumes:
+    - ./node1:/bitcoin
+  node2:
+    image: kylemanna/bitcoind
+    ports:
+    - "127.0.0.1:18445:18443"
+    volumes:
+    - ./node2:/bitcoin
+  node3:
+    image: kylemanna/bitcoind
+    volumes:
+    - ./node3:/bitcoin
