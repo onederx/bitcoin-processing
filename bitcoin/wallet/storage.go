@@ -8,9 +8,14 @@ import (
 
 type WalletStorage interface {
 	GetLastSeenBlockHash() string
-	SetLastSeenBlockHash(string)
-	StoreTransaction(*Transaction)
+	SetLastSeenBlockHash(blockHash string)
+	StoreTransaction(transaction *Transaction) *Transaction
 	GetTransaction(hash string) *Transaction
+	GetTransactionsWithLessConfirmations(confirmations int64) []*Transaction
+	updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64)
+
+	GetAccountByAddress(address string) *Account
+	StoreAccount(account *Account)
 }
 
 var storage WalletStorage
@@ -38,13 +43,44 @@ func (s *InMemoryWalletStorage) GetTransaction(hash string) *Transaction {
 	return nil
 }
 
-func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) {
+func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) *Transaction {
 	existingTransaction := s.GetTransaction(transaction.Hash)
 	if existingTransaction != nil {
 		existingTransaction.update(transaction)
+		return existingTransaction
 	}
-	transaction.id = uuid.Must(uuid.NewV4())
+	transaction.Id = uuid.Must(uuid.NewV4())
 	s.transactions = append(s.transactions, transaction)
+	return transaction
+}
+
+func (s *InMemoryWalletStorage) GetAccountByAddress(address string) *Account {
+	for _, account := range s.accounts {
+		if account.Address == address {
+			return account
+		}
+	}
+	return nil
+}
+
+func (s *InMemoryWalletStorage) StoreAccount(account *Account) {
+	s.accounts = append(s.accounts, account)
+}
+
+func (s *InMemoryWalletStorage) GetTransactionsWithLessConfirmations(confirmations int64) []*Transaction {
+	result := make([]*Transaction, 0)
+
+	for _, transaction := range s.transactions {
+		if transaction.reportedConfirmations < confirmations {
+			result = append(result, transaction)
+		}
+	}
+	return result
+}
+
+func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) {
+	storedTransaction := s.GetTransaction(transaction.Hash)
+	storedTransaction.reportedConfirmations = reportedConfirmations
 }
 
 func initStorage() {
