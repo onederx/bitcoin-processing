@@ -26,12 +26,12 @@ func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 	if responseBody, err = json.Marshal(account); err != nil {
 		panic(err)
 	}
-	events.Notify(events.EVENT_NEW_ADDRESS, account)
+	events.Notify(events.NewAddressEvent, account)
 	response.Write(responseBody)
 }
 
 func notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
-	events.Notify(events.EVENT_CHECK_TX_STATUS, "")
+	events.Notify(events.CheckTxStatusEvent, "")
 }
 
 func handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {

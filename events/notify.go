@@ -12,10 +12,10 @@ import (
 type EventType string
 
 const (
-	EVENT_NEW_ADDRESS           EventType = "new-address"
-	EVENT_CHECK_TX_STATUS                 = "check-tx-status"
-	EVENT_NEW_INCOMING_TX                 = "new-incoming-tx"
-	EVENT_INCOMING_TX_CONFIRMED           = "incoming-tx-confirmed"
+	NewAddressEvent          EventType = "new-address"
+	CheckTxStatusEvent                 = "check-tx-status"
+	NewIncomingTxEvent                 = "new-incoming-tx"
+	IncomingTxConfirmedEvent           = "incoming-tx-confirmed"
 )
 
 type notification struct {
@@ -63,7 +63,7 @@ func notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
 }
 
 func Notify(eventType EventType, data interface{}) {
-	if eventType == EVENT_CHECK_TX_STATUS {
+	if eventType == CheckTxStatusEvent {
 		notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}

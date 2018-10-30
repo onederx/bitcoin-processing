@@ -26,9 +26,9 @@ func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
 
 	for i := tx.reportedConfirmations + 1; i <= confirmationsToNotify; i++ {
 		if i == 0 {
-			eventType = events.EVENT_NEW_INCOMING_TX
+			eventType = events.NewIncomingTxEvent
 		} else {
-			eventType = events.EVENT_INCOMING_TX_CONFIRMED
+			eventType = events.IncomingTxConfirmedEvent
 		}
 		account := storage.GetAccountByAddress(tx.Address)
 		if account == nil {
@@ -59,7 +59,7 @@ func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
 func notifyTransaction(tx *Transaction) {
 	confirmationsToNotify := util.Min64(tx.Confirmations, maxConfirmations)
 
-	if tx.Direction == DIRECTION_INCOMING {
+	if tx.Direction == IncomingDirection {
 		notifyIncomingTransaction(tx, confirmationsToNotify)
 	}
 }

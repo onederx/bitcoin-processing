@@ -10,9 +10,9 @@ import (
 type TransactionDirection string
 
 const (
-	DIRECTION_INCOMING TransactionDirection = "incoming"
-	DIRECTION_OUTGOING                      = "outgoing"
-	DIRECTION_UNKNOWN                       = "unknown"
+	IncomingDirection TransactionDirection = "incoming"
+	OutgoingDirection                      = "outgoing"
+	UnknownDirection                       = "unknown"
 )
 
 type Transaction struct {
@@ -45,16 +45,16 @@ func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult)
 func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transaction {
 	var direction TransactionDirection
 	if btcNodeTransaction.Category == "receive" {
-		direction = DIRECTION_INCOMING
+		direction = IncomingDirection
 	} else if btcNodeTransaction.Category == "send" {
-		direction = DIRECTION_OUTGOING
+		direction = OutgoingDirection
 	} else {
 		log.Printf(
 			"Warning: unexpected transaction category %s for tx %s",
 			btcNodeTransaction.Category,
 			btcNodeTransaction.TxID,
 		)
-		direction = DIRECTION_UNKNOWN
+		direction = UnknownDirection
 	}
 
 	return &Transaction{
