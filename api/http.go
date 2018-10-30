@@ -22,10 +22,7 @@ func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 	if err = json.Unmarshal(body, &metainfo); err != nil {
 		panic(err)
 	}
-	account := wallet.Account{
-		Address:  wallet.GenerateNewAddress(),
-		Metainfo: metainfo,
-	}
+	account := wallet.CreateAccount(metainfo)
 	if responseBody, err = json.Marshal(account); err != nil {
 		panic(err)
 	}
