@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type transactionNotification struct {
+type TransactionNotification struct {
 	Transaction
 	AccountMetainfo map[string]interface{} `json:"metainfo"`
 }
@@ -44,7 +44,7 @@ func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
 		}
 		// make a copy of tx here, otherwise it may get modified while
 		// other goroutines process notification
-		notification := transactionNotification{
+		notification := TransactionNotification{
 			*tx,
 			accountMetainfo,
 		}

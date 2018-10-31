@@ -6,10 +6,10 @@ import (
 	"sync"
 )
 
-type storedEvent = notificationWithSeq
+type storedEvent = NotificationWithSeq
 
 type EventStorage interface {
-	StoreEvent(event notification) *storedEvent
+	StoreEvent(event Notification) *storedEvent
 	GetEventsFromSeq(seq int) []*storedEvent
 }
 
@@ -20,7 +20,7 @@ type InMemoryEventStorage struct {
 	events []*storedEvent
 }
 
-func (s *InMemoryEventStorage) StoreEvent(event notification) *storedEvent {
+func (s *InMemoryEventStorage) StoreEvent(event Notification) *storedEvent {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	eventWithSeq := &storedEvent{event, len(s.events)}

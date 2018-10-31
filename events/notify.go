@@ -9,22 +9,41 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
-type EventType string
+type EventType int
 
 const (
-	NewAddressEvent          EventType = "new-address"
-	CheckTxStatusEvent                 = "check-tx-status"
-	NewIncomingTxEvent                 = "new-incoming-tx"
-	IncomingTxConfirmedEvent           = "incoming-tx-confirmed"
+	NewAddressEvent EventType = iota
+	CheckTxStatusEvent
+	NewIncomingTxEvent
+	IncomingTxConfirmedEvent
 )
 
-type notification struct {
+func (et EventType) String() string {
+	switch et {
+	case NewAddressEvent:
+		return "new-address"
+	case CheckTxStatusEvent:
+		return "check-tx-status"
+	case NewIncomingTxEvent:
+		return "new-incoming-tx"
+	case IncomingTxConfirmedEvent:
+		return "incoming-tx-confirmed"
+	default:
+		return "invalid"
+	}
+}
+
+func (e EventType) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + e.String() + "\""), nil
+}
+
+type Notification struct {
 	Type EventType   `json:"type"`
 	Data interface{} `json:"data"`
 }
 
-type notificationWithSeq struct {
-	notification
+type NotificationWithSeq struct {
+	Notification
 	Seq int `json:"seq"`
 }
 
@@ -38,7 +57,7 @@ func init() {
 
 func notifyHTTPCallback(eventType EventType, data string) {
 	callbackUrl := settings.GetURL("tx-callback")
-	notificationJSON, err := json.Marshal(notification{eventType, data})
+	notificationJSON, err := json.Marshal(Notification{eventType, data})
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for webhook", err)
 		return
@@ -67,9 +86,17 @@ func Notify(eventType EventType, data interface{}) {
 		notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}
-	notificationData := storage.StoreEvent(notification{eventType, data})
+	notificationData := storage.StoreEvent(Notification{eventType, data})
 
-	notificationJSON, err := json.Marshal(notificationData)
+	notificationJSON, err := json.Marshal(struct {
+		Type EventType    `json:"type"`
+		Data *interface{} `json:"data"`
+		Seq  int          `json:"seq"`
+	}{
+		Type: notificationData.Type,
+		Data: &notificationData.Data,
+		Seq:  notificationData.Seq,
+	})
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for ws", err)
 		return

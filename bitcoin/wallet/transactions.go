@@ -7,13 +7,30 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type TransactionDirection string
+type TransactionDirection int
 
 const (
-	IncomingDirection TransactionDirection = "incoming"
-	OutgoingDirection                      = "outgoing"
-	UnknownDirection                       = "unknown"
+	IncomingDirection TransactionDirection = iota
+	OutgoingDirection
+	UnknownDirection
 )
+
+func (td TransactionDirection) String() string {
+	switch td {
+	case IncomingDirection:
+		return "incoming"
+	case OutgoingDirection:
+		return "outgoing"
+	case UnknownDirection:
+		return "unknown"
+	default:
+		return "invalid"
+	}
+}
+
+func (td TransactionDirection) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + td.String() + "\""), nil
+}
 
 type Transaction struct {
 	Id            uuid.UUID            `json:"id"`
