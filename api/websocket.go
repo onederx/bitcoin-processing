@@ -6,21 +6,13 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-
-	"github.com/onederx/bitcoin-processing/events"
 )
-
-type client struct {
-	conn *websocket.Conn
-	isOk bool
-}
 
 type subscribeMessage struct {
 	Seq int
 }
 
 var upgrader = websocket.Upgrader{} // use default options
-var clients []*client
 
 func shutdownConnection(conn *websocket.Conn) {
 	err := conn.WriteMessage(
@@ -52,7 +44,7 @@ func readSeqFromClient(conn *websocket.Conn) (subscribeMessage, error) {
 	return decodedMessage, nil
 }
 
-func handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
+func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
 	log.Print("Got new websocket subscriber")
 	conn, err := upgrader.Upgrade(w, r, nil)
 
@@ -71,8 +63,8 @@ func handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
 
 	log.Print("Subscriber requested messages from seq ", subscribeMessage.Seq)
 
-	eventQueue := events.SubscribeFromSeq(subscribeMessage.Seq)
-	defer events.Unsubscribe(eventQueue)
+	eventQueue := s.eventBroker.SubscribeFromSeq(subscribeMessage.Seq)
+	defer s.eventBroker.Unsubscribe(eventQueue)
 
 	clientClosedConnection := make(chan struct{})
 
@@ -119,6 +111,7 @@ func handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initWebsocketAPIServer() {
-	http.HandleFunc("/ws", handleWebsocketConnection)
+func (s *APIServer) initWebsocketAPIServer() {
+	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
+	requestDispatcher.HandleFunc("/ws", s.handleWebsocketConnection)
 }

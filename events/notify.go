@@ -47,22 +47,32 @@ type NotificationWithSeq struct {
 	Seq int `json:"seq"`
 }
 
-var eventBroadcaster *broadcasterWithStorage
-var ExternalTxNotifications chan string
-
-func init() {
-	ExternalTxNotifications = make(chan string, channelSize)
+type EventBroker struct {
+	storage                 EventStorage
+	eventBroadcaster        *broadcasterWithStorage
+	ExternalTxNotifications chan string
+	callbackUrl             string
 }
 
-func notifyHTTPCallback(eventType EventType, data string) {
-	callbackUrl := settings.GetURL("tx-callback")
+func NewEventBroker() *EventBroker {
+	storageType := settings.GetStringMandatory("storage.type")
+	storage := newEventStorage(storageType)
+	return &EventBroker{
+		storage:                 storage,
+		eventBroadcaster:        newBroadcasterWithStorage(storage),
+		ExternalTxNotifications: make(chan string, channelSize),
+		callbackUrl:             settings.GetURL("transaction.callback"),
+	}
+}
+
+func (e *EventBroker) notifyHTTPCallback(eventType EventType, data string) {
 	notificationJSON, err := json.Marshal(Notification{eventType, data})
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for webhook", err)
 		return
 	}
 	resp, err := http.Post(
-		callbackUrl,
+		e.callbackUrl,
 		"application/json",
 		bytes.NewReader(notificationJSON),
 	)
@@ -73,35 +83,31 @@ func notifyHTTPCallback(eventType EventType, data string) {
 	}
 }
 
-func notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
+func (e *EventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
 	select {
-	case ExternalTxNotifications <- data:
+	case e.ExternalTxNotifications <- data:
 	default:
 	}
 }
 
-func Notify(eventType EventType, data interface{}) {
+func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 	if eventType == CheckTxStatusEvent {
-		notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
+		e.notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}
-	notificationData := storage.StoreEvent(Notification{eventType, data})
+	notificationData := e.storage.StoreEvent(Notification{eventType, data})
 
-	eventBroadcaster.Broadcast(notificationData)
+	e.eventBroadcaster.Broadcast(notificationData)
 }
 
-func Subscribe() <-chan *NotificationWithSeq {
-	return eventBroadcaster.Subscribe()
+func (e *EventBroker) Subscribe() <-chan *NotificationWithSeq {
+	return e.eventBroadcaster.Subscribe()
 }
 
-func SubscribeFromSeq(seq int) <-chan *NotificationWithSeq {
-	return eventBroadcaster.SubscribeFromSeq(seq)
+func (e *EventBroker) SubscribeFromSeq(seq int) <-chan *NotificationWithSeq {
+	return e.eventBroadcaster.SubscribeFromSeq(seq)
 }
 
-func Unsubscribe(eventChannel <-chan *NotificationWithSeq) {
-	eventBroadcaster.Unsubscribe(eventChannel)
-}
-
-func Start() {
-	initStorage()
+func (e *EventBroker) Unsubscribe(eventChannel <-chan *NotificationWithSeq) {
+	e.eventBroadcaster.Unsubscribe(eventChannel)
 }

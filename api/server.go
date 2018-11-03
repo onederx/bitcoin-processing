@@ -3,13 +3,35 @@ package api
 import (
 	"log"
 	"net/http"
+
+	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
-func RunAPIServer(listenAddress string) {
-	log.Printf("Starting API server on %s", listenAddress)
+type APIServer struct {
+	wallet        *wallet.Wallet
+	eventBroker   *events.EventBroker
+	listenAddress string
+	httpServer    *http.Server
+}
 
-	initHTTPAPIServer()
-	initWebsocketAPIServer()
+func NewAPIServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker *events.EventBroker) *APIServer {
+	httpServer := &http.Server{
+		Addr:    listenAddress,
+		Handler: http.NewServeMux(),
+	}
+	server := &APIServer{
+		wallet:        btcWallet,
+		eventBroker:   eventBroker,
+		listenAddress: listenAddress,
+		httpServer:    httpServer,
+	}
+	server.initHTTPAPIServer()
+	server.initWebsocketAPIServer()
+	return server
+}
 
-	log.Fatal(http.ListenAndServe(listenAddress, nil))
+func (s *APIServer) Run() {
+	log.Printf("Starting API server on %s", s.listenAddress)
+	log.Fatal(s.httpServer.ListenAndServe())
 }

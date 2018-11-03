@@ -11,11 +11,17 @@ import (
 func main() {
 	settings.ReadSettingsAndRun(func() {
 
-		nodeapi.InitBTCRPC()
+		nodeAPI := nodeapi.NewNodeAPI()
+		eventBroker := events.NewEventBroker()
+		bitcoinWallet := wallet.NewWallet(nodeAPI, eventBroker)
+		apiServer := api.NewAPIServer(
+			settings.GetString("api.http.address"),
+			bitcoinWallet,
+			eventBroker,
+		)
 
-		go events.Start()
-		go api.RunAPIServer(settings.GetString("api.http.address"))
-		go wallet.Start()
+		go apiServer.Run()
+		go bitcoinWallet.Run()
 
 		select {}
 	})

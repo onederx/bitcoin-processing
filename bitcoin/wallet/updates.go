@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/onederx/bitcoin-processing/util"
@@ -14,13 +13,9 @@ type TransactionNotification struct {
 	AccountMetainfo map[string]interface{} `json:"metainfo"`
 }
 
-var unknownAccountError = map[string]interface{}{
-	"error": "account not found",
-}
+var unknownAccountError = map[string]interface{}{"error": "account not found"}
 
-var maxConfirmations int64
-
-func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
+func (w *Wallet) notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
 	var eventType events.EventType
 	var accountMetainfo map[string]interface{}
 
@@ -30,7 +25,7 @@ func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
 		} else {
 			eventType = events.IncomingTxConfirmedEvent
 		}
-		account := storage.GetAccountByAddress(tx.Address)
+		account := w.storage.GetAccountByAddress(tx.Address)
 		if account == nil {
 			log.Printf(
 				"Error: failed to match account by address %s "+
@@ -50,28 +45,28 @@ func notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
 		}
 		notification.Confirmations = i // Send confirmations sequentially
 
-		events.Notify(eventType, notification)
-		storage.updateReportedConfirmations(tx, i)
+		w.eventBroker.Notify(eventType, notification)
+		w.storage.updateReportedConfirmations(tx, i)
 	}
 
 }
 
-func notifyTransaction(tx *Transaction) {
-	confirmationsToNotify := util.Min64(tx.Confirmations, maxConfirmations)
+func (w *Wallet) notifyTransaction(tx *Transaction) {
+	confirmationsToNotify := util.Min64(tx.Confirmations, w.maxConfirmations)
 
 	if tx.Direction == IncomingDirection {
-		notifyIncomingTransaction(tx, confirmationsToNotify)
+		w.notifyIncomingTransaction(tx, confirmationsToNotify)
 	}
 }
 
-func updateTxInfo(tx *Transaction) {
-	tx = storage.StoreTransaction(tx)
-	notifyTransaction(tx)
+func (w *Wallet) updateTxInfo(tx *Transaction) {
+	tx = w.storage.StoreTransaction(tx)
+	w.notifyTransaction(tx)
 }
 
-func checkForNewTransactions() {
-	lastSeenBlock := storage.GetLastSeenBlockHash()
-	lastTxData, err := nodeapi.ListTransactionsSinceBlock(lastSeenBlock)
+func (w *Wallet) checkForNewTransactions() {
+	lastSeenBlock := w.storage.GetLastSeenBlockHash()
+	lastTxData, err := w.nodeAPI.ListTransactionsSinceBlock(lastSeenBlock)
 	if err != nil {
 		log.Print("Error: Checking for wallet updates failed: ", err)
 		return
@@ -86,16 +81,18 @@ func checkForNewTransactions() {
 	}
 	for _, btcNodeTransaction := range lastTxData.Transactions {
 		tx := newTransaction(&btcNodeTransaction)
-		updateTxInfo(tx)
+		w.updateTxInfo(tx)
 	}
-	storage.SetLastSeenBlockHash(lastTxData.LastBlock)
+	w.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
 }
 
-func checkForExistingTransactionUpdates() {
-	transactionsToCheck := storage.GetTransactionsWithLessConfirmations(maxConfirmations)
+func (w *Wallet) checkForExistingTransactionUpdates() {
+	transactionsToCheck := w.storage.GetTransactionsWithLessConfirmations(
+		w.maxConfirmations,
+	)
 
 	for _, tx := range transactionsToCheck {
-		fullTxInfo, err := nodeapi.GetTransaction(tx.Hash)
+		fullTxInfo, err := w.nodeAPI.GetTransaction(tx.Hash)
 
 		if err != nil {
 			log.Printf(
@@ -105,28 +102,27 @@ func checkForExistingTransactionUpdates() {
 			continue
 		}
 		tx.updateFromFullTxInfo(fullTxInfo)
-		updateTxInfo(tx)
+		w.updateTxInfo(tx)
 	}
 }
 
-func checkForWalletUpdates() {
-	checkForNewTransactions()
-	checkForExistingTransactionUpdates()
+func (w *Wallet) checkForWalletUpdates() {
+	w.checkForNewTransactions()
+	w.checkForExistingTransactionUpdates()
 }
 
-func pollWalletUpdates() {
+func (w *Wallet) pollWalletUpdates() {
 	pollInterval := time.Duration(settings.GetInt("bitcoin.poll-interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
 	for {
 		select {
 		case <-ticker:
-		case <-events.ExternalTxNotifications:
+		case <-w.eventBroker.ExternalTxNotifications:
 		}
-		checkForWalletUpdates()
+		w.checkForWalletUpdates()
 	}
 }
 
-func startWatchingWalletUpdates() {
-	maxConfirmations = int64(settings.GetInt("transaction.max-confirmations"))
-	pollWalletUpdates()
+func (w *Wallet) startWatchingWalletUpdates() {
+	w.pollWalletUpdates()
 }

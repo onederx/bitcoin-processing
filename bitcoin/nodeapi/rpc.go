@@ -12,15 +12,15 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
-var (
+type NodeAPI struct {
 	btcrpc *rpcclient.Client
-)
-
-func CreateNewAddress() (btcutil.Address, error) {
-	return btcrpc.GetNewAddress("")
 }
 
-func ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error) {
+func (n *NodeAPI) CreateNewAddress() (btcutil.Address, error) {
+	return n.btcrpc.GetNewAddress("")
+}
+
+func (n *NodeAPI) ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error) {
 	var blockHashInChainhashFormat *chainhash.Hash
 	var err error
 
@@ -36,10 +36,10 @@ func ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult
 		}
 	}
 
-	return btcrpc.ListSinceBlock(blockHashInChainhashFormat)
+	return n.btcrpc.ListSinceBlock(blockHashInChainhashFormat)
 }
 
-func GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
+func (n *NodeAPI) GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
 	var txHashInChainhashFormat *chainhash.Hash
 	var err error
 
@@ -51,11 +51,11 @@ func GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
 		)
 	}
 
-	return btcrpc.GetTransaction(txHashInChainhashFormat)
+	return n.btcrpc.GetTransaction(txHashInChainhashFormat)
 }
 
-func GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
-	transaction, err := GetTransaction(hash)
+func (n *NodeAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
+	transaction, err := n.GetTransaction(hash)
 
 	if err != nil {
 		return nil, err
@@ -64,10 +64,10 @@ func GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return btcrpc.DecodeRawTransaction(rawTxBytes)
+	return n.btcrpc.DecodeRawTransaction(rawTxBytes)
 }
 
-func InitBTCRPC() {
+func NewNodeAPI() *NodeAPI {
 	// prepare bitcoind RPC connection
 	// Connect to remote bitcoin core RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
@@ -80,13 +80,16 @@ func InitBTCRPC() {
 	// Notice the notification parameter is nil since notifications are
 	// not supported in HTTP POST mode.
 	var err error
-	btcrpc, err = rpcclient.New(connCfg, nil)
+	btcrpc, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	blockCount, err := btcrpc.GetBlockCount()
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("Testing Bitcoin node connection: block count = %d", blockCount)
+
+	return &NodeAPI{btcrpc}
 }

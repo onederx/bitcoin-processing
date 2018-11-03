@@ -7,11 +7,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
 
-func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
+func (s *APIServer) newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 	var metainfo map[string]interface{}
 	var body, responseBody []byte
 	var err error
@@ -22,20 +21,21 @@ func newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 	if err = json.Unmarshal(body, &metainfo); err != nil {
 		panic(err)
 	}
-	account := wallet.CreateAccount(metainfo)
+	account := s.wallet.CreateAccount(metainfo)
 	if responseBody, err = json.Marshal(account); err != nil {
 		panic(err)
 	}
-	events.Notify(events.NewAddressEvent, account)
+	s.eventBroker.Notify(events.NewAddressEvent, account)
 	response.Write(responseBody)
 }
 
-func notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
-	events.Notify(events.CheckTxStatusEvent, "")
+func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
+	s.eventBroker.Notify(events.CheckTxStatusEvent, "")
 }
 
-func handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
-	http.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
+func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
+	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
+	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Printf("Caught error handling '%s' %s", urlPattern, err)
@@ -51,7 +51,7 @@ func handle(urlPattern, method string, handler func(http.ResponseWriter, *http.R
 	})
 }
 
-func initHTTPAPIServer() {
-	handle("/new-address", "", newBitcoinAddress)
-	handle("/notify-wallet", "", notifyWalletTxStatusChanged)
+func (s *APIServer) initHTTPAPIServer() {
+	s.handle("/new-address", "", s.newBitcoinAddress)
+	s.handle("/notify-wallet", "", s.notifyWalletTxStatusChanged)
 }

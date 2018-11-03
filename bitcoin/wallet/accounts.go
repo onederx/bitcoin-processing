@@ -1,16 +1,12 @@
 package wallet
 
-import (
-	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
-)
-
 type Account struct {
 	Address  string                 `json:"address"`
 	Metainfo map[string]interface{} `json:"metainfo"`
 }
 
-func generateNewAddress() string {
-	address, err := nodeapi.CreateNewAddress()
+func (w *Wallet) generateNewAddress() string {
+	address, err := w.nodeAPI.CreateNewAddress()
 	if err != nil {
 		panic(err)
 	}
@@ -18,11 +14,11 @@ func generateNewAddress() string {
 	return addressStr
 }
 
-func CreateAccount(metainfo map[string]interface{}) *Account {
+func (w *Wallet) CreateAccount(metainfo map[string]interface{}) *Account {
 	account := &Account{
-		Address:  generateNewAddress(),
+		Address:  w.generateNewAddress(),
 		Metainfo: metainfo,
 	}
-	storage.StoreAccount(account)
+	w.storage.StoreAccount(account)
 	return account
 }

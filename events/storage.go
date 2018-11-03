@@ -1,7 +1,6 @@
 package events
 
 import (
-	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/onederx/bitcoin-processing/util"
 	"log"
 	"sync"
@@ -13,8 +12,6 @@ type EventStorage interface {
 	StoreEvent(event Notification) *storedEvent
 	GetEventsFromSeq(seq int) []*storedEvent
 }
-
-var storage EventStorage
 
 type InMemoryEventStorage struct {
 	mutex  *sync.Mutex
@@ -35,16 +32,14 @@ func (s *InMemoryEventStorage) GetEventsFromSeq(seq int) []*storedEvent {
 	return s.events[util.Min(seq, len(s.events)):]
 }
 
-func initStorage() {
-	storageType := settings.GetStringMandatory("storage.type")
-
+func newEventStorage(storageType string) EventStorage {
 	if storageType == "memory" {
-		storage = &InMemoryEventStorage{
+		return &InMemoryEventStorage{
 			mutex:  &sync.Mutex{},
 			events: make([]*storedEvent, 0),
 		}
 	} else {
 		log.Fatal("Error: unsupported storage type", storageType)
+		return nil
 	}
-	eventBroadcaster = newBroadcasterWithStorage(storage)
 }

@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/satori/go.uuid"
 	"log"
 )
@@ -17,8 +16,6 @@ type WalletStorage interface {
 	GetAccountByAddress(address string) *Account
 	StoreAccount(account *Account)
 }
-
-var storage WalletStorage
 
 type InMemoryWalletStorage struct {
 	lastSeenBlockHash string
@@ -84,15 +81,14 @@ func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transac
 	storedTransaction.reportedConfirmations = reportedConfirmations
 }
 
-func initStorage() {
-	storageType := settings.GetStringMandatory("storage.type")
-
+func newStorage(storageType string) WalletStorage {
 	if storageType == "memory" {
-		storage = &InMemoryWalletStorage{
+		return &InMemoryWalletStorage{
 			accounts:     make([]*Account, 0),
 			transactions: make([]*Transaction, 0),
 		}
 	} else {
 		log.Fatal("Error: unsupported storage type", storageType)
+		return nil
 	}
 }
