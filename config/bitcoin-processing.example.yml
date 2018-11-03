@@ -4,7 +4,11 @@ api:
   http:
     address: 127.0.0.1:8000
 storage:
-  type: memory
+  type: postgres
+  dsn: >
+    host=127.0.0.1 dbname=bitcoin_processing
+    user=bitcoin_processing password=TEST_DATABASE_PASSWORD
+    sslmode=disable
 bitcoin:
   node:
     # these are credentials for regtest node from test stand (stand is in tools/regtest)
