@@ -43,7 +43,7 @@ func (s *PostgresEventStorage) StoreEvent(event Notification) (*storedEvent, err
 		return nil, err
 	}
 	// XXX: warning: seq can have gaps in case of rollback
-	err = s.db.QueryRow(`INSERT INTO bitcoin_processing_events (type, data)
+	err = s.db.QueryRow(`INSERT INTO events (type, data)
         VALUES ($1, $2) RETURNING seq`, event.Type.String(), eventDataJSON,
 	).Scan(&seq)
 	if err != nil {
@@ -59,7 +59,7 @@ func (s *PostgresEventStorage) GetEventsFromSeq(seq int) ([]*storedEvent, error)
 
 	result := make([]*storedEvent, 0, 20)
 
-	rows, err := s.db.Query(`SELECT seq, type, data FROM bitcoin_processing_events
+	rows, err := s.db.Query(`SELECT seq, type, data FROM events
         WHERE seq >= $1`, seq,
 	)
 	if err != nil {
