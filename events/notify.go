@@ -9,44 +9,6 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
-type EventType int
-
-const (
-	NewAddressEvent EventType = iota
-	CheckTxStatusEvent
-	NewIncomingTxEvent
-	IncomingTxConfirmedEvent
-)
-
-func (et EventType) String() string {
-	switch et {
-	case NewAddressEvent:
-		return "new-address"
-	case CheckTxStatusEvent:
-		return "check-tx-status"
-	case NewIncomingTxEvent:
-		return "new-incoming-tx"
-	case IncomingTxConfirmedEvent:
-		return "incoming-tx-confirmed"
-	default:
-		return "invalid"
-	}
-}
-
-func (e EventType) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + e.String() + "\""), nil
-}
-
-type Notification struct {
-	Type EventType   `json:"type"`
-	Data interface{} `json:"data"`
-}
-
-type NotificationWithSeq struct {
-	Notification
-	Seq int `json:"seq"`
-}
-
 type EventBroker struct {
 	storage                 EventStorage
 	eventBroadcaster        *broadcasterWithStorage
