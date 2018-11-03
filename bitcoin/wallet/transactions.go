@@ -7,6 +7,8 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+const SatoshisInBTC = 100000000
+
 type TransactionDirection int
 
 const (
@@ -57,6 +59,7 @@ type Transaction struct {
 	Confirmations int64                `json:"confirmations"`
 	Address       string               `json:"address"`
 	Direction     TransactionDirection `json:"direction"`
+	Amount        uint64               `json:"amount"` // satoshis
 
 	reportedConfirmations int64
 }
@@ -92,12 +95,15 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		direction = UnknownDirection
 	}
 
+	satoshis := uint64(btcNodeTransaction.Amount * SatoshisInBTC)
+
 	return &Transaction{
 		Hash:                  btcNodeTransaction.TxID,
 		BlockHash:             btcNodeTransaction.BlockHash,
 		Confirmations:         btcNodeTransaction.Confirmations,
 		Address:               btcNodeTransaction.Address,
 		Direction:             direction,
+		Amount:                satoshis,
 		reportedConfirmations: -1,
 	}
 }

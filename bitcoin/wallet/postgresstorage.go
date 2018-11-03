@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
-	"strconv"
 
 	"github.com/satori/go.uuid"
 
@@ -65,6 +64,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 	var id uuid.UUID
 	var hash, blockHash, address, direction string
 	var confirmations, reportedConfirmations int64
+	var amount uint64
 
 	err := row.Scan(
 		&id,
@@ -73,6 +73,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		&confirmations,
 		&address,
 		&direction,
+		&amount,
 		&reportedConfirmations,
 	)
 
@@ -86,6 +87,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		Confirmations:         confirmations,
 		Address:               address,
 		Direction:             TransactionDirectionFromString(direction),
+		Amount:                amount,
 		reportedConfirmations: reportedConfirmations,
 	}
 	return tx, nil
@@ -93,7 +95,8 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 
 func (s *PostgresWalletStorage) GetTransaction(hash string) (*Transaction, error) {
 	row := s.db.QueryRow(`SELECT id, hash, block_hash, confirmations, address,
-		direction, reported_confirmations FROM transactions WHERE hash = $1`,
+		direction, amount, reported_confirmations
+		FROM transactions WHERE hash = $1`,
 		hash,
 	)
 	return transactionFromDatabaseRow(row)
@@ -101,7 +104,8 @@ func (s *PostgresWalletStorage) GetTransaction(hash string) (*Transaction, error
 
 func (s *PostgresWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, error) {
 	row := s.db.QueryRow(`SELECT id, hash, block_hash, confirmations, address,
-		direction, reported_confirmations FROM transactions WHERE id = $1`,
+		direction, amount, reported_confirmations
+		FROM transactions WHERE id = $1`,
 		id,
 	)
 	return transactionFromDatabaseRow(row)
@@ -126,14 +130,15 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		log.Printf("New tx %s", transaction.Hash)
 		transaction.Id = uuid.Must(uuid.NewV4())
 		_, err := s.db.Exec(`INSERT INTO transactions (id, hash, block_hash,
-			confirmations, address, direction, reported_confirmations)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			confirmations, address, direction, amount, reported_confirmations)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 			transaction.Id,
 			transaction.Hash,
 			transaction.BlockHash,
 			transaction.Confirmations,
 			transaction.Address,
 			transaction.Direction.String(),
+			transaction.Amount,
 			transaction.reportedConfirmations,
 		)
 		if err != nil {
@@ -185,7 +190,7 @@ func (s *PostgresWalletStorage) GetTransactionsWithLessConfirmations(confirmatio
 	result := make([]*Transaction, 0, 20)
 
 	rows, err := s.db.Query(`SELECT id, hash, block_hash, confirmations,
-		address, direction, reported_confirmations FROM transactions
+		address, direction, amount, reported_confirmations FROM transactions
         WHERE confirmations < $1`, confirmations,
 	)
 	if err != nil {
@@ -208,23 +213,11 @@ func (s *PostgresWalletStorage) GetTransactionsWithLessConfirmations(confirmatio
 }
 
 func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error {
-	storedTransaction, err := s.GetTransactionById(transaction.Id)
-	if err != nil {
-		return err
-	}
-	if reportedConfirmations < storedTransaction.reportedConfirmations {
-		panic(
-			"Error: tried to lower reported confirmations count for tx " +
-				transaction.Hash + " from " +
-				strconv.FormatInt(transaction.reportedConfirmations, 10) + " to " +
-				strconv.FormatInt(reportedConfirmations, 10),
-		)
-	}
-	_, err = s.db.Exec(`UPDATE transactions SET reported_confirmations = $1
+	_, err := s.db.Exec(`UPDATE transactions SET reported_confirmations = $1
 		WHERE id = $2`, reportedConfirmations, transaction.Id)
 	if err != nil {
 		return err
 	}
-	storedTransaction.reportedConfirmations = reportedConfirmations
+	transaction.reportedConfirmations = reportedConfirmations
 	return nil
 }

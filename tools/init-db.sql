@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     confirmations bigint,
     address TEXT,
     direction TEXT,
+    amount bigint, -- satoshis
     reported_confirmations bigint
 );
 
