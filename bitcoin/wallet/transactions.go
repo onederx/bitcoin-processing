@@ -13,19 +13,37 @@ const (
 	IncomingDirection TransactionDirection = iota
 	OutgoingDirection
 	UnknownDirection
+	InvalidDirection
 )
 
-func (td TransactionDirection) String() string {
-	switch td {
-	case IncomingDirection:
-		return "incoming"
-	case OutgoingDirection:
-		return "outgoing"
-	case UnknownDirection:
-		return "unknown"
-	default:
-		return "invalid"
+var transactionDirectionToStringMap map[TransactionDirection]string = map[TransactionDirection]string{
+	IncomingDirection: "incoming",
+	OutgoingDirection: "outgoing",
+	UnknownDirection:  "unknown",
+}
+
+var stringToTransactionDirectionMap map[string]TransactionDirection = make(map[string]TransactionDirection)
+
+func init() {
+	for txDirection, txDirectionStr := range transactionDirectionToStringMap {
+		stringToTransactionDirectionMap[txDirectionStr] = txDirection
 	}
+}
+
+func (td TransactionDirection) String() string {
+	tdStr, ok := transactionDirectionToStringMap[td]
+	if ok {
+		return tdStr
+	}
+	return "invalid"
+}
+
+func TransactionDirectionFromString(txDirectionStr string) TransactionDirection {
+	td, ok := stringToTransactionDirectionMap[txDirectionStr]
+	if ok {
+		return td
+	}
+	return InvalidDirection
 }
 
 func (td TransactionDirection) MarshalJSON() ([]byte, error) {
