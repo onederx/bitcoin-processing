@@ -47,12 +47,11 @@ type NotificationWithSeq struct {
 	Seq int `json:"seq"`
 }
 
-var EventQueue chan []byte
+var eventBroadcaster *broadcasterWithStorage
 var ExternalTxNotifications chan string
 
 func init() {
-	EventQueue = make(chan []byte)
-	ExternalTxNotifications = make(chan string)
+	ExternalTxNotifications = make(chan string, channelSize)
 }
 
 func notifyHTTPCallback(eventType EventType, data string) {
@@ -88,20 +87,19 @@ func Notify(eventType EventType, data interface{}) {
 	}
 	notificationData := storage.StoreEvent(Notification{eventType, data})
 
-	notificationJSON, err := json.Marshal(struct {
-		Type EventType    `json:"type"`
-		Data *interface{} `json:"data"`
-		Seq  int          `json:"seq"`
-	}{
-		Type: notificationData.Type,
-		Data: &notificationData.Data,
-		Seq:  notificationData.Seq,
-	})
-	if err != nil {
-		log.Printf("Error: could not json-encode notification for ws", err)
-		return
-	}
-	EventQueue <- notificationJSON
+	eventBroadcaster.Broadcast(notificationData)
+}
+
+func Subscribe() <-chan *NotificationWithSeq {
+	return eventBroadcaster.Subscribe()
+}
+
+func SubscribeFromSeq(seq int) <-chan *NotificationWithSeq {
+	return eventBroadcaster.SubscribeFromSeq(seq)
+}
+
+func Unsubscribe(eventChannel <-chan *NotificationWithSeq) {
+	eventBroadcaster.Unsubscribe(eventChannel)
 }
 
 func Start() {

@@ -2,6 +2,7 @@ package events
 
 import (
 	"github.com/onederx/bitcoin-processing/settings"
+	"github.com/onederx/bitcoin-processing/util"
 	"log"
 	"sync"
 )
@@ -31,7 +32,7 @@ func (s *InMemoryEventStorage) StoreEvent(event Notification) *storedEvent {
 func (s *InMemoryEventStorage) GetEventsFromSeq(seq int) []*storedEvent {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.events[seq:]
+	return s.events[util.Min(seq, len(s.events)):]
 }
 
 func initStorage() {
@@ -45,4 +46,5 @@ func initStorage() {
 	} else {
 		log.Fatal("Error: unsupported storage type", storageType)
 	}
+	eventBroadcaster = newBroadcasterWithStorage(storage)
 }
