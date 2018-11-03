@@ -1,6 +1,7 @@
 package events
 
 import (
+	"log"
 	"sync"
 )
 
@@ -145,7 +146,12 @@ func (b *broadcasterWithStorage) SubscribeFromSeq(seq int) <-chan broadcastedEve
 	eventsFromStorage := make(chan []broadcastedEvent)
 
 	go func() {
-		eventsFromStorage <- b.storage.GetEventsFromSeq(seq)
+		events, err := b.storage.GetEventsFromSeq(seq)
+		if err != nil {
+			log.Printf("Error: failed to get events from storage: %s", err)
+			eventsFromStorage <- make([]broadcastedEvent, 0)
+		}
+		eventsFromStorage <- events
 	}()
 
 waitingForStorage:

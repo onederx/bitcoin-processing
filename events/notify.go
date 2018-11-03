@@ -95,7 +95,17 @@ func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 		e.notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}
-	notificationData := e.storage.StoreEvent(Notification{eventType, data})
+	notificationData, err := e.storage.StoreEvent(Notification{eventType, data})
+
+	if err != nil {
+		log.Printf(
+			"Error: failed to store event type %s with data %v: %s",
+			eventType.String(),
+			data,
+			err,
+		)
+		return // TODO: do not send event to subscribers? Maybe send with seq = -1 ?
+	}
 
 	e.eventBroadcaster.Broadcast(notificationData)
 }
