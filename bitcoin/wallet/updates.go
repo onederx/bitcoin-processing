@@ -25,8 +25,8 @@ func (w *Wallet) notifyIncomingTransaction(tx *Transaction, confirmationsToNotif
 		} else {
 			eventType = events.IncomingTxConfirmedEvent
 		}
-		account := w.storage.GetAccountByAddress(tx.Address)
-		if account == nil {
+		account, err := w.storage.GetAccountByAddress(tx.Address)
+		if err != nil {
 			log.Printf(
 				"Error: failed to match account by address %s "+
 					"(transaction %s) for incoming payment",
@@ -46,7 +46,15 @@ func (w *Wallet) notifyIncomingTransaction(tx *Transaction, confirmationsToNotif
 		notification.Confirmations = i // Send confirmations sequentially
 
 		w.eventBroker.Notify(eventType, notification)
-		w.storage.updateReportedConfirmations(tx, i)
+		err = w.storage.updateReportedConfirmations(tx, i)
+		if err != nil {
+			log.Printf(
+				"Error: failed to update count of reported transaction "+
+					"confirmations in storage: %s",
+				err,
+			)
+			return
+		}
 	}
 
 }
@@ -60,7 +68,11 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 }
 
 func (w *Wallet) updateTxInfo(tx *Transaction) {
-	tx = w.storage.StoreTransaction(tx)
+	tx, err := w.storage.StoreTransaction(tx)
+	if err != nil {
+		log.Printf("Error: failed to store tx data in database: %s", err)
+		return
+	}
 	w.notifyTransaction(tx)
 }
 
@@ -83,13 +95,27 @@ func (w *Wallet) checkForNewTransactions() {
 		tx := newTransaction(&btcNodeTransaction)
 		w.updateTxInfo(tx)
 	}
-	w.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
+	err = w.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
+	if err != nil {
+		log.Printf(
+			"Error: failed to update last seen block hash in db: %s",
+			err,
+		)
+	}
 }
 
 func (w *Wallet) checkForExistingTransactionUpdates() {
-	transactionsToCheck := w.storage.GetTransactionsWithLessConfirmations(
+	transactionsToCheck, err := w.storage.GetTransactionsWithLessConfirmations(
 		w.maxConfirmations,
 	)
+
+	if err != nil {
+		log.Printf(
+			"Error: failed to fetch transactions from storage for update: %s",
+			err,
+		)
+		return
+	}
 
 	for _, tx := range transactionsToCheck {
 		fullTxInfo, err := w.nodeAPI.GetTransaction(tx.Hash)
