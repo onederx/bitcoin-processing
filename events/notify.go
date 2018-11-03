@@ -22,13 +22,13 @@ func NewEventBroker() *EventBroker {
 	return &EventBroker{
 		storage:                 storage,
 		eventBroadcaster:        newBroadcasterWithStorage(storage),
-		ExternalTxNotifications: make(chan string, channelSize),
+		ExternalTxNotifications: make(chan string, 3),
 		callbackUrl:             settings.GetURL("transaction.callback"),
 	}
 }
 
-func (e *EventBroker) notifyHTTPCallback(eventType EventType, data string) {
-	notificationJSON, err := json.Marshal(Notification{eventType, data})
+func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
+	notificationJSON, err := json.Marshal(event)
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for webhook", err)
 		return
@@ -38,11 +38,11 @@ func (e *EventBroker) notifyHTTPCallback(eventType EventType, data string) {
 		"application/json",
 		bytes.NewReader(notificationJSON),
 	)
-	resp.Body.Close()
-
 	if err != nil {
-		log.Printf("Error calling webhook", err)
+		log.Print("Warning: error calling webhook ", err)
+		return
 	}
+	resp.Body.Close()
 }
 
 func (e *EventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
@@ -70,6 +70,10 @@ func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 	}
 
 	e.eventBroadcaster.Broadcast(notificationData)
+
+	if eventType != NewAddressEvent {
+		e.notifyHTTPCallback(notificationData)
+	}
 }
 
 func (e *EventBroker) Subscribe() <-chan *NotificationWithSeq {
