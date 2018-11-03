@@ -100,7 +100,7 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		default:
 			// maybe client has unsubscribed already
 			// then this is a no-op
-			b.UnsubscribeFromSeq(resultEventChannel)
+			b.unsubscribeFromSeq(resultEventChannel)
 			return
 		}
 
@@ -116,7 +116,7 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		default:
 			// maybe client has unsubscribed already
 			// then this is a no-op
-			b.UnsubscribeFromSeq(resultEventChannel)
+			b.unsubscribeFromSeq(resultEventChannel)
 			return
 		}
 	}
@@ -125,7 +125,7 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		case resultEventChannel <- event:
 
 		default:
-			b.UnsubscribeFromSeq(resultEventChannel)
+			b.unsubscribeFromSeq(resultEventChannel)
 			return
 		}
 	}
@@ -167,7 +167,7 @@ waitingForStorage:
 	return resultEventChannel
 }
 
-func (b *broadcasterWithStorage) UnsubscribeFromSeq(subch <-chan broadcastedEvent) {
+func (b *broadcasterWithStorage) unsubscribeFromSeq(subch <-chan broadcastedEvent) {
 	b.seqM.Lock()
 	defer b.seqM.Unlock()
 
@@ -179,4 +179,19 @@ func (b *broadcasterWithStorage) UnsubscribeFromSeq(subch <-chan broadcastedEven
 
 	b.Unsubscribe(readEventChannel)
 	delete(b.seqSubs, subch)
+}
+
+func (b *broadcasterWithStorage) Unsubscribe(subch <-chan broadcastedEvent) {
+	b.m.Lock()
+
+	ch, ok := b.subs[subch]
+	if !ok {
+		b.m.Unlock()
+		b.unsubscribeFromSeq(subch)
+		return
+	}
+	defer b.m.Unlock()
+
+	close(ch)
+	delete(b.subs, subch)
 }
