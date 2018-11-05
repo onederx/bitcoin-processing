@@ -40,7 +40,9 @@ func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		return existingTransaction, nil
 	}
 	log.Printf("New tx %s", transaction.Hash)
-	transaction.Id = uuid.Must(uuid.NewV4())
+	if transaction.Id == uuid.Nil {
+		transaction.Id = uuid.Must(uuid.NewV4())
+	}
 	s.transactions = append(s.transactions, transaction)
 	return transaction, nil
 }

@@ -132,7 +132,9 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		return existingTransaction, nil
 	case sql.ErrNoRows: // new tx
 		log.Printf("New tx %s", transaction.Hash)
-		transaction.Id = uuid.Must(uuid.NewV4())
+		if transaction.Id == uuid.Nil {
+			transaction.Id = uuid.Must(uuid.NewV4())
+		}
 		_, err := s.db.Exec(`INSERT INTO transactions (id, hash, block_hash,
 			confirmations, address, direction, amount, reported_confirmations)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
