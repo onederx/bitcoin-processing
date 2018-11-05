@@ -46,6 +46,10 @@ func GetInt(key string) int {
 	return viper.GetInt(key)
 }
 
+func GetInt64(key string) int64 {
+	return viper.GetInt64(key)
+}
+
 func GetBool(key string) bool {
 	return viper.GetBool(key)
 }
