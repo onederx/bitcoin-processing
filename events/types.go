@@ -11,6 +11,8 @@ const (
 	CheckTxStatusEvent
 	NewIncomingTxEvent
 	IncomingTxConfirmedEvent
+	NewOutgoingTxEvent
+	OutgoingTxConfirmedEvent
 	InvalidEvent
 )
 
@@ -19,6 +21,8 @@ var eventTypeToStringMap map[EventType]string = map[EventType]string{
 	CheckTxStatusEvent:       "check-tx-status",
 	NewIncomingTxEvent:       "new-incoming-tx",
 	IncomingTxConfirmedEvent: "incoming-tx-confirmed",
+	NewOutgoingTxEvent:       "new-outgoing-tx",
+	OutgoingTxConfirmedEvent: "outgoing-tx-confirmed",
 }
 
 var stringToEventTypeMap map[string]EventType = make(map[string]EventType)
