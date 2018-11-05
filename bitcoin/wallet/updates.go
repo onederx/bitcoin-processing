@@ -84,7 +84,7 @@ func (w *Wallet) checkForNewTransactions() {
 		return
 	}
 
-	if len(lastTxData.Transactions) > 0 || lastTxData.LastBlock != lastSeenBlock {
+	if lastTxData.LastBlock != lastSeenBlock {
 		log.Printf(
 			"Got %d transactions from node. Last block hash is %s",
 			len(lastTxData.Transactions),
