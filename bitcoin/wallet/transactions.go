@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"errors"
 	"log"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -40,12 +41,14 @@ func (td TransactionDirection) String() string {
 	return "invalid"
 }
 
-func TransactionDirectionFromString(txDirectionStr string) TransactionDirection {
+func TransactionDirectionFromString(txDirectionStr string) (TransactionDirection, error) {
 	td, ok := stringToTransactionDirectionMap[txDirectionStr]
 	if ok {
-		return td
+		return td, nil
 	}
-	return InvalidDirection
+	return InvalidDirection, errors.New(
+		"Invalid transaction direction: " + txDirectionStr,
+	)
 }
 
 func (td TransactionDirection) MarshalJSON() ([]byte, error) {

@@ -80,13 +80,17 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
+	transactionDirection, err := TransactionDirectionFromString(direction)
+	if err != nil {
+		return nil, err
+	}
 	tx := &Transaction{
 		Id:                    id,
 		Hash:                  hash,
 		BlockHash:             blockHash,
 		Confirmations:         confirmations,
 		Address:               address,
-		Direction:             TransactionDirectionFromString(direction),
+		Direction:             transactionDirection,
 		Amount:                amount,
 		reportedConfirmations: reportedConfirmations,
 	}
