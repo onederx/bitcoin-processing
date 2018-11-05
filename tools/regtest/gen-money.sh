@@ -1,5 +1,5 @@
 #!/bin/bash -e
 
-node2/bitcoin-cli generate 101
+node2/bitcoin-cli generate 3
 sleep 1
-node3/bitcoin-cli generate 40
+node3/bitcoin-cli generate 110

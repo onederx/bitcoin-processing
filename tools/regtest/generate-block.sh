@@ -6,4 +6,4 @@ if [ -z "$N" ] ; then
     N=1
 fi
 
-node2/bitcoin-cli generate $N
+node3/bitcoin-cli generate $N
