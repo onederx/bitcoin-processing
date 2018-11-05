@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
 
@@ -33,6 +34,22 @@ func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, re
 	s.eventBroker.Notify(events.CheckTxStatusEvent, "")
 }
 
+func (s *APIServer) withdraw(response http.ResponseWriter, request *http.Request) {
+	var req wallet.WithdrawRequest
+	var body []byte
+	var err error
+
+	if body, err = ioutil.ReadAll(request.Body); err != nil {
+		panic(err)
+	}
+	if err = json.Unmarshal(body, &req); err != nil {
+		panic(err)
+	}
+	if err = s.wallet.Withdraw(&req); err != nil {
+		panic(err)
+	}
+}
+
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
@@ -54,4 +71,5 @@ func (s *APIServer) handle(urlPattern, method string, handler func(http.Response
 func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/new-address", "", s.newBitcoinAddress)
 	s.handle("/notify-wallet", "", s.notifyWalletTxStatusChanged)
+	s.handle("/withdraw", "", s.withdraw)
 }

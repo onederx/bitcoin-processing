@@ -10,6 +10,9 @@ type Wallet struct {
 	nodeAPI          *nodeapi.NodeAPI
 	eventBroker      *events.EventBroker
 	storage          WalletStorage
+	minWithdraw      uint64
+	minFeePerKb      uint64
+	minFeeFixed      uint64
 	maxConfirmations int64
 }
 
@@ -20,6 +23,9 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 		nodeAPI:          nodeAPI,
 		eventBroker:      eventBroker,
 		storage:          newStorage(storageType),
+		minWithdraw:      uint64(settings.GetInt64("wallet.min-withdraw")),
+		minFeePerKb:      uint64(settings.GetInt64("wallet.min-fee.per-kb")),
+		minFeeFixed:      uint64(settings.GetInt64("wallet.min-fee.fixed")),
 		maxConfirmations: maxConfirmations,
 	}
 }

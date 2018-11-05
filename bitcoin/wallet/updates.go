@@ -15,38 +15,63 @@ type TransactionNotification struct {
 
 var unknownAccountError = map[string]interface{}{"error": "account not found"}
 
-func (w *Wallet) notifyIncomingTransaction(tx *Transaction, confirmationsToNotify int64) {
-	var eventType events.EventType
-	var accountMetainfo map[string]interface{}
+func getTransactionNotificationType(confirmations int64, tx *Transaction) events.EventType {
+	switch tx.Direction {
+	case IncomingDirection:
+		if confirmations == 0 {
+			return events.NewIncomingTxEvent
+		} else {
+			return events.IncomingTxConfirmedEvent
+		}
+	case OutgoingDirection:
+		if confirmations == 0 {
+			return events.NewOutgoingTxEvent
+		} else {
+			return events.OutgoingTxConfirmedEvent
+		}
+	default:
+		panic("Unexpected tx direction " + tx.Direction.String())
+	}
+}
+
+func (w *Wallet) getAccountMetainfo(tx *Transaction) map[string]interface{} {
+	account, err := w.storage.GetAccountByAddress(tx.Address)
+	if err != nil {
+		log.Printf(
+			"Error: failed to match account by address %s "+
+				"(transaction %s) for incoming payment",
+			tx.Address,
+			tx.Hash,
+		)
+		return unknownAccountError
+	} else {
+		return account.Metainfo
+	}
+}
+
+func (w *Wallet) notifyTransaction(tx *Transaction) {
+	confirmationsToNotify := util.Min64(tx.Confirmations, w.maxConfirmations)
+
+	var metainfo map[string]interface{}
 
 	for i := tx.reportedConfirmations + 1; i <= confirmationsToNotify; i++ {
-		if i == 0 {
-			eventType = events.NewIncomingTxEvent
+		eventType := getTransactionNotificationType(i, tx)
+
+		if tx.Direction == IncomingDirection {
+			metainfo = w.getAccountMetainfo(tx)
 		} else {
-			eventType = events.IncomingTxConfirmedEvent
-		}
-		account, err := w.storage.GetAccountByAddress(tx.Address)
-		if err != nil {
-			log.Printf(
-				"Error: failed to match account by address %s "+
-					"(transaction %s) for incoming payment",
-				tx.Address,
-				tx.Hash,
-			)
-			accountMetainfo = unknownAccountError
-		} else {
-			accountMetainfo = account.Metainfo
+			metainfo = unknownAccountError
 		}
 		// make a copy of tx here, otherwise it may get modified while
 		// other goroutines process notification
 		notification := TransactionNotification{
 			*tx,
-			accountMetainfo,
+			metainfo,
 		}
 		notification.Confirmations = i // Send confirmations sequentially
 
 		w.eventBroker.Notify(eventType, notification)
-		err = w.storage.updateReportedConfirmations(tx, i)
+		err := w.storage.updateReportedConfirmations(tx, i)
 		if err != nil {
 			log.Printf(
 				"Error: failed to update count of reported transaction "+
@@ -55,15 +80,6 @@ func (w *Wallet) notifyIncomingTransaction(tx *Transaction, confirmationsToNotif
 			)
 			return
 		}
-	}
-
-}
-
-func (w *Wallet) notifyTransaction(tx *Transaction) {
-	confirmationsToNotify := util.Min64(tx.Confirmations, w.maxConfirmations)
-
-	if tx.Direction == IncomingDirection {
-		w.notifyIncomingTransaction(tx, confirmationsToNotify)
 	}
 }
 

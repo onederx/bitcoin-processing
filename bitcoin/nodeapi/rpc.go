@@ -8,12 +8,18 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
 	"log"
+	"sync"
 
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
 type NodeAPI struct {
 	btcrpc *rpcclient.Client
+
+	// Per KB fee is set in a separate RPC call, so, prevent multiple send
+	// commands from racing by holding a lock between seeting fee and sendting
+	// a payment
+	txFeeSetLock sync.Mutex
 }
 
 func (n *NodeAPI) CreateNewAddress() (btcutil.Address, error) {
@@ -65,6 +71,32 @@ func (n *NodeAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
 		return nil, err
 	}
 	return n.btcrpc.DecodeRawTransaction(rawTxBytes)
+}
+
+func (n *NodeAPI) SendWithPerKBFee(address string, amount uint64, fee uint64) (hash string, err error) {
+	n.txFeeSetLock.Lock()
+	defer n.txFeeSetLock.Unlock()
+
+	err = n.btcrpc.SetTxFee(btcutil.Amount(fee))
+
+	if err != nil {
+		return "", err
+	}
+
+	btcutilAddress, err := btcutil.DecodeAddress(address, nil)
+
+	if err != nil {
+		return "", err
+	}
+
+	chainHash, err := n.btcrpc.SendToAddress(
+		btcutilAddress,
+		btcutil.Amount(amount),
+	)
+	if err != nil {
+		return "", err
+	}
+	return chainHash.String(), nil
 }
 
 func NewNodeAPI() *NodeAPI {
