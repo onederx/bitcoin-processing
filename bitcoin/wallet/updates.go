@@ -54,6 +54,7 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 		// other goroutines process notification
 		notification := *tx
 		notification.Confirmations = i // Send confirmations sequentially
+		w.setTxStatusByConfirmations(&notification)
 
 		w.eventBroker.Notify(eventType, notification)
 		err := w.storage.updateReportedConfirmations(tx, i)
@@ -72,6 +73,7 @@ func (w *Wallet) updateTxInfo(tx *Transaction) {
 	if tx.Direction == IncomingDirection {
 		tx.Metainfo = w.getAccountMetainfo(tx)
 	}
+	w.setTxStatusByConfirmations(tx)
 	tx, err := w.storage.StoreTransaction(tx)
 	if err != nil {
 		log.Printf("Error: failed to store tx data in database: %s", err)
@@ -105,6 +107,17 @@ func (w *Wallet) checkForNewTransactions() {
 			"Error: failed to update last seen block hash in db: %s",
 			err,
 		)
+	}
+}
+
+func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
+	switch {
+	case tx.Confirmations <= 0:
+		tx.Status = NewTransaction
+	case tx.Confirmations > 0 && tx.Confirmations < w.maxConfirmations:
+		tx.Status = ConfirmedTransaction
+	case tx.Confirmations >= w.maxConfirmations:
+		tx.Status = FullyConfirmedTransaction
 	}
 }
 

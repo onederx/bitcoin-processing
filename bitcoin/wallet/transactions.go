@@ -20,6 +20,18 @@ const (
 	InvalidDirection
 )
 
+type TransactionStatus int
+
+const (
+	NewTransaction TransactionStatus = iota
+	ConfirmedTransaction
+	FullyConfirmedTransaction
+	PendingTransaction
+	PendingColdStorageTransaction
+	CancelledTransaction
+	InvalidTransaction
+)
+
 var transactionDirectionToStringMap map[TransactionDirection]string = map[TransactionDirection]string{
 	IncomingDirection: "incoming",
 	OutgoingDirection: "outgoing",
@@ -28,9 +40,23 @@ var transactionDirectionToStringMap map[TransactionDirection]string = map[Transa
 
 var stringToTransactionDirectionMap map[string]TransactionDirection = make(map[string]TransactionDirection)
 
+var transactionStatusToStringMap map[TransactionStatus]string = map[TransactionStatus]string{
+	NewTransaction:                "new",
+	ConfirmedTransaction:          "confirmed",
+	FullyConfirmedTransaction:     "fully-confirmed",
+	PendingTransaction:            "pending",
+	PendingColdStorageTransaction: "pending-cold-storage",
+	CancelledTransaction:          "cancelled",
+}
+
+var stringToTransactionStatusMap map[string]TransactionStatus = make(map[string]TransactionStatus)
+
 func init() {
 	for txDirection, txDirectionStr := range transactionDirectionToStringMap {
 		stringToTransactionDirectionMap[txDirectionStr] = txDirection
+	}
+	for txStatus, txStatusStr := range transactionStatusToStringMap {
+		stringToTransactionStatusMap[txStatusStr] = txStatus
 	}
 }
 
@@ -42,8 +68,17 @@ func (td TransactionDirection) String() string {
 	return "invalid"
 }
 
+func (ts TransactionStatus) String() string {
+	tsStr, ok := transactionStatusToStringMap[ts]
+	if ok {
+		return tsStr
+	}
+	return "invalid"
+}
+
 func TransactionDirectionFromString(txDirectionStr string) (TransactionDirection, error) {
 	td, ok := stringToTransactionDirectionMap[txDirectionStr]
+
 	if ok {
 		return td, nil
 	}
@@ -52,8 +87,22 @@ func TransactionDirectionFromString(txDirectionStr string) (TransactionDirection
 	)
 }
 
+func TransactionStatusFromString(txStatusStr string) (TransactionStatus, error) {
+	ts, ok := stringToTransactionStatusMap[txStatusStr]
+	if ok {
+		return ts, nil
+	}
+	return InvalidTransaction, errors.New(
+		"Invalid transaction status: " + txStatusStr,
+	)
+}
+
 func (td TransactionDirection) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + td.String() + "\""), nil
+}
+
+func (ts TransactionStatus) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + ts.String() + "\""), nil
 }
 
 type Transaction struct {
@@ -63,6 +112,7 @@ type Transaction struct {
 	Confirmations int64                `json:"confirmations"`
 	Address       string               `json:"address"`
 	Direction     TransactionDirection `json:"direction"`
+	Status        TransactionStatus    `json:"status"`
 	Amount        uint64               `json:"amount"` // satoshis
 	Metainfo      interface{}          `json:"metainfo"`
 
@@ -140,6 +190,7 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		Confirmations:         btcNodeTransaction.Confirmations,
 		Address:               btcNodeTransaction.Address,
 		Direction:             direction,
+		Status:                NewTransaction,
 		Amount:                satoshis,
 		reportedConfirmations: -1,
 	}

@@ -64,7 +64,7 @@ func (s *PostgresWalletStorage) SetLastSeenBlockHash(hash string) error {
 
 func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 	var id uuid.UUID
-	var hash, blockHash, address, direction string
+	var hash, blockHash, address, direction, status string
 	var metainfoJSON *string
 	var confirmations, reportedConfirmations int64
 	var amount uint64
@@ -77,6 +77,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		&confirmations,
 		&address,
 		&direction,
+		&status,
 		&amount,
 		&metainfoJSON,
 		&reportedConfirmations,
@@ -86,6 +87,10 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		return nil, err
 	}
 	transactionDirection, err := TransactionDirectionFromString(direction)
+	if err != nil {
+		return nil, err
+	}
+	transactionStatus, err := TransactionStatusFromString(status)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +109,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		Confirmations:         confirmations,
 		Address:               address,
 		Direction:             transactionDirection,
+		Status:                transactionStatus,
 		Amount:                amount,
 		Metainfo:              metainfo,
 		reportedConfirmations: reportedConfirmations,
@@ -113,7 +119,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 
 func (s *PostgresWalletStorage) GetTransaction(hash string) (*Transaction, error) {
 	row := s.db.QueryRow(`SELECT id, hash, block_hash, confirmations, address,
-		direction, amount, metainfo, reported_confirmations
+		direction, status, amount, metainfo, reported_confirmations
 		FROM transactions WHERE hash = $1`,
 		hash,
 	)
@@ -122,7 +128,7 @@ func (s *PostgresWalletStorage) GetTransaction(hash string) (*Transaction, error
 
 func (s *PostgresWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, error) {
 	row := s.db.QueryRow(`SELECT id, hash, block_hash, confirmations, address,
-		direction, amount, metainfo, reported_confirmations
+		direction, status, amount, metainfo, reported_confirmations
 		FROM transactions WHERE id = $1`,
 		id,
 	)
@@ -158,15 +164,16 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			return nil, err
 		}
 		_, err = s.db.Exec(`INSERT INTO transactions (id, hash, block_hash,
-			confirmations, address, direction, amount, metainfo,
+			confirmations, address, direction, status, amount, metainfo,
 			reported_confirmations)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 			transaction.Id,
 			transaction.Hash,
 			transaction.BlockHash,
 			transaction.Confirmations,
 			transaction.Address,
 			transaction.Direction.String(),
+			transaction.Status.String(),
 			transaction.Amount,
 			string(metainfoJSON),
 			transaction.reportedConfirmations,
@@ -224,7 +231,7 @@ func (s *PostgresWalletStorage) GetTransactionsWithLessConfirmations(confirmatio
 	result := make([]*Transaction, 0, 20)
 
 	rows, err := s.db.Query(`SELECT id, hash, block_hash, confirmations,
-		address, direction, amount, metainfo, reported_confirmations
+		address, direction, status, amount, metainfo, reported_confirmations
 		FROM transactions
         WHERE confirmations < $1`, confirmations,
 	)

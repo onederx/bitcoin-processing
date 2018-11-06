@@ -6,7 +6,6 @@ import (
 	"github.com/satori/go.uuid"
 	"log"
 	"strconv"
-	//"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 )
 
 type WithdrawRequest struct {
@@ -103,6 +102,7 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 		Confirmations:         0,
 		Address:               request.Address,
 		Direction:             OutgoingDirection,
+		Status:                NewTransaction,
 		Amount:                request.Amount,
 		Metainfo:              request.Metainfo,
 		reportedConfirmations: -1,
