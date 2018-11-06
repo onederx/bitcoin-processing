@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"log"
+	"math"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/satori/go.uuid"
@@ -98,7 +99,25 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		direction = UnknownDirection
 	}
 
-	satoshis := uint64(btcNodeTransaction.Amount * SatoshisInBTC)
+	if direction == IncomingDirection && btcNodeTransaction.Amount < 0 {
+		log.Printf(
+			"Warning: unexpected amount %f for transaction %s. Amount for "+
+				"incoming transaction should be nonnegative. Transaction: %#v",
+			btcNodeTransaction.Amount,
+			btcNodeTransaction.TxID,
+			btcNodeTransaction,
+		)
+	} else if direction == OutgoingDirection && btcNodeTransaction.Amount > 0 {
+		log.Printf(
+			"Warning: unexpected amount %f for transaction %s. Amount for "+
+				"outgoing transaction should not be positive. Transaction: %#v",
+			btcNodeTransaction.Amount,
+			btcNodeTransaction.TxID,
+			btcNodeTransaction,
+		)
+	}
+
+	satoshis := uint64(math.Abs(btcNodeTransaction.Amount) * SatoshisInBTC)
 
 	return &Transaction{
 		Hash:                  btcNodeTransaction.TxID,
