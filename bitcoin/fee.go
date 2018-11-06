@@ -2,7 +2,11 @@ package bitcoin
 
 import (
 	"errors"
+	"github.com/btcsuite/btcutil"
 )
+
+const MinimalFeeRate = 1000 // 1 satoshi per byte
+var MinimalFeeRateBTC = btcutil.Amount(MinimalFeeRate).ToBTC()
 
 type FeeType int
 

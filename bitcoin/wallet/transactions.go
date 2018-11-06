@@ -3,13 +3,13 @@ package wallet
 import (
 	"errors"
 	"log"
-	"math"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcutil"
 	"github.com/satori/go.uuid"
-)
 
-const SatoshisInBTC = 100000000
+	"github.com/onederx/bitcoin-processing/util"
+)
 
 type TransactionDirection int
 
@@ -86,6 +86,7 @@ func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult)
 
 func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transaction {
 	var direction TransactionDirection
+	var satoshis uint64
 	if btcNodeTransaction.Category == "receive" {
 		direction = IncomingDirection
 	} else if btcNodeTransaction.Category == "send" {
@@ -117,7 +118,20 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		)
 	}
 
-	satoshis := uint64(math.Abs(btcNodeTransaction.Amount) * SatoshisInBTC)
+	btcutilAmount, err := btcutil.NewAmount(btcNodeTransaction.Amount)
+
+	if err != nil {
+		log.Printf(
+			"Error: failed to convert amount %v to btcutil amount for tx %s."+
+				"Amount is probably invalid. Full tx %#v",
+			btcNodeTransaction.Amount,
+			btcNodeTransaction.TxID,
+			btcNodeTransaction,
+		)
+		satoshis = 0
+	} else {
+		satoshis = uint64(util.Abs64(int64(btcutilAmount)))
+	}
 
 	return &Transaction{
 		Hash:                  btcNodeTransaction.TxID,

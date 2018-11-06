@@ -4,6 +4,8 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"net/url"
+
+	"github.com/onederx/bitcoin-processing/bitcoin"
 )
 
 var cfgFile string
@@ -37,7 +39,7 @@ func initConfig() {
 	viper.SetDefault("bitcoin.poll-interval", 3000)
 	viper.SetDefault("transaction.max-confirmations", 6)
 	viper.SetDefault("wallet.min-withdraw", 600)
-	viper.SetDefault("wallet.min-fee.per-kb", 1000)
+	viper.SetDefault("wallet.min-fee.per-kb", bitcoin.MinimalFeeRate)
 	viper.SetDefault("wallet.min-fee.fixed", 500)
 }
 
