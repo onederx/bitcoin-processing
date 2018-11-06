@@ -168,7 +168,13 @@ func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee 
 	var response jsonRPCStringResponse
 	responseJSON, err := n.sendRequestToNode(
 		"sendtoaddress",
-		[]interface{}{address, btcutil.Amount(amount).ToBTC(), "", "", true},
+		[]interface{}{
+			address,
+			btcutil.Amount(amount).ToBTC(),
+			"",
+			"",
+			recipientPaysFee,
+		},
 	)
 	if err != nil {
 		return "", err
@@ -177,7 +183,6 @@ func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee 
 	if err != nil {
 		return "", err
 	}
-	log.Printf("sendToAddress result %#v", response)
 	if response.Error != nil {
 		return "", response.Error
 	}
@@ -398,14 +403,16 @@ func (n *NodeAPI) sendRawTransaction(rawTx string) (string, error) {
 
 func (n *NodeAPI) SendWithFixedFee(address string, amountSatoshi uint64, fee uint64, recipientPaysFee bool) (hash string, err error) {
 	var amount btcutil.Amount
-	if recipientPaysFee && amountSatoshi < fee {
-		return "", errors.New(fmt.Sprintf(
-			"Error: Recipient (%s) should pay fee %d satoshi, but amount sent"+
-				" is less: %d satoshi",
-			address,
-			fee,
-			amount,
-		))
+	if recipientPaysFee {
+		if amountSatoshi < fee {
+			return "", errors.New(fmt.Sprintf(
+				"Error: Recipient (%s) should pay fee %d satoshi, but amount sent"+
+					" is less: %d satoshi",
+				address,
+				fee,
+				amount,
+			))
+		}
 		amount = btcutil.Amount(amountSatoshi)
 	} else {
 		amount = btcutil.Amount(amountSatoshi + fee)
