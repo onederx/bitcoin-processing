@@ -64,6 +64,7 @@ type Transaction struct {
 	Address       string               `json:"address"`
 	Direction     TransactionDirection `json:"direction"`
 	Amount        uint64               `json:"amount"` // satoshis
+	Metainfo      interface{}          `json:"metainfo"`
 
 	reportedConfirmations int64
 }

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     address TEXT,
     direction TEXT,
     amount bigint, -- satoshis
+    metainfo JSONB,
     reported_confirmations bigint
 );
 

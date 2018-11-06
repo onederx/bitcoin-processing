@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-type TransactionNotification struct {
-	Transaction
-	AccountMetainfo map[string]interface{} `json:"metainfo"`
-}
-
 var unknownAccountError = map[string]interface{}{"error": "account not found"}
 
 func getTransactionNotificationType(confirmations int64, tx *Transaction) events.EventType {
@@ -52,22 +47,12 @@ func (w *Wallet) getAccountMetainfo(tx *Transaction) map[string]interface{} {
 func (w *Wallet) notifyTransaction(tx *Transaction) {
 	confirmationsToNotify := util.Min64(tx.Confirmations, w.maxConfirmations)
 
-	var metainfo map[string]interface{}
-
 	for i := tx.reportedConfirmations + 1; i <= confirmationsToNotify; i++ {
 		eventType := getTransactionNotificationType(i, tx)
 
-		if tx.Direction == IncomingDirection {
-			metainfo = w.getAccountMetainfo(tx)
-		} else {
-			metainfo = unknownAccountError
-		}
 		// make a copy of tx here, otherwise it may get modified while
 		// other goroutines process notification
-		notification := TransactionNotification{
-			*tx,
-			metainfo,
-		}
+		notification := *tx
 		notification.Confirmations = i // Send confirmations sequentially
 
 		w.eventBroker.Notify(eventType, notification)
@@ -84,6 +69,9 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 }
 
 func (w *Wallet) updateTxInfo(tx *Transaction) {
+	if tx.Direction == IncomingDirection {
+		tx.Metainfo = w.getAccountMetainfo(tx)
+	}
 	tx, err := w.storage.StoreTransaction(tx)
 	if err != nil {
 		log.Printf("Error: failed to store tx data in database: %s", err)

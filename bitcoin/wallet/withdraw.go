@@ -104,6 +104,7 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 		Address:               request.Address,
 		Direction:             OutgoingDirection,
 		Amount:                request.Amount,
+		Metainfo:              request.Metainfo,
 		reportedConfirmations: -1,
 	}
 
