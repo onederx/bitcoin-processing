@@ -62,7 +62,7 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 }
 
 func (w *Wallet) Withdraw(request *WithdrawRequest) error {
-	var sendMoneyFunc func(string, uint64, uint64) (string, error)
+	var sendMoneyFunc func(string, uint64, uint64, bool) (string, error)
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
 
 	if err != nil {
@@ -80,13 +80,18 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 	switch feeType {
 	case bitcoin.PerKBRateFee:
 		sendMoneyFunc = w.nodeAPI.SendWithPerKBFee
-	//case bitcoin.FixedFee:
-	//sendMoneyFunc = w.nodeAPI.SendWithFixedFee
+	case bitcoin.FixedFee:
+		sendMoneyFunc = w.nodeAPI.SendWithFixedFee
 	default:
 		return errors.New("Fee type not supported: " + request.FeeType)
 	}
 
-	txHash, err := sendMoneyFunc(request.Address, request.Amount, request.Fee)
+	txHash, err := sendMoneyFunc(
+		request.Address,
+		request.Amount,
+		request.Fee,
+		true, // recipient pays tx fee
+	)
 
 	if err != nil {
 		return err
