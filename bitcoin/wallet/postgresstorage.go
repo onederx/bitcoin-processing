@@ -3,6 +3,8 @@ package wallet
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 
 	"github.com/satori/go.uuid"
@@ -126,7 +128,11 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			existingTransaction.Id,
 		)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf(
+				"Update of tx data in DB failed: %s. Tx %#v",
+				err,
+				transaction,
+			))
 		}
 		existingTransaction.update(transaction)
 		return existingTransaction, nil
@@ -148,7 +154,11 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			transaction.reportedConfirmations,
 		)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf(
+				"Failed to insert new tx into DB: %s. Tx %#v",
+				err,
+				transaction,
+			))
 		}
 		return transaction, nil
 	default:
