@@ -22,7 +22,10 @@ func (s *APIServer) newBitcoinAddress(response http.ResponseWriter, request *htt
 	if err = json.Unmarshal(body, &metainfo); err != nil {
 		panic(err)
 	}
-	account := s.wallet.CreateAccount(metainfo)
+	account, err := s.wallet.CreateAccount(metainfo)
+	if err != nil {
+		panic(err)
+	}
 	if responseBody, err = json.Marshal(account); err != nil {
 		panic(err)
 	}

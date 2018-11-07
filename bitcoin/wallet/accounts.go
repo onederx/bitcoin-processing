@@ -5,20 +5,27 @@ type Account struct {
 	Metainfo map[string]interface{} `json:"metainfo"`
 }
 
-func (w *Wallet) generateNewAddress() string {
+func (w *Wallet) generateNewAddress() (string, error) {
 	address, err := w.nodeAPI.CreateNewAddress()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	addressStr := address.EncodeAddress()
-	return addressStr
+	return addressStr, nil
 }
 
-func (w *Wallet) CreateAccount(metainfo map[string]interface{}) *Account {
+func (w *Wallet) CreateAccount(metainfo map[string]interface{}) (*Account, error) {
+	address, err := w.generateNewAddress()
+	if err != nil {
+		return nil, err
+	}
 	account := &Account{
-		Address:  w.generateNewAddress(),
+		Address:  address,
 		Metainfo: metainfo,
 	}
-	w.storage.StoreAccount(account)
-	return account
+	err = w.storage.StoreAccount(account)
+	if err != nil {
+		return nil, err
+	}
+	return account, nil
 }
