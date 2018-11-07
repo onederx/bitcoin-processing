@@ -116,6 +116,7 @@ type Transaction struct {
 	Amount        uint64               `json:"amount"` // satoshis
 	Metainfo      interface{}          `json:"metainfo"`
 
+	fresh                 bool
 	reportedConfirmations int64
 }
 
@@ -185,13 +186,14 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 	}
 
 	return &Transaction{
-		Hash:                  btcNodeTransaction.TxID,
-		BlockHash:             btcNodeTransaction.BlockHash,
-		Confirmations:         btcNodeTransaction.Confirmations,
-		Address:               btcNodeTransaction.Address,
-		Direction:             direction,
-		Status:                NewTransaction,
-		Amount:                satoshis,
+		Hash:          btcNodeTransaction.TxID,
+		BlockHash:     btcNodeTransaction.BlockHash,
+		Confirmations: btcNodeTransaction.Confirmations,
+		Address:       btcNodeTransaction.Address,
+		Direction:     direction,
+		Status:        NewTransaction,
+		Amount:        satoshis,
+		fresh:         true,
 		reportedConfirmations: -1,
 	}
 }

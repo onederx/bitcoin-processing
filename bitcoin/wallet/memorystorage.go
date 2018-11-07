@@ -3,7 +3,6 @@ package wallet
 import (
 	"errors"
 	"github.com/satori/go.uuid"
-	"log"
 )
 
 type InMemoryWalletStorage struct {
@@ -36,10 +35,11 @@ func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		return nil, err
 	}
 	if existingTransaction != nil {
+		transaction.fresh = false
 		existingTransaction.update(transaction)
 		return existingTransaction, nil
 	}
-	log.Printf("New tx %s", transaction.Hash)
+	transaction.fresh = true
 	if transaction.Id == uuid.Nil {
 		transaction.Id = uuid.Must(uuid.NewV4())
 	}

@@ -103,15 +103,16 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		metainfo = nil
 	}
 	tx := &Transaction{
-		Id:                    id,
-		Hash:                  hash,
-		BlockHash:             blockHash,
-		Confirmations:         confirmations,
-		Address:               address,
-		Direction:             transactionDirection,
-		Status:                transactionStatus,
-		Amount:                amount,
-		Metainfo:              metainfo,
+		Id:            id,
+		Hash:          hash,
+		BlockHash:     blockHash,
+		Confirmations: confirmations,
+		Address:       address,
+		Direction:     transactionDirection,
+		Status:        transactionStatus,
+		Amount:        amount,
+		Metainfo:      metainfo,
+		fresh:         false,
 		reportedConfirmations: reportedConfirmations,
 	}
 	return tx, nil
@@ -155,7 +156,6 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		existingTransaction.update(transaction)
 		return existingTransaction, nil
 	case sql.ErrNoRows: // new tx
-		log.Printf("New tx %s", transaction.Hash)
 		if transaction.Id == uuid.Nil {
 			transaction.Id = uuid.Must(uuid.NewV4())
 		}

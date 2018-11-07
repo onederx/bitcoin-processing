@@ -75,6 +75,9 @@ func (w *Wallet) updateTxInfo(tx *Transaction) {
 	}
 	w.setTxStatusByConfirmations(tx)
 	tx, err := w.storage.StoreTransaction(tx)
+	if tx.fresh {
+		log.Printf("New tx %s", tx.Hash)
+	}
 	if err != nil {
 		log.Printf("Error: failed to store tx data in database: %s", err)
 		return

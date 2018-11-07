@@ -97,14 +97,15 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 	}
 
 	outgoingTx := &Transaction{
-		Id:                    request.Id,
-		Hash:                  txHash,
-		Confirmations:         0,
-		Address:               request.Address,
-		Direction:             OutgoingDirection,
-		Status:                NewTransaction,
-		Amount:                request.Amount,
-		Metainfo:              request.Metainfo,
+		Id:            request.Id,
+		Hash:          txHash,
+		Confirmations: 0,
+		Address:       request.Address,
+		Direction:     OutgoingDirection,
+		Status:        NewTransaction,
+		Amount:        request.Amount,
+		Metainfo:      request.Metainfo,
+		fresh:         true,
 		reportedConfirmations: -1,
 	}
 
