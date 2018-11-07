@@ -38,6 +38,36 @@ type JsonRPCError struct {
 	Message string
 }
 
+type AddressInfo struct {
+	Address      string
+	ScriptPubKey string
+	IsMine       bool `json:"ismine"`
+	IsWatchonly  bool `json:"iswatchonly"`
+	IsScript     bool `json:"isscript"`
+	IsWitness    bool `json:"iswitness"`
+	Script       string
+	Hex          string
+	Pubkey       string
+	Embedded     struct {
+		IsScript       bool   `json:"isscript"`
+		IsWitness      bool   `json:"iswitness"`
+		WitnessVersion bool   `json:"witness_version"`
+		WitnessProgram string `json:"witness_program"`
+		Pubkey         string
+		Address        string
+		ScriptPubKey   string
+	}
+	Label         string
+	Timestamp     uint64
+	HdKeyPath     string `json:"hdkeypath"`
+	HdSeedId      string `json:"hdseedid"`
+	HdMasterKeyId string `json:"hdmasterkeyid"`
+	Labels        []struct {
+		Name    string
+		Purpose string
+	}
+}
+
 type jsonRPCRequest struct {
 	JSONRPCVersion string        `json:"jsonrpc"`
 	Method         string        `json:"method"`
@@ -455,6 +485,27 @@ func (n *NodeAPI) SendWithFixedFee(address string, amountSatoshi uint64, fee uin
 	}
 
 	return n.sendRawTransaction(signedTx)
+}
+
+func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
+	// there is no GetAddressInfo in btcd/rpcclient
+
+	var response struct {
+		Result *AddressInfo
+		Error  *JsonRPCError
+	}
+	getAddressInfoJSONResp, err := n.sendRequestToNode(
+		"getaddressinfo",
+		[]interface{}{address},
+	)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(getAddressInfoJSONResp, &response)
+	if response.Error != nil {
+		return nil, response.Error
+	}
+	return response.Result, nil
 }
 
 func NewNodeAPI() *NodeAPI {
