@@ -15,6 +15,7 @@ import (
 type PostgresWalletStorage struct {
 	db                *sql.DB
 	lastSeenBlockHash string
+	hotWalletAddress  string
 }
 
 type queryResult interface {
@@ -22,7 +23,6 @@ type queryResult interface {
 }
 
 func newPostgresWalletStorage() *PostgresWalletStorage {
-	lastSeenBlockHash := ""
 	dsn := settings.GetStringMandatory("storage.dsn")
 
 	db, err := sql.Open("postgres", dsn)
@@ -31,18 +31,46 @@ func newPostgresWalletStorage() *PostgresWalletStorage {
 		log.Fatal(err)
 	}
 
-	err = db.QueryRow(`SELECT value FROM metadata
-		WHERE key = 'last_seen_block_hash'`).Scan(&lastSeenBlockHash)
+	storage := &PostgresWalletStorage{
+		db: db,
+	}
 
-	if err != nil && err != sql.ErrNoRows {
+	storage.lastSeenBlockHash, err = storage.getMeta("last_seen_block_hash", "")
+
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	storage := &PostgresWalletStorage{
-		db:                db,
-		lastSeenBlockHash: lastSeenBlockHash,
+	storage.hotWalletAddress, err = storage.getMeta("hot_wallet_address", "")
+
+	if err != nil {
+		log.Fatal(err)
 	}
+
 	return storage
+}
+
+func (s *PostgresWalletStorage) getMeta(name string, defaultVal string) (string, error) {
+	result := defaultVal
+	err := s.db.QueryRow(`SELECT value FROM metadata
+		WHERE key = $1`, name).Scan(&result)
+	if err == nil || err == sql.ErrNoRows {
+		return result, nil
+	}
+	return "", err
+}
+
+func (s *PostgresWalletStorage) setMeta(name string, value string) error {
+	_, err := s.db.Exec(`INSERT INTO metadata (key, value)
+		VALUES ($1, $2)
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+		name,
+		value,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *PostgresWalletStorage) GetLastSeenBlockHash() string {
@@ -50,11 +78,7 @@ func (s *PostgresWalletStorage) GetLastSeenBlockHash() string {
 }
 
 func (s *PostgresWalletStorage) SetLastSeenBlockHash(hash string) error {
-	_, err := s.db.Exec(`INSERT INTO metadata (key, value)
-		VALUES ('last_seen_block_hash', $1)
-		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-		hash,
-	)
+	err := s.setMeta("last_seen_block_hash", hash)
 	if err != nil {
 		return err
 	}
@@ -261,5 +285,18 @@ func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transac
 		return err
 	}
 	transaction.reportedConfirmations = reportedConfirmations
+	return nil
+}
+
+func (s *PostgresWalletStorage) GetHotWalletAddress() string {
+	return s.hotWalletAddress
+}
+
+func (s *PostgresWalletStorage) SetHotWalletAddress(address string) error {
+	err := s.setMeta("hot_wallet_address", address)
+	if err != nil {
+		return err
+	}
+	s.hotWalletAddress = address
 	return nil
 }

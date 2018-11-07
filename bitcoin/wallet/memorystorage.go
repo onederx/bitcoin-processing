@@ -9,6 +9,7 @@ type InMemoryWalletStorage struct {
 	lastSeenBlockHash string
 	accounts          []*Account
 	transactions      []*Transaction
+	hotWalletAddress  string
 }
 
 func (s *InMemoryWalletStorage) GetLastSeenBlockHash() string {
@@ -78,5 +79,14 @@ func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transac
 		return err
 	}
 	storedTransaction.reportedConfirmations = reportedConfirmations
+	return nil
+}
+
+func (s *InMemoryWalletStorage) GetHotWalletAddress() string {
+	return s.hotWalletAddress
+}
+
+func (s *InMemoryWalletStorage) SetHotWalletAddress(address string) error {
+	s.hotWalletAddress = address
 	return nil
 }

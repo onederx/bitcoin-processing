@@ -53,6 +53,10 @@ func (s *APIServer) withdraw(response http.ResponseWriter, request *http.Request
 	}
 }
 
+func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *http.Request) {
+	response.Write([]byte(s.wallet.GetHotWalletAddress()))
+}
+
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
@@ -75,4 +79,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/new-address", "", s.newBitcoinAddress)
 	s.handle("/notify-wallet", "", s.notifyWalletTxStatusChanged)
 	s.handle("/withdraw", "", s.withdraw)
+	s.handle("/get-hot-storage-address", "", s.getHotStorageAddress)
 }

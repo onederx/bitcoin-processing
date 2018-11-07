@@ -10,6 +10,7 @@ type Wallet struct {
 	nodeAPI          *nodeapi.NodeAPI
 	eventBroker      *events.EventBroker
 	storage          WalletStorage
+	hotWalletAddress string
 	minWithdraw      uint64
 	minFeePerKb      uint64
 	minFeeFixed      uint64
@@ -31,6 +32,7 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 }
 
 func (w *Wallet) Run() {
+	w.initHotWallet()
 	w.checkForWalletUpdates()
 	w.startWatchingWalletUpdates()
 }

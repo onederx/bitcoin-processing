@@ -14,6 +14,9 @@ type WalletStorage interface {
 
 	GetAccountByAddress(address string) (*Account, error)
 	StoreAccount(account *Account) error
+
+	GetHotWalletAddress() string
+	SetHotWalletAddress(address string) error
 }
 
 func newStorage(storageType string) WalletStorage {

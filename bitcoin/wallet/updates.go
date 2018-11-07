@@ -4,11 +4,13 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/onederx/bitcoin-processing/util"
+	"github.com/btcsuite/btcutil"
 	"log"
 	"time"
 )
 
 var unknownAccountError = map[string]interface{}{"error": "account not found"}
+var hotStorageMeta = map[string]interface{}{"kind": "input to hot storage"}
 
 func getTransactionNotificationType(confirmations int64, tx *Transaction) events.EventType {
 	switch tx.Direction {
@@ -70,8 +72,13 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 }
 
 func (w *Wallet) updateTxInfo(tx *Transaction) {
+	isHotStorageTx := tx.Address == w.hotWalletAddress
 	if tx.Direction == IncomingDirection {
-		tx.Metainfo = w.getAccountMetainfo(tx)
+		if !isHotStorageTx {
+			tx.Metainfo = w.getAccountMetainfo(tx)
+		} else {
+			tx.Metainfo = hotStorageMeta
+		}
 	}
 	w.setTxStatusByConfirmations(tx)
 	tx, err := w.storage.StoreTransaction(tx)
@@ -80,6 +87,18 @@ func (w *Wallet) updateTxInfo(tx *Transaction) {
 	}
 	if err != nil {
 		log.Printf("Error: failed to store tx data in database: %s", err)
+		return
+	}
+	if isHotStorageTx {
+		if tx.fresh {
+			log.Printf(
+				"Got transfer to hot wallet: %d satoshi (%s) tx %s (%s)",
+				tx.Amount,
+				btcutil.Amount(tx.Amount).String(),
+				tx.Hash,
+				tx.Id,
+			)
+		}
 		return
 	}
 	w.notifyTransaction(tx)
