@@ -134,6 +134,11 @@ func (w *Wallet) checkForNewTransactions() {
 
 func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
 	switch {
+	case tx.Status != NewTransaction && tx.Status != ConfirmedTransaction:
+		// only "new" and "confirmed" statuses can be changed based on
+		// number of confirmations ("new" can become "confirmed", "confirmed"
+		// can become "fully-confirmed")
+		return
 	case tx.Confirmations <= 0:
 		tx.Status = NewTransaction
 	case tx.Confirmations > 0 && tx.Confirmations < w.maxConfirmations:
