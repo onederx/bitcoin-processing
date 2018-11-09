@@ -180,17 +180,6 @@ func (n *NodeAPI) sendRequestToNode(method string, params []interface{}) ([]byte
 		return nil, err
 	}
 	defer response.Body.Close()
-	if response.StatusCode != 200 {
-		errorText := "Bitcoin node responded with " + response.Status + " "
-		body, err := ioutil.ReadAll(response.Body)
-		if err == nil {
-			return nil, errors.New(errorText + string(body))
-		} else {
-			return nil, errors.New(
-				errorText + "also failed to read response body " + err.Error(),
-			)
-		}
-	}
 	return ioutil.ReadAll(response.Body)
 }
 
