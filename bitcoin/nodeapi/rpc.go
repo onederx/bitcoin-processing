@@ -27,10 +27,12 @@ type NodeAPI struct {
 	pass    string
 	useTLS  bool
 
-	// Per KB fee is set in a separate RPC call, so, prevent multiple send
-	// commands from racing by holding a lock between seeting fee and sendting
-	// a payment
-	txFeeSetLock sync.Mutex
+	// Sending money consists of several RPC calls (SetTxFee is done before
+	// SendToAddress for per KB fee and sending with fixed fee is done using
+	// many RPC calls working with raw transactions)
+	// prevent commands from racing (trying to double-spend UTXOs or
+	// re-setting fee etc) by holding a lock while creating outgoing payment
+	moneySendLock sync.Mutex
 }
 
 type JsonRPCError struct {
@@ -220,8 +222,8 @@ func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee 
 }
 
 func (n *NodeAPI) SendWithPerKBFee(address string, amount uint64, fee uint64, recipientPaysFee bool) (hash string, err error) {
-	n.txFeeSetLock.Lock()
-	defer n.txFeeSetLock.Unlock()
+	n.moneySendLock.Lock()
+	defer n.moneySendLock.Unlock()
 
 	err = n.btcrpc.SetTxFee(btcutil.Amount(fee))
 
@@ -433,6 +435,8 @@ func (n *NodeAPI) sendRawTransaction(rawTx string) (string, error) {
 
 func (n *NodeAPI) SendWithFixedFee(address string, amountSatoshi uint64, fee uint64, recipientPaysFee bool) (hash string, err error) {
 	var amount btcutil.Amount
+	n.moneySendLock.Lock()
+	defer n.moneySendLock.Unlock()
 	if recipientPaysFee {
 		if amountSatoshi < fee {
 			return "", errors.New(fmt.Sprintf(
