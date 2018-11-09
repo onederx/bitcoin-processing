@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"github.com/onederx/bitcoin-processing/bitcoin"
+	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/satori/go.uuid"
 	"log"
 	"strconv"
@@ -28,6 +29,15 @@ func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 		feeType,
 		request.Metainfo,
 	)
+}
+
+func isInsufficientFundsError(err error) bool {
+	rpcError, ok := err.(*nodeapi.JsonRPCError)
+
+	if ok {
+		return rpcError.Message == "Insufficient funds"
+	}
+	return false
 }
 
 func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.FeeType) error {
@@ -85,6 +95,17 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 		return errors.New("Fee type not supported: " + request.FeeType)
 	}
 
+	outgoingTx := &Transaction{
+		Id:            request.Id,
+		Confirmations: 0,
+		Address:       request.Address,
+		Direction:     OutgoingDirection,
+		Amount:        request.Amount,
+		Metainfo:      request.Metainfo,
+		fresh:         true,
+		reportedConfirmations: -1,
+	}
+
 	txHash, err := sendMoneyFunc(
 		request.Address,
 		request.Amount,
@@ -93,24 +114,16 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 	)
 
 	if err != nil {
-		return err
-	}
-
-	outgoingTx := &Transaction{
-		Id:            request.Id,
-		Hash:          txHash,
-		Confirmations: 0,
-		Address:       request.Address,
-		Direction:     OutgoingDirection,
-		Status:        NewTransaction,
-		Amount:        request.Amount,
-		Metainfo:      request.Metainfo,
-		fresh:         true,
-		reportedConfirmations: -1,
+		if !isInsufficientFundsError(err) {
+			return err
+		}
+		outgoingTx.Status = PendingTransaction
+	} else {
+		outgoingTx.Status = NewTransaction
+		outgoingTx.Hash = txHash
 	}
 
 	w.notifyTransaction(outgoingTx)
-
 	_, err = w.storage.StoreTransaction(outgoingTx)
 
 	if err != nil {
