@@ -2,14 +2,18 @@ package wallet
 
 import (
 	"log"
+
+	"github.com/satori/go.uuid"
 )
 
 type WalletStorage interface {
 	GetLastSeenBlockHash() string
 	SetLastSeenBlockHash(blockHash string) error
 	StoreTransaction(transaction *Transaction) (*Transaction, error)
-	GetTransaction(hash string) (*Transaction, error)
-	GetTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error)
+	GetTransactionByHash(hash string) (*Transaction, error)
+	GetTransactionById(id uuid.UUID) (*Transaction, error)
+	GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error)
+	GetPendingTransactions() ([]*Transaction, error)
 	updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error
 
 	GetAccountByAddress(address string) (*Account, error)

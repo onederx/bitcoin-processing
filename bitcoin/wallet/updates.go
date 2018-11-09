@@ -149,7 +149,7 @@ func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
 }
 
 func (w *Wallet) checkForExistingTransactionUpdates() {
-	transactionsToCheck, err := w.storage.GetTransactionsWithLessConfirmations(
+	transactionsToCheck, err := w.storage.GetBroadcastedTransactionsWithLessConfirmations(
 		w.maxConfirmations,
 	)
 

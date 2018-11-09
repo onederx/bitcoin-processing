@@ -142,7 +142,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 	return tx, nil
 }
 
-func (s *PostgresWalletStorage) GetTransaction(hash string) (*Transaction, error) {
+func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*Transaction, error) {
 	row := s.db.QueryRow(`SELECT id, hash, block_hash, confirmations, address,
 		direction, status, amount, metainfo, reported_confirmations
 		FROM transactions WHERE hash = $1`,
@@ -161,9 +161,34 @@ func (s *PostgresWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, 
 }
 
 func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Transaction, error) {
-	existingTransaction, err := s.GetTransaction(transaction.Hash)
-	switch err {
-	case nil: // tx already in database
+	var existingTransaction *Transaction
+	var err error
+
+	txIsNew := true
+
+	if transaction.Id != uuid.Nil {
+		existingTransaction, err = s.GetTransactionById(transaction.Id)
+		switch err {
+		case nil: // tx already in database
+			txIsNew = false
+		case sql.ErrNoRows: // new tx
+		default:
+			return nil, err
+		}
+	}
+
+	if txIsNew && transaction.Hash != "" {
+		existingTransaction, err = s.GetTransactionByHash(transaction.Hash)
+		switch err {
+		case nil: // tx already in database
+			txIsNew = false
+		case sql.ErrNoRows: // new tx
+		default:
+			return nil, err
+		}
+	}
+
+	if !txIsNew {
 		_, err := s.db.Exec(`UPDATE transactions SET block_hash = $1,
 			confirmations = $2 WHERE id = $3`,
 			transaction.BlockHash,
@@ -179,7 +204,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		}
 		existingTransaction.update(transaction)
 		return existingTransaction, nil
-	case sql.ErrNoRows: // new tx
+	} else {
 		if transaction.Id == uuid.Nil {
 			transaction.Id = uuid.Must(uuid.NewV4())
 		}
@@ -210,8 +235,6 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			))
 		}
 		return transaction, nil
-	default:
-		return nil, err
 	}
 }
 
@@ -251,13 +274,13 @@ func (s *PostgresWalletStorage) StoreAccount(account *Account) error {
 
 }
 
-func (s *PostgresWalletStorage) GetTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error) {
+func (s *PostgresWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error) {
 	result := make([]*Transaction, 0, 20)
 
 	rows, err := s.db.Query(`SELECT id, hash, block_hash, confirmations,
 		address, direction, status, amount, metainfo, reported_confirmations
 		FROM transactions
-        WHERE confirmations < $1`, confirmations,
+        WHERE confirmations < $1 and hash != ''`, confirmations,
 	)
 	if err != nil {
 		return result, err
@@ -299,4 +322,34 @@ func (s *PostgresWalletStorage) SetHotWalletAddress(address string) error {
 	}
 	s.hotWalletAddress = address
 	return nil
+}
+
+func (s *PostgresWalletStorage) GetPendingTransactions() ([]*Transaction, error) {
+	result := make([]*Transaction, 0, 20)
+
+	rows, err := s.db.Query(`SELECT id, hash, block_hash, confirmations,
+		address, direction, status, amount, metainfo, reported_confirmations
+		FROM transactions
+        WHERE status = ? OR status = ?`,
+		PendingTransaction.String(),
+		PendingColdStorageTransaction.String(),
+	)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		transaction, err := transactionFromDatabaseRow(rows)
+		if err != nil {
+			return result, err
+		}
+		result = append(result, transaction)
+	}
+	err = rows.Err()
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+
 }

@@ -21,7 +21,7 @@ func (s *InMemoryWalletStorage) SetLastSeenBlockHash(hash string) error {
 	return nil
 }
 
-func (s *InMemoryWalletStorage) GetTransaction(hash string) (*Transaction, error) {
+func (s *InMemoryWalletStorage) GetTransactionByHash(hash string) (*Transaction, error) {
 	for _, transaction := range s.transactions {
 		if transaction.Hash == hash {
 			return transaction, nil
@@ -30,8 +30,17 @@ func (s *InMemoryWalletStorage) GetTransaction(hash string) (*Transaction, error
 	return nil, errors.New("Transaction with hash " + hash + " not found")
 }
 
+func (s *InMemoryWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, error) {
+	for _, transaction := range s.transactions {
+		if transaction.Id == id {
+			return transaction, nil
+		}
+	}
+	return nil, errors.New("Transaction with id " + id.String() + " not found")
+}
+
 func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Transaction, error) {
-	existingTransaction, err := s.GetTransaction(transaction.Hash)
+	existingTransaction, err := s.GetTransactionByHash(transaction.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -62,10 +71,13 @@ func (s *InMemoryWalletStorage) StoreAccount(account *Account) error {
 	return nil
 }
 
-func (s *InMemoryWalletStorage) GetTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error) {
+func (s *InMemoryWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error) {
 	result := make([]*Transaction, 0)
 
 	for _, transaction := range s.transactions {
+		if transaction.Hash == "" {
+			continue
+		}
 		if transaction.reportedConfirmations < confirmations {
 			result = append(result, transaction)
 		}
@@ -74,7 +86,7 @@ func (s *InMemoryWalletStorage) GetTransactionsWithLessConfirmations(confirmatio
 }
 
 func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error {
-	storedTransaction, err := s.GetTransaction(transaction.Hash)
+	storedTransaction, err := s.GetTransactionByHash(transaction.Hash)
 	if err != nil {
 		return err
 	}
@@ -89,4 +101,17 @@ func (s *InMemoryWalletStorage) GetHotWalletAddress() string {
 func (s *InMemoryWalletStorage) SetHotWalletAddress(address string) error {
 	s.hotWalletAddress = address
 	return nil
+}
+
+func (s *InMemoryWalletStorage) GetPendingTransactions() ([]*Transaction, error) {
+	result := make([]*Transaction, 0)
+
+	for _, transaction := range s.transactions {
+		status := transaction.Status
+		if status == PendingTransaction || status == PendingColdStorageTransaction {
+			result = append(result, transaction)
+		}
+	}
+	return result, nil
+
 }
