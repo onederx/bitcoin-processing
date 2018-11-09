@@ -41,7 +41,7 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 	}
 	if feeType == bitcoin.PerKBRateFee && request.Fee < w.minFeePerKb {
 		return errors.New(
-			"Error: refusing to withdraw with fee" +
+			"Error: refusing to withdraw with fee " +
 				strconv.FormatUint(request.Fee, 10) +
 				" because it is less than min withdraw fee " +
 				strconv.FormatUint(w.minFeePerKb, 10) +
@@ -50,7 +50,7 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 	}
 	if feeType == bitcoin.FixedFee && request.Fee < w.minFeeFixed {
 		return errors.New(
-			"Error: refusing to withdraw with fee" +
+			"Error: refusing to withdraw with fee " +
 				strconv.FormatUint(request.Fee, 10) +
 				" because it is less than min withdraw fee " +
 				strconv.FormatUint(w.minFeeFixed, 10) +

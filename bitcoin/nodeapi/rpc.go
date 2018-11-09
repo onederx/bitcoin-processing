@@ -440,7 +440,7 @@ func (n *NodeAPI) SendWithFixedFee(address string, amountSatoshi uint64, fee uin
 					" is less: %d satoshi",
 				address,
 				fee,
-				amount,
+				amountSatoshi,
 			))
 		}
 		amount = btcutil.Amount(amountSatoshi)
