@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/satori/go.uuid"
 
+	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/util"
 )
 
@@ -115,6 +116,8 @@ type Transaction struct {
 	Status        TransactionStatus    `json:"status"`
 	Amount        uint64               `json:"amount"` // satoshis
 	Metainfo      interface{}          `json:"metainfo"`
+	Fee           uint64               `json:"fee"` // satoshis
+	FeeType       bitcoin.FeeType      `json:"fee_type"`
 
 	fresh                 bool
 	reportedConfirmations int64
@@ -187,14 +190,14 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 	}
 
 	return &Transaction{
-		Hash:          btcNodeTransaction.TxID,
-		BlockHash:     btcNodeTransaction.BlockHash,
-		Confirmations: btcNodeTransaction.Confirmations,
-		Address:       btcNodeTransaction.Address,
-		Direction:     direction,
-		Status:        NewTransaction,
-		Amount:        satoshis,
-		fresh:         true,
+		Hash:                  btcNodeTransaction.TxID,
+		BlockHash:             btcNodeTransaction.BlockHash,
+		Confirmations:         btcNodeTransaction.Confirmations,
+		Address:               btcNodeTransaction.Address,
+		Direction:             direction,
+		Status:                NewTransaction,
+		Amount:                satoshis,
+		fresh:                 true,
 		reportedConfirmations: -1,
 	}
 }

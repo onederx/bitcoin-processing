@@ -11,9 +11,9 @@ var MinimalFeeRateBTC = btcutil.Amount(MinimalFeeRate).ToBTC()
 type FeeType int
 
 const (
-	FixedFee FeeType = iota
+	InvalidFee FeeType = iota
 	PerKBRateFee
-	InvalidFee
+	FixedFee
 )
 
 var feeTypeToStringMap map[FeeType]string = map[FeeType]string{
@@ -46,4 +46,8 @@ func FeeTypeFromString(feeTypeStr string) (FeeType, error) {
 	return InvalidFee, errors.New(
 		"Failed to convert string '" + feeTypeStr + "' to fee type",
 	)
+}
+
+func (ft FeeType) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + ft.String() + "\""), nil
 }

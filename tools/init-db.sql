@@ -15,13 +15,15 @@ CREATE TABLE IF NOT EXISTS transactions (
     id uuid PRIMARY KEY,
     hash TEXT,
     block_hash TEXT,
-    confirmations bigint,
+    confirmations BIGINT,
     address TEXT,
     direction TEXT,
     status TEXT,
-    amount bigint, -- satoshis
+    amount BIGINT, -- satoshis
     metainfo JSONB,
-    reported_confirmations bigint
+    fee BIGINT,
+    fee_type TEXT,
+    reported_confirmations BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS metadata (
