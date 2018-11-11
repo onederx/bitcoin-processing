@@ -54,7 +54,7 @@ func (s *APIServer) withdraw(response http.ResponseWriter, request *http.Request
 }
 
 func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *http.Request) {
-	response.Write([]byte(s.wallet.GetHotWalletAddress()))
+	response.Write([]byte(s.wallet.GetHotWalletAddress() + "\n"))
 }
 
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
