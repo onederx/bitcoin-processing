@@ -121,15 +121,16 @@ type Transaction struct {
 }
 
 func (tx *Transaction) update(other *Transaction) {
-	if tx.Hash != other.Hash {
+	if tx.Hash != "" && tx.Hash != other.Hash {
 		panic("Tx update called for transaction with other hash")
 	}
+	tx.Hash = other.Hash
 	tx.BlockHash = other.BlockHash
 	tx.Confirmations = other.Confirmations
 }
 
 func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult) {
-	if tx.Hash != other.TxID {
+	if tx.Hash != "" && tx.Hash != other.TxID {
 		panic("Tx update called for transaction with other hash")
 	}
 	tx.BlockHash = other.BlockHash
