@@ -21,7 +21,7 @@ func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus
 }
 
 func (w *Wallet) updatePendingTxStatusOrLogError(tx *Transaction, status TransactionStatus) {
-	err := w.updatePendingTxStatus(tx, PendingTransaction)
+	err := w.updatePendingTxStatus(tx, status)
 	if err != nil {
 		log.Printf(
 			"Error: failed to store updated pending tx status: %s",
