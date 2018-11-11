@@ -57,6 +57,32 @@ func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *
 	response.Write([]byte(s.wallet.GetHotWalletAddress() + "\n"))
 }
 
+func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.Request) {
+	var txFilter struct {
+		Direction string
+		Status    string
+	}
+	var body, responseBody []byte
+	var err error
+
+	if body, err = ioutil.ReadAll(request.Body); err != nil {
+		panic(err)
+	}
+	if len(body) > 0 {
+		if err = json.Unmarshal(body, &txFilter); err != nil {
+			panic(err)
+		}
+	}
+	txns, err := s.wallet.GetTransactionsWithFilter(txFilter.Direction, txFilter.Status)
+	if err != nil {
+		panic(err)
+	}
+	if responseBody, err = json.Marshal(txns); err != nil {
+		panic(err)
+	}
+	response.Write(responseBody)
+}
+
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
@@ -80,4 +106,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/notify-wallet", "", s.notifyWalletTxStatusChanged)
 	s.handle("/withdraw", "", s.withdraw)
 	s.handle("/get-hot-storage-address", "", s.getHotStorageAddress)
+	s.handle("/get-transactions", "", s.getTransactions)
 }

@@ -15,6 +15,7 @@ type WalletStorage interface {
 	GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error)
 	GetPendingTransactions() ([]*Transaction, error)
 	updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error
+	GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error)
 
 	GetAccountByAddress(address string) (*Account, error)
 	StoreAccount(account *Account) error

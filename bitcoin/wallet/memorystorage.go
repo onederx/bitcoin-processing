@@ -132,5 +132,19 @@ func (s *InMemoryWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 		}
 	}
 	return result, nil
+}
 
+func (s *InMemoryWalletStorage) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error) {
+	result := make([]*Transaction, 0)
+
+	for _, transaction := range s.transactions {
+		if directionFilter != "" && directionFilter != transaction.Direction.String() {
+			continue
+		}
+		if statusFilter != "" && statusFilter != transaction.Status.String() {
+			continue
+		}
+		result = append(result, transaction)
+	}
+	return result, nil
 }

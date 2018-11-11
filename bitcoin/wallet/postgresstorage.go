@@ -8,6 +8,7 @@ import (
 	"log"
 	"runtime/debug"
 	"strconv"
+	"strings"
 
 	"github.com/satori/go.uuid"
 
@@ -434,4 +435,44 @@ func (s *PostgresWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) e
 	}
 	s.moneyRequiredFromColdStorage = amount
 	return nil
+}
+
+func (s *PostgresWalletStorage) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error) {
+	query := fmt.Sprintf("SELECT %s FROM transactions", transactionFields)
+	queryArgs := make([]interface{}, 0, 2)
+	whereClause := make([]string, 0, 2)
+	argc := 0
+	result := make([]*Transaction, 0, 20)
+
+	if directionFilter != "" {
+		argc++
+		whereClause = append(whereClause, fmt.Sprintf("direction = $%d", argc))
+		queryArgs = append(queryArgs, directionFilter)
+	}
+	if statusFilter != "" {
+		argc++
+		whereClause = append(whereClause, fmt.Sprintf("status = $%d", argc))
+		queryArgs = append(queryArgs, statusFilter)
+	}
+	if len(whereClause) > 0 {
+		query += " WHERE " + strings.Join(whereClause, " AND ")
+	}
+	rows, err := s.db.Query(query, queryArgs...)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		transaction, err := transactionFromDatabaseRow(rows)
+		if err != nil {
+			return result, err
+		}
+		result = append(result, transaction)
+	}
+	err = rows.Err()
+	if err != nil {
+		return result, err
+	}
+	return result, nil
 }
