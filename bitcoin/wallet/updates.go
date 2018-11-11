@@ -207,6 +207,9 @@ func (w *Wallet) pollWalletUpdates() {
 		select {
 		case <-ticker:
 		case <-w.eventBroker.ExternalTxNotifications:
+		case withdrawRequest := <-w.withdrawQueue:
+			withdrawRequest.result <- w.sendWithdrawal(withdrawRequest.tx, true)
+			close(withdrawRequest.result)
 		}
 		w.checkForWalletUpdates()
 	}

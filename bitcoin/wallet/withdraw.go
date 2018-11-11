@@ -18,6 +18,11 @@ type WithdrawRequest struct {
 	Metainfo interface{}
 }
 
+type internalWithdrawRequest struct {
+	tx     *Transaction
+	result chan error
+}
+
 func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 	log.Printf(
 		"Got withdraw request with id %s, to address %s, "+
@@ -115,6 +120,17 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	return nil
 }
 
+func (w *Wallet) sendWithdrawalViaWalletUpdater(tx *Transaction) error {
+	// to prevent races, actual withdraw will be done in wallet updater
+	// goroutine
+	resultCh := make(chan error)
+	w.withdrawQueue <- internalWithdrawRequest{
+		tx:     tx,
+		result: resultCh,
+	}
+	return <-resultCh
+}
+
 func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
 
@@ -143,5 +159,5 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 		reportedConfirmations: -1,
 	}
 
-	return w.sendWithdrawal(outgoingTx, true)
+	return w.sendWithdrawalViaWalletUpdater(outgoingTx)
 }

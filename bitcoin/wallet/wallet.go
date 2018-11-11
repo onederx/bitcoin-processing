@@ -6,6 +6,8 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
+const withdrawQueueSize = 10000
+
 type Wallet struct {
 	nodeAPI          *nodeapi.NodeAPI
 	eventBroker      *events.EventBroker
@@ -15,6 +17,8 @@ type Wallet struct {
 	minFeePerKb      uint64
 	minFeeFixed      uint64
 	maxConfirmations int64
+
+	withdrawQueue chan internalWithdrawRequest
 }
 
 func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Wallet {
@@ -28,6 +32,7 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 		minFeePerKb:      uint64(settings.GetInt64("wallet.min-fee.per-kb")),
 		minFeeFixed:      uint64(settings.GetInt64("wallet.min-fee.fixed")),
 		maxConfirmations: maxConfirmations,
+		withdrawQueue:    make(chan internalWithdrawRequest, withdrawQueueSize),
 	}
 }
 
