@@ -501,6 +501,57 @@ func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 	return response.Result, nil
 }
 
+func (n *NodeAPI) getBalance() (uint64, error) {
+	balance, err := n.btcrpc.GetBalance("*")
+	if err != nil {
+		return 0, err
+	}
+	return uint64(balance), nil
+}
+
+func (n *NodeAPI) getUnconfirmedBalance() (uint64, error) {
+	// there is GetUnconfirmedBalance in btcd/rpcclient, but it is broken:
+	// it sends one positional argument while Bitcoin Core expects no args
+	var response struct {
+		Result *float64
+		Error  *JsonRPCError
+	}
+	getUnconfirmedBalanceJSONResp, err := n.sendRequestToNode(
+		"getunconfirmedbalance",
+		nil,
+	)
+	if err != nil {
+		return 0, err
+	}
+	err = json.Unmarshal(getUnconfirmedBalanceJSONResp, &response)
+	if response.Error != nil {
+		return 0, response.Error
+	}
+	amount, err := btcutil.NewAmount(*response.Result)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(amount), nil
+}
+
+func (n *NodeAPI) GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error) {
+	n.moneySendLock.Lock()
+	defer n.moneySendLock.Unlock()
+
+	confirmedBalance, err := n.getBalance()
+
+	if err != nil {
+		return 0, 0, err
+	}
+
+	unconfirmedBalance, err := n.getUnconfirmedBalance()
+
+	if err != nil {
+		return 0, 0, err
+	}
+	return confirmedBalance, unconfirmedBalance, nil
+}
+
 func NewNodeAPI() *NodeAPI {
 	var nodeURLScheme string
 	// prepare bitcoind RPC connection
