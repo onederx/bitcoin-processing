@@ -71,7 +71,7 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 	}
 }
 
-func (w *Wallet) updateTxInfo(tx *Transaction) {
+func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 	isHotStorageTx := tx.Address == w.hotWalletAddress
 	if tx.Direction == IncomingDirection {
 		if !isHotStorageTx {
@@ -80,12 +80,14 @@ func (w *Wallet) updateTxInfo(tx *Transaction) {
 			tx.Metainfo = hotStorageMeta
 		}
 	}
+	oldStatus := tx.Status
 	w.setTxStatusByConfirmations(tx)
 	tx, err := w.storage.StoreTransaction(tx)
 	if err != nil {
 		log.Printf("Error: failed to store tx data in database: %s", err)
-		return
+		return false
 	}
+	txInfoChanged := tx.fresh || (oldStatus != tx.Status)
 	if tx.fresh {
 		log.Printf("New tx %s", tx.Hash)
 	}
@@ -99,14 +101,16 @@ func (w *Wallet) updateTxInfo(tx *Transaction) {
 				tx.Id,
 			)
 		}
-		return
+		return txInfoChanged
 	}
 	w.notifyTransaction(tx)
+	return txInfoChanged
 }
 
 func (w *Wallet) checkForNewTransactions() {
 	lastSeenBlock := w.storage.GetLastSeenBlockHash()
 	lastTxData, err := w.nodeAPI.ListTransactionsSinceBlock(lastSeenBlock)
+	txInfoChanged := false
 	if err != nil {
 		log.Print("Error: Checking for wallet updates failed: ", err)
 		return
@@ -119,9 +123,13 @@ func (w *Wallet) checkForNewTransactions() {
 			lastTxData.LastBlock,
 		)
 	}
+	if len(lastTxData.Transactions) > 0 {
+		log.Printf("Got new txns:")
+	}
 	for _, btcNodeTransaction := range lastTxData.Transactions {
+		log.Printf("%s", btcNodeTransaction.TxID)
 		tx := newTransaction(&btcNodeTransaction)
-		w.updateTxInfo(tx)
+		txInfoChanged = txInfoChanged || w.updateTxInfo(tx)
 	}
 	err = w.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
 	if err != nil {
@@ -130,14 +138,21 @@ func (w *Wallet) checkForNewTransactions() {
 			err,
 		)
 	}
+	if txInfoChanged {
+		w.updatePendingTxns()
+	}
 }
 
 func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
 	switch {
-	case tx.Status != NewTransaction && tx.Status != ConfirmedTransaction:
+	case tx.Status != NewTransaction && tx.Status != ConfirmedTransaction && tx.Status != FullyConfirmedTransaction:
 		// only "new" and "confirmed" statuses can be changed based on
 		// number of confirmations ("new" can become "confirmed", "confirmed"
-		// can become "fully-confirmed")
+		// can become "fully-confirmed"). We also allow "fully-confirmed" to
+		// changed because statuses should be sent consistently, so, we want to
+		// be able to set status back to "new" or "confirmed" based on number of
+		// confirmations to report these statuses to client before reporting
+		// actual status "fully-confirmed"
 		return
 	case tx.Confirmations <= 0:
 		tx.Status = NewTransaction
@@ -152,6 +167,7 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 	transactionsToCheck, err := w.storage.GetBroadcastedTransactionsWithLessConfirmations(
 		w.maxConfirmations,
 	)
+	txInfoChanged := false
 
 	if err != nil {
 		log.Printf(
@@ -172,7 +188,10 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 			continue
 		}
 		tx.updateFromFullTxInfo(fullTxInfo)
-		w.updateTxInfo(tx)
+		txInfoChanged = txInfoChanged || w.updateTxInfo(tx)
+	}
+	if txInfoChanged {
+		w.updatePendingTxns()
 	}
 }
 

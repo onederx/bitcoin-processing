@@ -34,5 +34,6 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 func (w *Wallet) Run() {
 	w.initHotWallet()
 	w.checkForWalletUpdates()
+	w.updatePendingTxns()
 	w.startWatchingWalletUpdates()
 }

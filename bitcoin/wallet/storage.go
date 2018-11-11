@@ -21,6 +21,9 @@ type WalletStorage interface {
 
 	GetHotWalletAddress() string
 	SetHotWalletAddress(address string) error
+
+	GetMoneyRequiredFromColdStorage() uint64
+	SetMoneyRequiredFromColdStorage(amount uint64) error
 }
 
 func newStorage(storageType string) WalletStorage {

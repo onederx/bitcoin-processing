@@ -7,10 +7,11 @@ import (
 )
 
 type InMemoryWalletStorage struct {
-	lastSeenBlockHash string
-	accounts          []*Account
-	transactions      []*Transaction
-	hotWalletAddress  string
+	lastSeenBlockHash            string
+	accounts                     []*Account
+	transactions                 []*Transaction
+	hotWalletAddress             string
+	moneyRequiredFromColdStorage uint64
 }
 
 func (s *InMemoryWalletStorage) GetLastSeenBlockHash() string {
@@ -19,6 +20,15 @@ func (s *InMemoryWalletStorage) GetLastSeenBlockHash() string {
 
 func (s *InMemoryWalletStorage) SetLastSeenBlockHash(hash string) error {
 	s.lastSeenBlockHash = hash
+	return nil
+}
+
+func (s *InMemoryWalletStorage) GetMoneyRequiredFromColdStorage() uint64 {
+	return s.moneyRequiredFromColdStorage
+}
+
+func (s *InMemoryWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) error {
+	s.moneyRequiredFromColdStorage = amount
 	return nil
 }
 

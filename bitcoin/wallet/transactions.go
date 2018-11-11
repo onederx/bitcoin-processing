@@ -130,6 +130,7 @@ func (tx *Transaction) update(other *Transaction) {
 	tx.Hash = other.Hash
 	tx.BlockHash = other.BlockHash
 	tx.Confirmations = other.Confirmations
+	tx.Status = other.Status
 }
 
 func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult) {

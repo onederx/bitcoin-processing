@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"strconv"
 
 	"github.com/satori/go.uuid"
@@ -15,9 +16,10 @@ import (
 )
 
 type PostgresWalletStorage struct {
-	db                *sql.DB
-	lastSeenBlockHash string
-	hotWalletAddress  string
+	db                           *sql.DB
+	lastSeenBlockHash            string
+	hotWalletAddress             string
+	moneyRequiredFromColdStorage uint64
 }
 
 type queryResult interface {
@@ -59,6 +61,25 @@ func newPostgresWalletStorage() *PostgresWalletStorage {
 	}
 
 	storage.hotWalletAddress, err = storage.getMeta("hot_wallet_address", "")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	moneyRequiredFromColdStorageString, err := storage.getMeta(
+		"money_required_from_cold_storage",
+		"0",
+	)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	storage.moneyRequiredFromColdStorage, err = strconv.ParseUint(
+		moneyRequiredFromColdStorageString,
+		10,
+		64,
+	)
 
 	if err != nil {
 		log.Fatal(err)
@@ -397,4 +418,20 @@ func (s *PostgresWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 	}
 	return result, nil
 
+}
+
+func (s *PostgresWalletStorage) GetMoneyRequiredFromColdStorage() uint64 {
+	return s.moneyRequiredFromColdStorage
+}
+
+func (s *PostgresWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) error {
+	err := s.setMeta(
+		"money_required_from_cold_storage",
+		strconv.FormatUint(amount, 10),
+	)
+	if err != nil {
+		return err
+	}
+	s.moneyRequiredFromColdStorage = amount
+	return nil
 }

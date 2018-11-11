@@ -70,8 +70,52 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 	return nil
 }
 
-func (w *Wallet) Withdraw(request *WithdrawRequest) error {
+func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	var sendMoneyFunc func(string, uint64, uint64, bool) (string, error)
+
+	switch tx.FeeType {
+	case bitcoin.PerKBRateFee:
+		sendMoneyFunc = w.nodeAPI.SendWithPerKBFee
+	case bitcoin.FixedFee:
+		sendMoneyFunc = w.nodeAPI.SendWithFixedFee
+	default:
+		return errors.New("Fee type not supported: " + tx.FeeType.String())
+	}
+
+	txHash, err := sendMoneyFunc(
+		tx.Address,
+		tx.Amount,
+		tx.Fee,
+		true, // recipient pays tx fee
+	)
+
+	if err != nil {
+		if !isInsufficientFundsError(err) {
+			return err
+		}
+		err = w.updatePendingTxStatus(tx, PendingTransaction)
+		if err != nil {
+			return err
+		}
+	} else {
+		tx.Status = NewTransaction
+		tx.Hash = txHash
+
+		_, err = w.storage.StoreTransaction(tx)
+		if err != nil {
+			return err
+		}
+		w.notifyTransaction(tx)
+	}
+
+	if updatePending {
+		w.updatePendingTxns()
+	}
+
+	return nil
+}
+
+func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
 
 	if err != nil {
@@ -86,49 +130,18 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 		return err
 	}
 
-	switch feeType {
-	case bitcoin.PerKBRateFee:
-		sendMoneyFunc = w.nodeAPI.SendWithPerKBFee
-	case bitcoin.FixedFee:
-		sendMoneyFunc = w.nodeAPI.SendWithFixedFee
-	default:
-		return errors.New("Fee type not supported: " + request.FeeType)
-	}
-
 	outgoingTx := &Transaction{
-		Id:            request.Id,
-		Confirmations: 0,
-		Address:       request.Address,
-		Direction:     OutgoingDirection,
-		Amount:        request.Amount,
-		Metainfo:      request.Metainfo,
-		fresh:         true,
+		Id:                    request.Id,
+		Confirmations:         0,
+		Address:               request.Address,
+		Direction:             OutgoingDirection,
+		Amount:                request.Amount,
+		Metainfo:              request.Metainfo,
+		Fee:                   request.Fee,
+		FeeType:               feeType,
+		fresh:                 true,
 		reportedConfirmations: -1,
 	}
 
-	txHash, err := sendMoneyFunc(
-		request.Address,
-		request.Amount,
-		request.Fee,
-		true, // recipient pays tx fee
-	)
-
-	if err != nil {
-		if !isInsufficientFundsError(err) {
-			return err
-		}
-		outgoingTx.Status = PendingTransaction
-	} else {
-		outgoingTx.Status = NewTransaction
-		outgoingTx.Hash = txHash
-	}
-
-	w.notifyTransaction(outgoingTx)
-	_, err = w.storage.StoreTransaction(outgoingTx)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return w.sendWithdrawal(outgoingTx, true)
 }

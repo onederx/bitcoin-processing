@@ -13,16 +13,18 @@ const (
 	IncomingTxConfirmedEvent
 	NewOutgoingTxEvent
 	OutgoingTxConfirmedEvent
+	PendingStatusUpdatedEvent
 	InvalidEvent
 )
 
 var eventTypeToStringMap map[EventType]string = map[EventType]string{
-	NewAddressEvent:          "new-address",
-	CheckTxStatusEvent:       "check-tx-status",
-	NewIncomingTxEvent:       "new-incoming-tx",
-	IncomingTxConfirmedEvent: "incoming-tx-confirmed",
-	NewOutgoingTxEvent:       "new-outgoing-tx",
-	OutgoingTxConfirmedEvent: "outgoing-tx-confirmed",
+	NewAddressEvent:           "new-address",
+	CheckTxStatusEvent:        "check-tx-status",
+	NewIncomingTxEvent:        "new-incoming-tx",
+	IncomingTxConfirmedEvent:  "incoming-tx-confirmed",
+	NewOutgoingTxEvent:        "new-outgoing-tx",
+	OutgoingTxConfirmedEvent:  "outgoing-tx-confirmed",
+	PendingStatusUpdatedEvent: "tx-pending-status-updated",
 }
 
 var stringToEventTypeMap map[string]EventType = make(map[string]EventType)
