@@ -32,7 +32,6 @@ func (w *Wallet) updatePendingTxStatusOrLogError(tx *Transaction, status Transac
 
 func (w *Wallet) updatePendingTxns() {
 	var amount int64
-	log.Printf("Updating pending txns")
 	pendingTxns, err := w.storage.GetPendingTransactions()
 	if err != nil {
 		log.Printf("Error: failed to get pending txns for update %s", err)
@@ -42,7 +41,6 @@ func (w *Wallet) updatePendingTxns() {
 		return pendingTxns[i].Amount < pendingTxns[j].Amount
 	})
 	confBal, unconfBal, err := w.nodeAPI.GetConfirmedAndUnconfirmedBalance()
-	log.Printf("Balances are %d %d", confBal, unconfBal)
 	if err != nil {
 		log.Printf("Error: failed to get wallet balance %s", err)
 		return
@@ -55,13 +53,12 @@ func (w *Wallet) updatePendingTxns() {
 		amount = int64(tx.Amount)
 		if availableBalance-amount >= 0 {
 			availableBalance -= amount
-			log.Printf("Enough money to send tx %v, balance now is %d", tx, availableBalance)
+			log.Printf("There is now enough money to send tx %v, resending", tx)
 			err = w.sendWithdrawal(tx, false)
 			if err != nil {
 				log.Printf("Error re-sending pending tx: %s", err)
 			}
 		} else {
-			log.Printf("Not enough balance to send tx %v", tx)
 			exceedingTx = i
 			break
 		}

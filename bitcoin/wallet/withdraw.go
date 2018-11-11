@@ -98,6 +98,7 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 		if !isInsufficientFundsError(err) {
 			return err
 		}
+		log.Printf("Not enough funds to send tx %v, marking as pending", tx)
 		err = w.updatePendingTxStatus(tx, PendingTransaction)
 		if err != nil {
 			return err

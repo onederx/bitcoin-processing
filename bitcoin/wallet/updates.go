@@ -123,11 +123,7 @@ func (w *Wallet) checkForNewTransactions() {
 			lastTxData.LastBlock,
 		)
 	}
-	if len(lastTxData.Transactions) > 0 {
-		log.Printf("Got new txns:")
-	}
 	for _, btcNodeTransaction := range lastTxData.Transactions {
-		log.Printf("%s", btcNodeTransaction.TxID)
 		tx := newTransaction(&btcNodeTransaction)
 		txInfoChanged = txInfoChanged || w.updateTxInfo(tx)
 	}
