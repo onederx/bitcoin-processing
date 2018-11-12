@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/satori/go.uuid"
+	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,6 +16,16 @@ import (
 type httpAPIResponse struct {
 	Error  string      `json:"error"`
 	Result interface{} `json:"result"`
+}
+
+var satoshiInBTCDecimal = decimal.New(1, 8)
+
+func amountFromString(amount string) (uint64, error) {
+	amountDecimal, err := decimal.NewFromString(amount)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(amountDecimal.Mul(satoshiInBTCDecimal).IntPart()), nil
 }
 
 func (s *APIServer) respond(response http.ResponseWriter, data interface{}, err error) {
@@ -58,9 +69,13 @@ func (s *APIServer) newBitcoinAddress(response http.ResponseWriter, request *htt
 		s.respond(response, nil, err)
 		return
 	}
-	if err = json.Unmarshal(body, &metainfo); err != nil {
-		s.respond(response, nil, err)
-		return
+	if len(body) > 0 {
+		if err = json.Unmarshal(body, &metainfo); err != nil {
+			s.respond(response, nil, err)
+			return
+		}
+	} else {
+		metainfo = nil
 	}
 	account, err := s.wallet.CreateAccount(metainfo)
 	if err != nil {
@@ -77,7 +92,14 @@ func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, re
 }
 
 func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
-	var req wallet.WithdrawRequest
+	var req struct {
+		Id      uuid.UUID
+		Address string
+		Amount  string
+		Fee     string
+		FeeType string `json:"fee_type"`
+	}
+	var withdrawReq wallet.WithdrawRequest
 	var body []byte
 	var err error
 
@@ -89,19 +111,34 @@ func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, r
 		s.respond(response, nil, err)
 		return
 	}
-	if req.Id == uuid.Nil {
-		req.Id = uuid.Must(uuid.NewV4())
-		log.Printf("Generated new withdrawal id %s", req.Id)
-	}
-	if req.FeeType == "" {
-		log.Printf("Fee type not specified: setting to 'fixed' by default")
-		req.FeeType = "fixed"
-	}
-	if err = s.wallet.Withdraw(&req, toColdStorage); err != nil {
+	withdrawReq.Address = req.Address
+	withdrawReq.Amount, err = amountFromString(req.Amount)
+	if err != nil {
 		s.respond(response, nil, err)
 		return
 	}
-	s.respond(response, req, nil)
+	withdrawReq.Fee, err = amountFromString(req.Fee)
+	if err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+	if req.Id == uuid.Nil {
+		withdrawReq.Id = uuid.Must(uuid.NewV4())
+		log.Printf("Generated new withdrawal id %s", withdrawReq.Id)
+	} else {
+		withdrawReq.Id = req.Id
+	}
+	if req.FeeType == "" {
+		log.Printf("Fee type not specified: setting to 'fixed' by default")
+		withdrawReq.FeeType = "fixed"
+	} else {
+		withdrawReq.FeeType = req.FeeType
+	}
+	if err = s.wallet.Withdraw(&withdrawReq, toColdStorage); err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+	s.respond(response, withdrawReq, nil)
 }
 
 func (s *APIServer) withdrawRegular(response http.ResponseWriter, request *http.Request) {
