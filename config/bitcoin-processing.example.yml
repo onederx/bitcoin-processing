@@ -1,5 +1,5 @@
-transaction:
-  callback: http://127.0.0.1:9000/
+callback:
+  url: http://127.0.0.1:9000/
 api:
   http:
     address: 127.0.0.1:8000

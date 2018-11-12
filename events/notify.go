@@ -1,19 +1,19 @@
 package events
 
 import (
-	"bytes"
-	"encoding/json"
 	"log"
-	"net/http"
 
 	"github.com/onederx/bitcoin-processing/settings"
 )
+
+const callbackUrlQueueSize = 100000
 
 type EventBroker struct {
 	storage                 EventStorage
 	eventBroadcaster        *broadcasterWithStorage
 	ExternalTxNotifications chan string
 	callbackUrl             string
+	callbackUrlQueue        chan []byte
 }
 
 func NewEventBroker() *EventBroker {
@@ -23,26 +23,9 @@ func NewEventBroker() *EventBroker {
 		storage:                 storage,
 		eventBroadcaster:        newBroadcasterWithStorage(storage),
 		ExternalTxNotifications: make(chan string, 3),
-		callbackUrl:             settings.GetURL("transaction.callback"),
+		callbackUrl:             settings.GetURL("callback.url"),
+		callbackUrlQueue:        make(chan []byte, callbackUrlQueueSize),
 	}
-}
-
-func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
-	notificationJSON, err := json.Marshal(event)
-	if err != nil {
-		log.Printf("Error: could not json-encode notification for webhook", err)
-		return
-	}
-	resp, err := http.Post(
-		e.callbackUrl,
-		"application/json",
-		bytes.NewReader(notificationJSON),
-	)
-	if err != nil {
-		log.Print("Warning: error calling webhook ", err)
-		return
-	}
-	resp.Body.Close()
 }
 
 func (e *EventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
@@ -86,4 +69,8 @@ func (e *EventBroker) SubscribeFromSeq(seq int) <-chan *NotificationWithSeq {
 
 func (e *EventBroker) Unsubscribe(eventChannel <-chan *NotificationWithSeq) {
 	e.eventBroadcaster.Unsubscribe(eventChannel)
+}
+
+func (e *EventBroker) Run() {
+	e.sendHTTPCallbackNotifications()
 }

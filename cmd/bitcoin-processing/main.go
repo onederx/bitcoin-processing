@@ -22,6 +22,7 @@ func main() {
 
 		go apiServer.Run()
 		go bitcoinWallet.Run()
+		go eventBroker.Run()
 
 		select {}
 	})
