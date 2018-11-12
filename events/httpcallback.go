@@ -74,7 +74,7 @@ func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
 }
 
 func (e *EventBroker) sendHTTPCallbackNotifications() {
-	backoff := settings.GetInt("callback.backoff")
+	backoff := settings.GetInt("transaction.callback.backoff")
 
 	for notification := range e.callbackUrlQueue {
 		delay := time.Second
