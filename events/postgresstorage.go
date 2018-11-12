@@ -60,7 +60,7 @@ func (s *PostgresEventStorage) GetEventsFromSeq(seq int) ([]*storedEvent, error)
 	result := make([]*storedEvent, 0, 20)
 
 	rows, err := s.db.Query(`SELECT seq, type, data FROM events
-        WHERE seq >= $1`, seq,
+        WHERE seq >= $1 ORDER BY seq`, seq,
 	)
 	if err != nil {
 		return result, err
