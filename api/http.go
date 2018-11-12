@@ -83,6 +83,23 @@ func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.
 	response.Write(responseBody)
 }
 
+func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Request) {
+	var respData struct {
+		Balance           uint64 `json:"balance"`
+		BalanceWithUnconf uint64 `json:"balance_including_unconfirmed"`
+	}
+	var err error
+	respData.Balance, respData.BalanceWithUnconf, err = s.wallet.GetBalance()
+	if err != nil {
+		panic(err)
+	}
+	responseBody, err := json.Marshal(respData)
+	if err != nil {
+		panic(err)
+	}
+	response.Write(responseBody)
+}
+
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
@@ -107,4 +124,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/withdraw", "", s.withdraw)
 	s.handle("/get-hot-storage-address", "", s.getHotStorageAddress)
 	s.handle("/get-transactions", "", s.getTransactions)
+	s.handle("/get-balance", "", s.getBalance)
 }
