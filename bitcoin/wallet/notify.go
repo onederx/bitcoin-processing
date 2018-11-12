@@ -26,6 +26,6 @@ func (w *Wallet) NotifyTransaction(eventType events.EventType, tx Transaction) {
 		Currency:    "BTC",
 		Amount:      decimal.New(int64(tx.Amount), -8).String(),
 		IpnId:       tx.Id.String(),
-		Fee:         decimal.New(int64(tx.Amount), -8).String(),
+		Fee:         decimal.New(int64(tx.Fee), -8).String(),
 	})
 }

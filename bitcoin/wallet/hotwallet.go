@@ -50,8 +50,8 @@ func (w *Wallet) getOrCreateHotWallet() string {
 func (w *Wallet) checkHotWalletAddress() {
 	addressInfo, err := w.nodeAPI.GetAddressInfo(w.hotWalletAddress)
 	if err != nil {
-		log.Fatal(
-			"Error: failed to check hot wallet address ",
+		log.Fatalf(
+			"Error: failed to check hot wallet address %s: %s",
 			w.hotWalletAddress,
 			err,
 		)
