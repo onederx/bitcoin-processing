@@ -29,7 +29,7 @@ func initConfig() {
 	locateAndReadConfigFile()
 
 	// let CLI args override config params
-	viper.BindPFlag("callback.url", cli.Flags().Lookup("callback-url"))
+	viper.BindPFlag("transaction.callback.url", cli.Flags().Lookup("transaction-callback-url"))
 	viper.BindPFlag("api.http.address", cli.Flags().Lookup("http-address"))
 	viper.BindPFlag("storage.type", cli.Flags().Lookup("storage-type"))
 
@@ -41,7 +41,7 @@ func initConfig() {
 	viper.SetDefault("wallet.min-withdraw", 600)
 	viper.SetDefault("wallet.min-fee.per-kb", bitcoin.MinimalFeeRate)
 	viper.SetDefault("wallet.min-fee.fixed", 500)
-	viper.SetDefault("callback.backoff", 100)
+	viper.SetDefault("transaction.callback.backoff", 100)
 }
 
 func GetString(key string) string {

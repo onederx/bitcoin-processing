@@ -23,7 +23,7 @@ func NewEventBroker() *EventBroker {
 		storage:                 storage,
 		eventBroadcaster:        newBroadcasterWithStorage(storage),
 		ExternalTxNotifications: make(chan string, 3),
-		callbackUrl:             settings.GetURL("callback.url"),
+		callbackUrl:             settings.GetURL("transaction.callback.url"),
 		callbackUrlQueue:        make(chan []byte, callbackUrlQueueSize),
 	}
 }
