@@ -10,12 +10,12 @@ import (
 )
 
 type WithdrawRequest struct {
-	Id       uuid.UUID
-	Address  string
-	Amount   uint64
-	Fee      uint64
-	FeeType  string `json:"fee_type"`
-	Metainfo interface{}
+	Id       uuid.UUID   `json:"id"`
+	Address  string      `json:"address"`
+	Amount   uint64      `json:"amount"`
+	Fee      uint64      `json:"fee"`
+	FeeType  string      `json:"fee_type"`
+	Metainfo interface{} `json:"metainfo"`
 }
 
 type internalWithdrawRequest struct {

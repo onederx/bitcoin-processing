@@ -7,36 +7,73 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
 
+type httpAPIResponse struct {
+	Error  string      `json:"error"`
+	Result interface{} `json:"result"`
+}
+
+func (s *APIServer) respond(response http.ResponseWriter, data interface{}, err error) {
+	var responseBody []byte
+	if err != nil {
+		response.WriteHeader(500)
+		responseBody, err = json.Marshal(httpAPIResponse{Error: err.Error()})
+		if err != nil {
+			panic("Failed to marshal error response for error " + err.Error())
+		}
+		_, err = response.Write(responseBody)
+		if err != nil {
+			panic(fmt.Sprintf(
+				"Failed to write error response %q: %s",
+				responseBody,
+				err,
+			))
+		}
+		return
+	}
+	responseBody, err = json.Marshal(httpAPIResponse{Error: "ok", Result: data})
+	if err != nil {
+		panic("Failed to marshal ok response for error " + err.Error())
+	}
+	_, err = response.Write(responseBody)
+	if err != nil {
+		panic(fmt.Sprintf(
+			"Failed to write ok response %q: %s",
+			responseBody,
+			err,
+		))
+	}
+}
+
 func (s *APIServer) newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 	var metainfo map[string]interface{}
-	var body, responseBody []byte
+	var body []byte
 	var err error
 
 	if body, err = ioutil.ReadAll(request.Body); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	if err = json.Unmarshal(body, &metainfo); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	account, err := s.wallet.CreateAccount(metainfo)
 	if err != nil {
-		panic(err)
-	}
-	if responseBody, err = json.Marshal(account); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	s.eventBroker.Notify(events.NewAddressEvent, account)
-	response.Write(responseBody)
+	s.respond(response, account, nil)
 }
 
 func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
 	s.eventBroker.Notify(events.CheckTxStatusEvent, "")
+	s.respond(response, nil, nil)
 }
 
 func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
@@ -45,14 +82,26 @@ func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, r
 	var err error
 
 	if body, err = ioutil.ReadAll(request.Body); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	if err = json.Unmarshal(body, &req); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
+	}
+	if req.Id == uuid.Nil {
+		req.Id = uuid.Must(uuid.NewV4())
+		log.Printf("Generated new withdrawal id %s", req.Id)
+	}
+	if req.FeeType == "" {
+		log.Printf("Fee type not specified: setting to 'fixed' by default")
+		req.FeeType = "fixed"
 	}
 	if err = s.wallet.Withdraw(&req, toColdStorage); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
+	s.respond(response, req, nil)
 }
 
 func (s *APIServer) withdrawRegular(response http.ResponseWriter, request *http.Request) {
@@ -64,7 +113,7 @@ func (s *APIServer) withdrawToColdStorage(response http.ResponseWriter, request 
 }
 
 func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *http.Request) {
-	response.Write([]byte(s.wallet.GetHotWalletAddress() + "\n"))
+	s.respond(response, s.wallet.GetHotWalletAddress(), nil)
 }
 
 func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.Request) {
@@ -72,25 +121,22 @@ func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.
 		Direction string
 		Status    string
 	}
-	var body, responseBody []byte
+	var body []byte
 	var err error
 
 	if body, err = ioutil.ReadAll(request.Body); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	if len(body) > 0 {
 		if err = json.Unmarshal(body, &txFilter); err != nil {
-			panic(err)
+			s.respond(response, nil, err)
+			return
 		}
 	}
 	txns, err := s.wallet.GetTransactionsWithFilter(txFilter.Direction, txFilter.Status)
-	if err != nil {
-		panic(err)
-	}
-	if responseBody, err = json.Marshal(txns); err != nil {
-		panic(err)
-	}
-	response.Write(responseBody)
+
+	s.respond(response, txns, err)
 }
 
 func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Request) {
@@ -100,21 +146,12 @@ func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Reque
 	}
 	var err error
 	respData.Balance, respData.BalanceWithUnconf, err = s.wallet.GetBalance()
-	if err != nil {
-		panic(err)
-	}
-	responseBody, err := json.Marshal(respData)
-	if err != nil {
-		panic(err)
-	}
-	response.Write(responseBody)
+
+	s.respond(response, respData, err)
 }
 
 func (s *APIServer) getRequiredFromColdStorage(response http.ResponseWriter, request *http.Request) {
-	response.Write([]byte(strconv.FormatUint(
-		s.wallet.GetMoneyRequiredFromColdStorage(),
-		10,
-	)))
+	s.respond(response, s.wallet.GetMoneyRequiredFromColdStorage(), nil)
 }
 
 func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Request) {
@@ -123,43 +160,30 @@ func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Re
 	var err error
 
 	if body, err = ioutil.ReadAll(request.Body); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	if err = json.Unmarshal(body, &id); err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
 	err = s.wallet.CancelPendingTx(id)
 	if err != nil {
-		panic(err)
+		s.respond(response, nil, err)
+		return
 	}
-}
-
-func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
-	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
-	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Printf("Caught error handling '%s' %s", urlPattern, err)
-				response.WriteHeader(500)
-				fmt.Fprintf(response, "Error: %s\n", err)
-			}
-		}()
-		if method != "" && method != request.Method {
-			response.WriteHeader(405)
-			fmt.Fprintf(response, "Method %s is not allowed", request.Method)
-		}
-		handler(response, request)
-	})
+	s.respond(response, nil, nil)
 }
 
 func (s *APIServer) initHTTPAPIServer() {
-	s.handle("/new-address", "", s.newBitcoinAddress)
-	s.handle("/notify-wallet", "", s.notifyWalletTxStatusChanged)
-	s.handle("/withdraw", "", s.withdrawRegular)
-	s.handle("/get-hot-storage-address", "", s.getHotStorageAddress)
-	s.handle("/get-transactions", "", s.getTransactions)
-	s.handle("/get-balance", "", s.getBalance)
-	s.handle("/get-required-from-cold-storage", "", s.getRequiredFromColdStorage)
-	s.handle("/cancel-pending", "", s.cancelPending)
-	s.handle("/withdraw-to-cold-storage", "", s.withdrawToColdStorage)
+	m := s.httpServer.Handler.(*http.ServeMux)
+	m.HandleFunc("/new-address", s.newBitcoinAddress)
+	m.HandleFunc("/notify-wallet", s.notifyWalletTxStatusChanged)
+	m.HandleFunc("/withdraw", s.withdrawRegular)
+	m.HandleFunc("/get-hot-storage-address", s.getHotStorageAddress)
+	m.HandleFunc("/get-transactions", s.getTransactions)
+	m.HandleFunc("/get-balance", s.getBalance)
+	m.HandleFunc("/get-required-from-cold-storage", s.getRequiredFromColdStorage)
+	m.HandleFunc("/cancel-pending", s.cancelPending)
+	m.HandleFunc("/withdraw-to-cold-storage", s.withdrawToColdStorage)
 }
