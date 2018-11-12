@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -108,6 +109,23 @@ func (s *APIServer) getRequiredFromColdStorage(response http.ResponseWriter, req
 	)))
 }
 
+func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Request) {
+	var id uuid.UUID
+	var body []byte
+	var err error
+
+	if body, err = ioutil.ReadAll(request.Body); err != nil {
+		panic(err)
+	}
+	if err = json.Unmarshal(body, &id); err != nil {
+		panic(err)
+	}
+	err = s.wallet.CancelPendingTx(id)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
@@ -134,4 +152,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/get-transactions", "", s.getTransactions)
 	s.handle("/get-balance", "", s.getBalance)
 	s.handle("/get-required-from-cold-storage", "", s.getRequiredFromColdStorage)
+	s.handle("/cancel-pending", "", s.cancelPending)
 }

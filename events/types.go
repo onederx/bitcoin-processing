@@ -14,6 +14,7 @@ const (
 	NewOutgoingTxEvent
 	OutgoingTxConfirmedEvent
 	PendingStatusUpdatedEvent
+	PendingTxCancelledEvent
 	InvalidEvent
 )
 
@@ -25,6 +26,7 @@ var eventTypeToStringMap map[EventType]string = map[EventType]string{
 	NewOutgoingTxEvent:        "new-outgoing-tx",
 	OutgoingTxConfirmedEvent:  "outgoing-tx-confirmed",
 	PendingStatusUpdatedEvent: "tx-pending-status-updated",
+	PendingTxCancelledEvent:   "pending-tx-cancelled",
 }
 
 var stringToEventTypeMap map[string]EventType = make(map[string]EventType)

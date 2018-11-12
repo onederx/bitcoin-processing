@@ -1,13 +1,21 @@
 package wallet
 
 import (
+	"errors"
+	"github.com/satori/go.uuid"
 	"log"
 	"sort"
 
 	"github.com/onederx/bitcoin-processing/events"
 )
 
+type internalCancelRequest struct {
+	id     uuid.UUID
+	result chan error
+}
+
 func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus) error {
+	var eventType events.EventType
 	if status == tx.Status {
 		return nil
 	}
@@ -16,7 +24,12 @@ func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus
 	if err != nil {
 		return err
 	}
-	w.eventBroker.Notify(events.PendingStatusUpdatedEvent, *tx)
+	if status == CancelledTransaction {
+		eventType = events.PendingTxCancelledEvent
+	} else {
+		eventType = events.PendingStatusUpdatedEvent
+	}
+	w.eventBroker.Notify(eventType, *tx)
 	return nil
 }
 
@@ -96,4 +109,31 @@ func (w *Wallet) updatePendingTxns() {
 	} else if w.storage.GetMoneyRequiredFromColdStorage() > 0 {
 		w.storage.SetMoneyRequiredFromColdStorage(0)
 	}
+}
+
+func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
+	tx, err := w.storage.GetTransactionById(id)
+	if err != nil {
+		return err
+	}
+	if tx.Status != PendingTransaction && tx.Status != PendingColdStorageTransaction {
+		return errors.New("Transaction is not pending")
+	}
+	err = w.updatePendingTxStatus(tx, CancelledTransaction)
+	if err != nil {
+		return err
+	}
+	w.updatePendingTxns()
+	return nil
+}
+
+func (w *Wallet) CancelPendingTx(id uuid.UUID) error {
+	// to prevent races, actual cancellation will be done in wallet updater
+	// goroutine
+	resultCh := make(chan error)
+	w.cancelQueue <- internalCancelRequest{
+		id:     id,
+		result: resultCh,
+	}
+	return <-resultCh
 }
