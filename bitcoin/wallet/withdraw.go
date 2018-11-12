@@ -154,6 +154,23 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 		return err
 	}
 
+	if request.Address == "" {
+		if !toColdStorage {
+			return errors.New("Can't process withdraw: address is empty")
+		}
+		if w.coldWalletAddress == "" {
+			return errors.New(
+				"Withdraw to cold storage failed: address is not given in " +
+					"request and not set in config",
+			)
+		}
+		log.Printf(
+			"Making transfer to cold storage address set in config: %s",
+			w.coldWalletAddress,
+		)
+		request.Address = w.coldWalletAddress
+	}
+
 	outgoingTx := &Transaction{
 		Id:                    request.Id,
 		Confirmations:         0,

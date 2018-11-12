@@ -9,14 +9,15 @@ import (
 const internalQueueSize = 10000
 
 type Wallet struct {
-	nodeAPI          *nodeapi.NodeAPI
-	eventBroker      *events.EventBroker
-	storage          WalletStorage
-	hotWalletAddress string
-	minWithdraw      uint64
-	minFeePerKb      uint64
-	minFeeFixed      uint64
-	maxConfirmations int64
+	nodeAPI           *nodeapi.NodeAPI
+	eventBroker       *events.EventBroker
+	storage           WalletStorage
+	hotWalletAddress  string
+	coldWalletAddress string
+	minWithdraw       uint64
+	minFeePerKb       uint64
+	minFeeFixed       uint64
+	maxConfirmations  int64
 
 	withdrawQueue chan internalWithdrawRequest
 	cancelQueue   chan internalCancelRequest
@@ -40,6 +41,7 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 
 func (w *Wallet) Run() {
 	w.initHotWallet()
+	w.initColdWallet()
 	w.checkForWalletUpdates()
 	w.updatePendingTxns()
 	w.startWatchingWalletUpdates()
