@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
@@ -100,6 +101,13 @@ func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Reque
 	response.Write(responseBody)
 }
 
+func (s *APIServer) getRequiredFromColdStorage(response http.ResponseWriter, request *http.Request) {
+	response.Write([]byte(strconv.FormatUint(
+		s.wallet.GetMoneyRequiredFromColdStorage(),
+		10,
+	)))
+}
+
 func (s *APIServer) handle(urlPattern, method string, handler func(http.ResponseWriter, *http.Request)) {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc(urlPattern, func(response http.ResponseWriter, request *http.Request) {
@@ -125,4 +133,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/get-hot-storage-address", "", s.getHotStorageAddress)
 	s.handle("/get-transactions", "", s.getTransactions)
 	s.handle("/get-balance", "", s.getBalance)
+	s.handle("/get-required-from-cold-storage", "", s.getRequiredFromColdStorage)
 }

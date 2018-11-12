@@ -11,3 +11,7 @@ func (w *Wallet) GetBalance() (uint64, uint64, error) {
 	}
 	return conf, conf + unconf, nil
 }
+
+func (w *Wallet) GetMoneyRequiredFromColdStorage() uint64 {
+	return w.storage.GetMoneyRequiredFromColdStorage()
+}
