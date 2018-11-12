@@ -109,7 +109,7 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 func (w *Wallet) checkForNewTransactions() {
 	lastSeenBlock := w.storage.GetLastSeenBlockHash()
 	lastTxData, err := w.nodeAPI.ListTransactionsSinceBlock(lastSeenBlock)
-	txInfoChanged := false
+	anyTxInfoChanged := false
 	if err != nil {
 		log.Print("Error: Checking for wallet updates failed: ", err)
 		return
@@ -124,7 +124,8 @@ func (w *Wallet) checkForNewTransactions() {
 	}
 	for _, btcNodeTransaction := range lastTxData.Transactions {
 		tx := newTransaction(&btcNodeTransaction)
-		txInfoChanged = txInfoChanged || w.updateTxInfo(tx)
+		currentTxInfoChanged := w.updateTxInfo(tx)
+		anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
 	}
 	err = w.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
 	if err != nil {
@@ -133,7 +134,7 @@ func (w *Wallet) checkForNewTransactions() {
 			err,
 		)
 	}
-	if txInfoChanged {
+	if anyTxInfoChanged {
 		w.updatePendingTxns()
 	}
 }
@@ -162,7 +163,7 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 	transactionsToCheck, err := w.storage.GetBroadcastedTransactionsWithLessConfirmations(
 		w.maxConfirmations,
 	)
-	txInfoChanged := false
+	anyTxInfoChanged := false
 
 	if err != nil {
 		log.Printf(
@@ -183,9 +184,10 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 			continue
 		}
 		tx.updateFromFullTxInfo(fullTxInfo)
-		txInfoChanged = txInfoChanged || w.updateTxInfo(tx)
+		currentTxInfoChanged := w.updateTxInfo(tx)
+		anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
 	}
-	if txInfoChanged {
+	if anyTxInfoChanged {
 		w.updatePendingTxns()
 	}
 }
