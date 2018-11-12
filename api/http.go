@@ -214,7 +214,7 @@ func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Re
 
 func (s *APIServer) initHTTPAPIServer() {
 	m := s.httpServer.Handler.(*http.ServeMux)
-	m.HandleFunc("/new-address", s.newBitcoinAddress)
+	m.HandleFunc("/new_wallet", s.newBitcoinAddress)
 	m.HandleFunc("/notify-wallet", s.notifyWalletTxStatusChanged)
 	m.HandleFunc("/withdraw", s.withdrawRegular)
 	m.HandleFunc("/get-hot-storage-address", s.getHotStorageAddress)
