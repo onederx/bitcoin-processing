@@ -14,13 +14,33 @@ import (
 )
 
 func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
-	notificationJSON, err := json.Marshal(event)
+	var flatNotificationData map[string]interface{}
+	notificationDataJSON, err := json.Marshal(event.Data)
+
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for webhook", err)
 		return
 	}
+
+	err = json.Unmarshal(notificationDataJSON, &flatNotificationData)
+
+	if err != nil {
+		log.Printf("Error: could not json-decode notificationDataJSON", err)
+		return
+	}
+
+	flatNotificationData["seq"] = event.Seq
+	flatNotificationData["type"] = event.Type
+
+	flatNotificationJSON, err := json.Marshal(flatNotificationData)
+
+	if err != nil {
+		log.Printf("Error: could not json-encode flat notification", err)
+		return
+	}
+
 	select {
-	case e.callbackUrlQueue <- notificationJSON:
+	case e.callbackUrlQueue <- flatNotificationJSON:
 	default:
 	}
 }

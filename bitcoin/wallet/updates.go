@@ -58,7 +58,7 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 		notification.Confirmations = i // Send confirmations sequentially
 		w.setTxStatusByConfirmations(&notification)
 
-		w.eventBroker.Notify(eventType, notification)
+		w.NotifyTransaction(eventType, notification)
 		err := w.storage.updateReportedConfirmations(tx, i)
 		if err != nil {
 			log.Printf(

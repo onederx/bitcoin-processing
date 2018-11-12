@@ -29,7 +29,7 @@ func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus
 	} else {
 		eventType = events.PendingStatusUpdatedEvent
 	}
-	w.eventBroker.Notify(eventType, *tx)
+	w.NotifyTransaction(eventType, *tx)
 	return nil
 }
 

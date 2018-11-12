@@ -204,3 +204,30 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		reportedConfirmations: -1,
 	}
 }
+
+func (td TransactionDirection) ToCoinpaymentsLikeType() string {
+	// convert direction to coinpayments-like type:
+	// "deposit" for incoming, "withdrawal" for outgoing
+	switch td {
+	case IncomingDirection:
+		return "deposit"
+	case OutgoingDirection:
+		return "withdrawal"
+	default:
+		return "unknown"
+	}
+}
+
+func (ts TransactionStatus) ToCoinpaymentsLikeCode() int {
+	// convert status to numeric code in a coinpayments-like fashion:
+	// final status (FullyConfirmedTransaction) should become 100,
+	// other status codes should be less
+	switch {
+	case ts == FullyConfirmedTransaction:
+		return 100
+	case int(ts) < 100:
+		return int(ts)
+	default:
+		return 99
+	}
+}
