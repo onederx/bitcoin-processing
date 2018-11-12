@@ -107,6 +107,11 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 		tx.Status = NewTransaction
 		tx.Hash = txHash
 
+		log.Printf(
+			"Successfully created and broadcasted outgoing tx (withdrawal) %v",
+			tx,
+		)
+
 		_, err = w.storage.StoreTransaction(tx)
 		if err != nil {
 			return err
