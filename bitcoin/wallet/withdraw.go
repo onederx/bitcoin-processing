@@ -95,7 +95,7 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	)
 
 	if err != nil {
-		if !isInsufficientFundsError(err) {
+		if tx.ColdStorage || !isInsufficientFundsError(err) {
 			return err
 		}
 		log.Printf("Not enough funds to send tx %v, marking as pending", tx)
@@ -116,7 +116,9 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 		if err != nil {
 			return err
 		}
-		w.notifyTransaction(tx)
+		if !tx.ColdStorage {
+			w.notifyTransaction(tx)
+		}
 	}
 
 	if updatePending {
@@ -137,7 +139,7 @@ func (w *Wallet) sendWithdrawalViaWalletUpdater(tx *Transaction) error {
 	return <-resultCh
 }
 
-func (w *Wallet) Withdraw(request *WithdrawRequest) error {
+func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
 
 	if err != nil {
@@ -161,6 +163,7 @@ func (w *Wallet) Withdraw(request *WithdrawRequest) error {
 		Metainfo:              request.Metainfo,
 		Fee:                   request.Fee,
 		FeeType:               feeType,
+		ColdStorage:           toColdStorage,
 		fresh:                 true,
 		reportedConfirmations: -1,
 	}

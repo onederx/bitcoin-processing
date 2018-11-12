@@ -39,6 +39,7 @@ const transactionFields string = `
 	metainfo,
 	fee,
 	fee_type,
+	cold_storage,
 	reported_confirmations
 `
 
@@ -132,6 +133,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 	var confirmations, reportedConfirmations int64
 	var amount, fee uint64
 	var metainfo interface{}
+	var coldStorage bool
 
 	err := row.Scan(
 		&id,
@@ -145,6 +147,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		&metainfoJSON,
 		&fee,
 		&feeType,
+		&coldStorage,
 		&reportedConfirmations,
 	)
 
@@ -180,6 +183,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		Metainfo:              metainfo,
 		Fee:                   fee,
 		FeeType:               transactionFeeType,
+		ColdStorage:           coldStorage,
 		fresh:                 false,
 		reportedConfirmations: reportedConfirmations,
 	}
@@ -269,7 +273,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			return nil, err
 		}
 		query := fmt.Sprintf(`INSERT INTO transactions (%s)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 			transactionFields,
 		)
 		_, err = s.db.Exec(
@@ -285,6 +289,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			string(metainfoJSON),
 			transaction.Fee,
 			transaction.FeeType.String(),
+			transaction.ColdStorage,
 			transaction.reportedConfirmations,
 		)
 		if err != nil {

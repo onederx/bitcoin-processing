@@ -91,19 +91,18 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 	if tx.fresh {
 		log.Printf("New tx %s", tx.Hash)
 	}
-	if isHotStorageTx {
-		if tx.fresh {
-			log.Printf(
-				"Got transfer to hot wallet: %d satoshi (%s) tx %s (%s)",
-				tx.Amount,
-				btcutil.Amount(tx.Amount).String(),
-				tx.Hash,
-				tx.Id,
-			)
-		}
-		return txInfoChanged
+	if isHotStorageTx && tx.fresh {
+		log.Printf(
+			"Got transfer to hot wallet: %d satoshi (%s) tx %s (%s)",
+			tx.Amount,
+			btcutil.Amount(tx.Amount).String(),
+			tx.Hash,
+			tx.Id,
+		)
 	}
-	w.notifyTransaction(tx)
+	if !isHotStorageTx && !tx.ColdStorage { // don't notify about internal txns
+		w.notifyTransaction(tx)
+	}
 	return txInfoChanged
 }
 

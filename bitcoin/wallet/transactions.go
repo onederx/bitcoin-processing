@@ -118,6 +118,7 @@ type Transaction struct {
 	Metainfo      interface{}          `json:"metainfo"`
 	Fee           uint64               `json:"fee"` // satoshis
 	FeeType       bitcoin.FeeType      `json:"fee_type"`
+	ColdStorage   bool                 `json:"cold_storage"`
 
 	fresh                 bool
 	reportedConfirmations int64
@@ -198,6 +199,7 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		Direction:             direction,
 		Status:                NewTransaction,
 		Amount:                satoshis,
+		ColdStorage:           false,
 		fresh:                 true,
 		reportedConfirmations: -1,
 	}

@@ -39,7 +39,7 @@ func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, re
 	s.eventBroker.Notify(events.CheckTxStatusEvent, "")
 }
 
-func (s *APIServer) withdraw(response http.ResponseWriter, request *http.Request) {
+func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
 	var req wallet.WithdrawRequest
 	var body []byte
 	var err error
@@ -50,9 +50,17 @@ func (s *APIServer) withdraw(response http.ResponseWriter, request *http.Request
 	if err = json.Unmarshal(body, &req); err != nil {
 		panic(err)
 	}
-	if err = s.wallet.Withdraw(&req); err != nil {
+	if err = s.wallet.Withdraw(&req, toColdStorage); err != nil {
 		panic(err)
 	}
+}
+
+func (s *APIServer) withdrawRegular(response http.ResponseWriter, request *http.Request) {
+	s.withdraw(false, response, request)
+}
+
+func (s *APIServer) withdrawToColdStorage(response http.ResponseWriter, request *http.Request) {
+	s.withdraw(true, response, request)
 }
 
 func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *http.Request) {
@@ -147,10 +155,11 @@ func (s *APIServer) handle(urlPattern, method string, handler func(http.Response
 func (s *APIServer) initHTTPAPIServer() {
 	s.handle("/new-address", "", s.newBitcoinAddress)
 	s.handle("/notify-wallet", "", s.notifyWalletTxStatusChanged)
-	s.handle("/withdraw", "", s.withdraw)
+	s.handle("/withdraw", "", s.withdrawRegular)
 	s.handle("/get-hot-storage-address", "", s.getHotStorageAddress)
 	s.handle("/get-transactions", "", s.getTransactions)
 	s.handle("/get-balance", "", s.getBalance)
 	s.handle("/get-required-from-cold-storage", "", s.getRequiredFromColdStorage)
 	s.handle("/cancel-pending", "", s.cancelPending)
+	s.handle("/withdraw-to-cold-storage", "", s.withdrawToColdStorage)
 }

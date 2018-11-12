@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     metainfo JSONB,
     fee BIGINT,
     fee_type TEXT,
+    cold_storage BOOLEAN,
     reported_confirmations BIGINT
 );
 
