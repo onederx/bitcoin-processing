@@ -1,5 +1,7 @@
-callback:
-  url: http://127.0.0.1:9000/
+transaction:
+  callback:
+    url: http://127.0.0.1:9000/
+  max-confirmations: 1
 api:
   http:
     address: 127.0.0.1:8000
