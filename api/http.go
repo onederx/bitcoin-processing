@@ -31,7 +31,6 @@ func amountFromString(amount string) (uint64, error) {
 func (s *APIServer) respond(response http.ResponseWriter, data interface{}, err error) {
 	var responseBody []byte
 	if err != nil {
-		response.WriteHeader(500)
 		responseBody, err = json.Marshal(httpAPIResponse{Error: err.Error()})
 		if err != nil {
 			panic("Failed to marshal error response for error " + err.Error())
