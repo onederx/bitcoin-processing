@@ -171,6 +171,14 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 		request.Address = w.coldWalletAddress
 	}
 
+	if request.Address == w.hotWalletAddress {
+		return errors.New(
+			"Refusing to withdraw to hot wallet address: this operation " +
+			"makes no sence because hot wallet address belongs to " +
+			"wallet of bitcoin processing app",
+		)
+	}
+
 	outgoingTx := &Transaction{
 		Id:                    request.Id,
 		Confirmations:         0,
