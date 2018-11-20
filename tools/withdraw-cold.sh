@@ -26,7 +26,7 @@ UUID=`python -c 'import uuid; print uuid.uuid4()'`
 
 echo "Withdraw with id $UUID"
 
-curl -s -X POST http://127.0.0.1:8000/withdraw --data '{
+curl -s -X POST http://127.0.0.1:8000/withdraw-to-cold-storage --data '{
     "id": "'$UUID'",
     "address": "'$address'",
     "amount": "'$amount'",
