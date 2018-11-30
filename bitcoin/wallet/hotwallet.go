@@ -23,7 +23,7 @@ func (w *Wallet) generateHotWalletAddress() (string, error) {
 }
 
 func (w *Wallet) getOrCreateHotWallet() string {
-	addressFromSettings := settings.GetString("wallet.hot-wallet-address")
+	addressFromSettings := settings.GetString("wallet.hot_wallet_address")
 	if addressFromSettings != "" {
 		log.Printf(
 			"Using hot wallet address from config: %s",

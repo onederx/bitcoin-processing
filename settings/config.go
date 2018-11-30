@@ -36,11 +36,11 @@ func initConfig() {
 	// defaults
 	viper.SetDefault("http.address", "127.0.0.1:8000")
 	viper.SetDefault("bitcoin.node.tls", false)
-	viper.SetDefault("bitcoin.poll-interval", 3000)
-	viper.SetDefault("transaction.max-confirmations", 6)
-	viper.SetDefault("wallet.min-withdraw", 600)
-	viper.SetDefault("wallet.min-fee.per-kb", bitcoin.MinimalFeeRate)
-	viper.SetDefault("wallet.min-fee.fixed", 500)
+	viper.SetDefault("bitcoin.poll_interval", 3000)
+	viper.SetDefault("transaction.max_confirmations", 6)
+	viper.SetDefault("wallet.min_withdraw", 600)
+	viper.SetDefault("wallet.min_fee.per_kb", bitcoin.MinimalFeeRate)
+	viper.SetDefault("wallet.min_fee.fixed", 500)
 	viper.SetDefault("transaction.callback.backoff", 100)
 }
 

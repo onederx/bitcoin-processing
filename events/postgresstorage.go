@@ -16,7 +16,6 @@ type PostgresEventStorage struct {
 
 func newPostgresEventStorage() *PostgresEventStorage {
 	dsn := settings.GetStringMandatory("storage.dsn")
-	//maxEvents := settings.GetInt("storage.max-events")
 
 	db, err := sql.Open("postgres", dsn)
 

@@ -198,7 +198,7 @@ func (w *Wallet) checkForWalletUpdates() {
 }
 
 func (w *Wallet) pollWalletUpdates() {
-	pollInterval := time.Duration(settings.GetInt("bitcoin.poll-interval"))
+	pollInterval := time.Duration(settings.GetInt("bitcoin.poll_interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
 	for {
 		select {

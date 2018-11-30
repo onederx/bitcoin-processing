@@ -6,7 +6,7 @@ import (
 )
 
 func (w *Wallet) initColdWallet() {
-	w.coldWalletAddress = settings.GetString("wallet.cold-wallet-address")
+	w.coldWalletAddress = settings.GetString("wallet.cold_wallet_address")
 
 	if w.coldWalletAddress == "" {
 		return

@@ -26,14 +26,14 @@ type Wallet struct {
 
 func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Wallet {
 	storageType := settings.GetStringMandatory("storage.type")
-	maxConfirmations := int64(settings.GetInt("transaction.max-confirmations"))
+	maxConfirmations := int64(settings.GetInt("transaction.max_confirmations"))
 	return &Wallet{
 		nodeAPI:          nodeAPI,
 		eventBroker:      eventBroker,
 		storage:          newStorage(storageType),
-		minWithdraw:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min-withdraw")),
-		minFeePerKb:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min-fee.per-kb")),
-		minFeeFixed:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min-fee.fixed")),
+		minWithdraw:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min_withdraw")),
+		minFeePerKb:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min_fee.per_kb")),
+		minFeeFixed:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min_fee.fixed")),
 		maxConfirmations: maxConfirmations,
 		withdrawQueue:    make(chan internalWithdrawRequest, internalQueueSize),
 		cancelQueue:      make(chan internalCancelRequest, internalQueueSize),
