@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"fmt"
 	"github.com/satori/go.uuid"
 	"log"
 	"sort"
@@ -116,7 +117,11 @@ func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if tx.Status != PendingTransaction && tx.Status != PendingColdStorageTransaction {
+	switch tx.Status {
+	case PendingTransaction:
+	case PendingColdStorageTransaction:
+	case PendingManualConfirmationTransaction:
+	default:
 		return errors.New("Transaction is not pending")
 	}
 	err = w.updatePendingTxStatus(tx, CancelledTransaction)
@@ -136,4 +141,19 @@ func (w *Wallet) CancelPendingTx(id uuid.UUID) error {
 		result: resultCh,
 	}
 	return <-resultCh
+}
+
+func (w *Wallet) ConfirmPendingTransaction(id uuid.UUID) error {
+	tx, err := w.storage.GetTransactionById(id)
+	if err != nil {
+		return err
+	}
+	if tx.Status != PendingManualConfirmationTransaction {
+		return fmt.Errorf(
+			"Tx %s is not pending manual confirmation. Its status is %s",
+			id,
+			tx.Status,
+		)
+	}
+	return w.sendWithdrawal(tx, true)
 }

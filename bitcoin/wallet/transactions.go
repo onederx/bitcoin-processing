@@ -29,6 +29,7 @@ const (
 	FullyConfirmedTransaction
 	PendingTransaction
 	PendingColdStorageTransaction
+	PendingManualConfirmationTransaction
 	CancelledTransaction
 	InvalidTransaction
 )
@@ -42,12 +43,13 @@ var transactionDirectionToStringMap map[TransactionDirection]string = map[Transa
 var stringToTransactionDirectionMap map[string]TransactionDirection = make(map[string]TransactionDirection)
 
 var transactionStatusToStringMap map[TransactionStatus]string = map[TransactionStatus]string{
-	NewTransaction:                "new",
-	ConfirmedTransaction:          "confirmed",
-	FullyConfirmedTransaction:     "fully-confirmed",
-	PendingTransaction:            "pending",
-	PendingColdStorageTransaction: "pending-cold-storage",
-	CancelledTransaction:          "cancelled",
+	NewTransaction:                       "new",
+	ConfirmedTransaction:                 "confirmed",
+	FullyConfirmedTransaction:            "fully-confirmed",
+	PendingTransaction:                   "pending",
+	PendingColdStorageTransaction:        "pending-cold-storage",
+	PendingManualConfirmationTransaction: "pending-manual-confirmaion",
+	CancelledTransaction:                 "cancelled",
 }
 
 var stringToTransactionStatusMap map[string]TransactionStatus = make(map[string]TransactionStatus)

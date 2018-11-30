@@ -10,15 +10,16 @@ import (
 const internalQueueSize = 10000
 
 type Wallet struct {
-	nodeAPI           *nodeapi.NodeAPI
-	eventBroker       *events.EventBroker
-	storage           WalletStorage
-	hotWalletAddress  string
-	coldWalletAddress string
-	minWithdraw       bitcoin.BitcoinAmount
-	minFeePerKb       bitcoin.BitcoinAmount
-	minFeeFixed       bitcoin.BitcoinAmount
-	maxConfirmations  int64
+	nodeAPI                              *nodeapi.NodeAPI
+	eventBroker                          *events.EventBroker
+	storage                              WalletStorage
+	hotWalletAddress                     string
+	coldWalletAddress                    string
+	minWithdraw                          bitcoin.BitcoinAmount
+	minFeePerKb                          bitcoin.BitcoinAmount
+	minFeeFixed                          bitcoin.BitcoinAmount
+	minWithdrawWithoutManualConfirmation bitcoin.BitcoinAmount
+	maxConfirmations                     int64
 
 	withdrawQueue chan internalWithdrawRequest
 	cancelQueue   chan internalCancelRequest
@@ -28,15 +29,16 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 	storageType := settings.GetStringMandatory("storage.type")
 	maxConfirmations := int64(settings.GetInt("transaction.max_confirmations"))
 	return &Wallet{
-		nodeAPI:          nodeAPI,
-		eventBroker:      eventBroker,
-		storage:          newStorage(storageType),
-		minWithdraw:      settings.GetBitcoinAmount("wallet.min_withdraw"),
-		minFeePerKb:      settings.GetBitcoinAmount("wallet.min_fee.per_kb"),
-		minFeeFixed:      settings.GetBitcoinAmount("wallet.min_fee.fixed"),
-		maxConfirmations: maxConfirmations,
-		withdrawQueue:    make(chan internalWithdrawRequest, internalQueueSize),
-		cancelQueue:      make(chan internalCancelRequest, internalQueueSize),
+		nodeAPI:                              nodeAPI,
+		eventBroker:                          eventBroker,
+		storage:                              newStorage(storageType),
+		minWithdraw:                          settings.GetBitcoinAmount("wallet.min_withdraw"),
+		minFeePerKb:                          settings.GetBitcoinAmount("wallet.min_fee.per_kb"),
+		minFeeFixed:                          settings.GetBitcoinAmount("wallet.min_fee.fixed"),
+		minWithdrawWithoutManualConfirmation: settings.GetBitcoinAmount("wallet.min_withdraw_without_manual_confirmation"),
+		maxConfirmations:                     maxConfirmations,
+		withdrawQueue:                        make(chan internalWithdrawRequest, internalQueueSize),
+		cancelQueue:                          make(chan internalCancelRequest, internalQueueSize),
 	}
 }
 

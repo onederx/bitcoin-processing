@@ -41,6 +41,7 @@ func initConfig() {
 	viper.SetDefault("wallet.min_withdraw", 0.000006)
 	viper.SetDefault("wallet.min_fee.per_kb", bitcoin.MinimalFeeRateBTC)
 	viper.SetDefault("wallet.min_fee.fixed", 0.000005)
+	viper.SetDefault("wallet.min_withdraw_without_manual_confirmation", 0.0)
 	viper.SetDefault("transaction.callback.backoff", 100)
 }
 

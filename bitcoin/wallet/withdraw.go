@@ -45,29 +45,32 @@ func isInsufficientFundsError(err error) bool {
 	return false
 }
 
-func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.FeeType) error {
+func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.FeeType) (needManualConfirmation bool, err error) {
 	if request.Amount < w.minWithdraw {
-		return errors.New(
+		return false, errors.New(
 			"Error: refusing to withdraw " + request.Amount.String() +
 				" because it is less than min withdraw amount " +
 				w.minWithdraw.String(),
 		)
 	}
 	if feeType == bitcoin.PerKBRateFee && request.Fee < w.minFeePerKb {
-		return errors.New(
+		return false, errors.New(
 			"Error: refusing to withdraw with fee " + request.Fee.String() +
 				" because it is less than min withdraw fee " +
 				w.minFeePerKb.String() + " for fee type " + feeType.String(),
 		)
 	}
 	if feeType == bitcoin.FixedFee && request.Fee < w.minFeeFixed {
-		return errors.New(
+		return false, errors.New(
 			"Error: refusing to withdraw with fee " + request.Fee.String() +
 				" because it is less than min withdraw fee " +
 				w.minFeeFixed.String() + " for fee type " + feeType.String(),
 		)
 	}
-	return nil
+	if request.Amount > w.minWithdrawWithoutManualConfirmation {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
@@ -134,6 +137,17 @@ func (w *Wallet) sendWithdrawalViaWalletUpdater(tx *Transaction) error {
 	return <-resultCh
 }
 
+func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
+	log.Printf(
+		"Withdrawal %v has amount %s which is more than configured max "+
+			"amount to be processed without manual confirmation. Holding it "+
+			"until confirmed manually.",
+		tx,
+		tx.Amount,
+	)
+	return w.updatePendingTxStatus(tx, PendingManualConfirmationTransaction)
+}
+
 func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
 
@@ -143,7 +157,7 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 
 	logWithdrawRequest(request, feeType)
 
-	err = w.checkWithdrawLimits(request, feeType)
+	needManualConfirmation, err := w.checkWithdrawLimits(request, feeType)
 
 	if err != nil {
 		return err
@@ -188,5 +202,10 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 		reportedConfirmations: -1,
 	}
 
-	return w.sendWithdrawalViaWalletUpdater(outgoingTx)
+	if !needManualConfirmation || toColdStorage {
+		// withdraw to cold storage does not need confirmation
+		return w.sendWithdrawalViaWalletUpdater(outgoingTx)
+	} else {
+		return w.holdWithdrawalUntilConfirmed(outgoingTx)
+	}
 }

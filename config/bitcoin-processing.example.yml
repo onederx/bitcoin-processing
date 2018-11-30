@@ -17,5 +17,3 @@ bitcoin:
     address: 127.0.0.1:18443
     user: bitcoinrpc
     password: TEST_BITCOIN_NODE_PASSWORD
-wallet:
-#  cold-wallet-address: 2N5qCsMrg4Y1D7DmhatGgZdYzG1bYSysSFr

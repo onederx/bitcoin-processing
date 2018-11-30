@@ -201,6 +201,27 @@ func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Re
 	s.respond(response, nil, nil)
 }
 
+func (s *APIServer) confirmPendingTransaction(response http.ResponseWriter, request *http.Request) {
+	var id uuid.UUID
+	var body []byte
+	var err error
+
+	if body, err = ioutil.ReadAll(request.Body); err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+	if err = json.Unmarshal(body, &id); err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+	err = s.wallet.ConfirmPendingTransaction(id)
+	if err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+	s.respond(response, nil, nil)
+}
+
 func (s *APIServer) initHTTPAPIServer() {
 	m := s.httpServer.Handler.(*http.ServeMux)
 	m.HandleFunc("/new_wallet", s.newBitcoinAddress)
@@ -212,4 +233,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	m.HandleFunc("/get_required_from_cold_storage", s.getRequiredFromColdStorage)
 	m.HandleFunc("/cancel_pending", s.cancelPending)
 	m.HandleFunc("/withdraw_to_cold_storage", s.withdrawToColdStorage)
+	m.HandleFunc("/confirm", s.confirmPendingTransaction)
 }
