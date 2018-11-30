@@ -199,6 +199,15 @@ func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*Transaction,
 	return transactionFromDatabaseRow(row)
 }
 
+func (s *PostgresWalletStorage) GetTransactionByHashAndDirection(hash string, direction TransactionDirection) (*Transaction, error) {
+	query := fmt.Sprintf(
+		`SELECT %s FROM transactions WHERE hash = $1 and direction = $2`,
+		transactionFields,
+	)
+	row := s.db.QueryRow(query, hash, direction.String())
+	return transactionFromDatabaseRow(row)
+}
+
 func (s *PostgresWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE id = $1`,
@@ -227,7 +236,10 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 	}
 
 	if txIsNew && transaction.Hash != "" {
-		existingTransaction, err = s.GetTransactionByHash(transaction.Hash)
+		existingTransaction, err = s.GetTransactionByHashAndDirection(
+			transaction.Hash,
+			transaction.Direction,
+		)
 		switch err {
 		case nil: // tx already in database
 			txIsNew = false
