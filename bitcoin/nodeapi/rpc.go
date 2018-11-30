@@ -210,7 +210,7 @@ func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee 
 	return response.Result, nil
 }
 
-func (n *NodeAPI) SendWithPerKBFee(address string, amount uint64, fee uint64, recipientPaysFee bool) (hash string, err error) {
+func (n *NodeAPI) SendWithPerKBFee(address string, amount bitcoin.BitcoinAmount, fee bitcoin.BitcoinAmount, recipientPaysFee bool) (hash string, err error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
 
@@ -219,7 +219,7 @@ func (n *NodeAPI) SendWithPerKBFee(address string, amount uint64, fee uint64, re
 	if err != nil {
 		return "", err
 	}
-	return n.sendToAddress(address, amount, recipientPaysFee)
+	return n.sendToAddress(address, uint64(amount), recipientPaysFee)
 }
 
 func (n *NodeAPI) createRawTransaction(inputs []btcjson.TransactionInput, outputs map[string]float64) (string, error) {
@@ -422,23 +422,21 @@ func (n *NodeAPI) sendRawTransaction(rawTx string) (string, error) {
 	return response.Result, nil
 }
 
-func (n *NodeAPI) SendWithFixedFee(address string, amountSatoshi uint64, fee uint64, recipientPaysFee bool) (hash string, err error) {
-	var amount btcutil.Amount
+func (n *NodeAPI) SendWithFixedFee(address string, amount bitcoin.BitcoinAmount, fee bitcoin.BitcoinAmount, recipientPaysFee bool) (hash string, err error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
 	if recipientPaysFee {
-		if amountSatoshi < fee {
+		if amount < fee {
 			return "", errors.New(fmt.Sprintf(
-				"Error: Recipient (%s) should pay fee %d satoshi, but amount sent"+
-					" is less: %d satoshi",
+				"Error: Recipient (%s) should pay fee %s satoshi, but amount sent"+
+					" is less: %s",
 				address,
 				fee,
-				amountSatoshi,
+				amount,
 			))
 		}
-		amount = btcutil.Amount(amountSatoshi)
 	} else {
-		amount = btcutil.Amount(amountSatoshi + fee)
+		amount += fee
 	}
 	rawTx, err := n.createRawTransaction(
 		[]btcjson.TransactionInput{}, // empty array: no inputs
@@ -459,7 +457,7 @@ func (n *NodeAPI) SendWithFixedFee(address string, amountSatoshi uint64, fee uin
 		return "", err
 	}
 
-	transformedTx, err := n.transformTxToSetFixedFee(rawTxFunded, address, fee)
+	transformedTx, err := n.transformTxToSetFixedFee(rawTxFunded, address, uint64(fee))
 
 	if err != nil {
 		return "", err

@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/settings"
@@ -14,9 +15,9 @@ type Wallet struct {
 	storage           WalletStorage
 	hotWalletAddress  string
 	coldWalletAddress string
-	minWithdraw       uint64
-	minFeePerKb       uint64
-	minFeeFixed       uint64
+	minWithdraw       bitcoin.BitcoinAmount
+	minFeePerKb       bitcoin.BitcoinAmount
+	minFeeFixed       bitcoin.BitcoinAmount
 	maxConfirmations  int64
 
 	withdrawQueue chan internalWithdrawRequest
@@ -30,9 +31,9 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 		nodeAPI:          nodeAPI,
 		eventBroker:      eventBroker,
 		storage:          newStorage(storageType),
-		minWithdraw:      uint64(settings.GetInt64("wallet.min-withdraw")),
-		minFeePerKb:      uint64(settings.GetInt64("wallet.min-fee.per-kb")),
-		minFeeFixed:      uint64(settings.GetInt64("wallet.min-fee.fixed")),
+		minWithdraw:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min-withdraw")),
+		minFeePerKb:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min-fee.per-kb")),
+		minFeeFixed:      bitcoin.BitcoinAmount(settings.GetInt64("wallet.min-fee.fixed")),
 		maxConfirmations: maxConfirmations,
 		withdrawQueue:    make(chan internalWithdrawRequest, internalQueueSize),
 		cancelQueue:      make(chan internalCancelRequest, internalQueueSize),

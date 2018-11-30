@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
 	"net/http"
 
+	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
@@ -16,16 +16,6 @@ import (
 type httpAPIResponse struct {
 	Error  string      `json:"error"`
 	Result interface{} `json:"result"`
-}
-
-var satoshiInBTCDecimal = decimal.New(1, 8)
-
-func amountFromString(amount string) (uint64, error) {
-	amountDecimal, err := decimal.NewFromString(amount)
-	if err != nil {
-		return 0, err
-	}
-	return uint64(amountDecimal.Mul(satoshiInBTCDecimal).IntPart()), nil
 }
 
 func (s *APIServer) respond(response http.ResponseWriter, data interface{}, err error) {
@@ -111,12 +101,12 @@ func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, r
 		return
 	}
 	withdrawReq.Address = req.Address
-	withdrawReq.Amount, err = amountFromString(req.Amount)
+	withdrawReq.Amount, err = bitcoin.BitcoinAmountFromStringedFloat(req.Amount)
 	if err != nil {
 		s.respond(response, nil, err)
 		return
 	}
-	withdrawReq.Fee, err = amountFromString(req.Fee)
+	withdrawReq.Fee, err = bitcoin.BitcoinAmountFromStringedFloat(req.Fee)
 	if err != nil {
 		s.respond(response, nil, err)
 		return
@@ -177,8 +167,8 @@ func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.
 
 func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Request) {
 	var respData struct {
-		Balance           uint64 `json:"balance"`
-		BalanceWithUnconf uint64 `json:"balance_including_unconfirmed"`
+		Balance           bitcoin.BitcoinAmount `json:"balance"`
+		BalanceWithUnconf bitcoin.BitcoinAmount `json:"balance_including_unconfirmed"`
 	}
 	var err error
 	respData.Balance, respData.BalanceWithUnconf, err = s.wallet.GetBalance()

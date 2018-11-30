@@ -6,16 +6,15 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/satori/go.uuid"
 	"log"
-	"strconv"
 )
 
 type WithdrawRequest struct {
-	Id       uuid.UUID   `json:"id"`
-	Address  string      `json:"address"`
-	Amount   uint64      `json:"amount"`
-	Fee      uint64      `json:"fee"`
-	FeeType  string      `json:"fee_type"`
-	Metainfo interface{} `json:"metainfo"`
+	Id       uuid.UUID             `json:"id"`
+	Address  string                `json:"address"`
+	Amount   bitcoin.BitcoinAmount `json:"amount"`
+	Fee      bitcoin.BitcoinAmount `json:"fee"`
+	FeeType  string                `json:"fee_type"`
+	Metainfo interface{}           `json:"metainfo"`
 }
 
 type internalWithdrawRequest struct {
@@ -48,35 +47,30 @@ func isInsufficientFundsError(err error) bool {
 func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.FeeType) error {
 	if request.Amount < w.minWithdraw {
 		return errors.New(
-			"Error: refusing to withdraw " +
-				strconv.FormatUint(request.Amount, 10) +
+			"Error: refusing to withdraw " + request.Amount.String() +
 				" because it is less than min withdraw amount " +
-				strconv.FormatUint(w.minWithdraw, 10),
+				w.minWithdraw.String(),
 		)
 	}
 	if feeType == bitcoin.PerKBRateFee && request.Fee < w.minFeePerKb {
 		return errors.New(
-			"Error: refusing to withdraw with fee " +
-				strconv.FormatUint(request.Fee, 10) +
+			"Error: refusing to withdraw with fee " + request.Fee.String() +
 				" because it is less than min withdraw fee " +
-				strconv.FormatUint(w.minFeePerKb, 10) +
-				" for fee type " + feeType.String(),
+				w.minFeePerKb.String() + " for fee type " + feeType.String(),
 		)
 	}
 	if feeType == bitcoin.FixedFee && request.Fee < w.minFeeFixed {
 		return errors.New(
-			"Error: refusing to withdraw with fee " +
-				strconv.FormatUint(request.Fee, 10) +
+			"Error: refusing to withdraw with fee " + request.Fee.String() +
 				" because it is less than min withdraw fee " +
-				strconv.FormatUint(w.minFeeFixed, 10) +
-				" for fee type " + feeType.String(),
+				w.minFeeFixed.String() + " for fee type " + feeType.String(),
 		)
 	}
 	return nil
 }
 
 func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
-	var sendMoneyFunc func(string, uint64, uint64, bool) (string, error)
+	var sendMoneyFunc func(string, bitcoin.BitcoinAmount, bitcoin.BitcoinAmount, bool) (string, error)
 
 	switch tx.FeeType {
 	case bitcoin.PerKBRateFee:
@@ -174,8 +168,8 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	if request.Address == w.hotWalletAddress {
 		return errors.New(
 			"Refusing to withdraw to hot wallet address: this operation " +
-			"makes no sence because hot wallet address belongs to " +
-			"wallet of bitcoin processing app",
+				"makes no sence because hot wallet address belongs to " +
+				"wallet of bitcoin processing app",
 		)
 	}
 

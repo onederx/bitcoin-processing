@@ -107,18 +107,18 @@ func (ts TransactionStatus) MarshalJSON() ([]byte, error) {
 }
 
 type Transaction struct {
-	Id            uuid.UUID            `json:"id"`
-	Hash          string               `json:"hash"`
-	BlockHash     string               `json:"blockhash"`
-	Confirmations int64                `json:"confirmations"`
-	Address       string               `json:"address"`
-	Direction     TransactionDirection `json:"direction"`
-	Status        TransactionStatus    `json:"status"`
-	Amount        uint64               `json:"amount"` // satoshis
-	Metainfo      interface{}          `json:"metainfo"`
-	Fee           uint64               `json:"fee"` // satoshis
-	FeeType       bitcoin.FeeType      `json:"fee_type"`
-	ColdStorage   bool                 `json:"cold_storage"`
+	Id            uuid.UUID             `json:"id"`
+	Hash          string                `json:"hash"`
+	BlockHash     string                `json:"blockhash"`
+	Confirmations int64                 `json:"confirmations"`
+	Address       string                `json:"address"`
+	Direction     TransactionDirection  `json:"direction"`
+	Status        TransactionStatus     `json:"status"`
+	Amount        bitcoin.BitcoinAmount `json:"amount"`
+	Metainfo      interface{}           `json:"metainfo"`
+	Fee           bitcoin.BitcoinAmount `json:"fee"`
+	FeeType       bitcoin.FeeType       `json:"fee_type"`
+	ColdStorage   bool                  `json:"cold_storage"`
 
 	fresh                 bool
 	reportedConfirmations int64
@@ -144,7 +144,7 @@ func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult)
 
 func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transaction {
 	var direction TransactionDirection
-	var satoshis uint64
+	var amount bitcoin.BitcoinAmount
 	if btcNodeTransaction.Category == "receive" {
 		direction = IncomingDirection
 	} else if btcNodeTransaction.Category == "send" {
@@ -186,9 +186,9 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 			btcNodeTransaction.TxID,
 			btcNodeTransaction,
 		)
-		satoshis = 0
+		amount = 0
 	} else {
-		satoshis = uint64(util.Abs64(int64(btcutilAmount)))
+		amount = bitcoin.BitcoinAmount(util.Abs64(int64(btcutilAmount)))
 	}
 
 	return &Transaction{
@@ -198,7 +198,7 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		Address:               btcNodeTransaction.Address,
 		Direction:             direction,
 		Status:                NewTransaction,
-		Amount:                satoshis,
+		Amount:                amount,
 		ColdStorage:           false,
 		fresh:                 true,
 		reportedConfirmations: -1,
