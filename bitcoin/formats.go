@@ -45,3 +45,9 @@ func BitcoinAmountFromStringedFloat(amountSF string) (BitcoinAmount, error) {
 	}
 	return BitcoinAmount(amountDecimal.Mul(satoshiInBTCDecimal).IntPart()), nil
 }
+
+func BitcoinAmountFromFloat(amountF64 float64) BitcoinAmount {
+	return BitcoinAmount(
+		decimal.NewFromFloat(amountF64).Mul(satoshiInBTCDecimal).IntPart(),
+	)
+}

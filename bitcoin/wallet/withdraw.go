@@ -25,11 +25,12 @@ type internalWithdrawRequest struct {
 func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 	log.Printf(
 		"Got withdraw request with id %s, to address %s, "+
-			"satoshi amount %d and fee %d (type %s). Metainfo: %v",
+			"amount %s (%d satoshi) and fee %s (%d satoshi) (type %s)."+
+			"Metainfo: %v",
 		request.Id,
 		request.Address,
-		request.Amount,
-		request.Fee,
+		request.Amount, request.Amount,
+		request.Fee, request.Fee,
 		feeType,
 		request.Metainfo,
 	)

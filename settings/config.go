@@ -38,9 +38,9 @@ func initConfig() {
 	viper.SetDefault("bitcoin.node.tls", false)
 	viper.SetDefault("bitcoin.poll_interval", 3000)
 	viper.SetDefault("transaction.max_confirmations", 6)
-	viper.SetDefault("wallet.min_withdraw", 600)
-	viper.SetDefault("wallet.min_fee.per_kb", bitcoin.MinimalFeeRate)
-	viper.SetDefault("wallet.min_fee.fixed", 500)
+	viper.SetDefault("wallet.min_withdraw", 0.000006)
+	viper.SetDefault("wallet.min_fee.per_kb", bitcoin.MinimalFeeRateBTC)
+	viper.SetDefault("wallet.min_fee.fixed", 0.000005)
 	viper.SetDefault("transaction.callback.backoff", 100)
 }
 
@@ -79,4 +79,8 @@ func GetStringMandatory(key string) string {
 		log.Fatalf("Error: setting %s is required", key)
 	}
 	return value
+}
+
+func GetBitcoinAmount(key string) bitcoin.BitcoinAmount {
+	return bitcoin.BitcoinAmountFromFloat(viper.GetFloat64(key))
 }
