@@ -1,4 +1,6 @@
 cmd/bitcoin-processing/bitcoin-processing.yml
 cmd/bitcoin-processing/bitcoin-processing
 tools/test-ws-subscribe
-tools/regtest/.env
+inventory
+.bitcoin
+.env
