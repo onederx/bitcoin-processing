@@ -15,20 +15,27 @@ func init() {
 	var withdrawFeeType string
 	var withdrawMetainfoString string
 
-	var cmdWithdraw = &cobra.Command{
-		Use:     "withdraw ADDRESS AMOUNT FEE",
-		Example: "withdraw mv4rnyY3Su5gjcDNzbMLKBQkBicCtHUtFB 0.3",
-		Short:   "Withdraw money to bitcoin address",
-		Args:    cobra.ExactArgs(3),
-		Run: func(cmd *cobra.Command, args []string) {
+	makeWithdrawCommmandRunner := func(url string, toColdStorage bool) func(cmd *cobra.Command, args []string) {
+		return func(cmd *cobra.Command, args []string) {
 			var withdrawMetainfo interface{}
+			var address, amount, fee string
 
 			withdrawIdParsed, _ := uuid.FromString(withdrawId)
+
+			if len(args) == 3 {
+				address, amount, fee = args[0], args[1], args[2]
+			} else {
+				if !toColdStorage {
+					panic("Regular withdraw requires 3 args")
+				}
+				amount, fee = args[0], args[1]
+			}
+
 			var requestData = api.WithdrawRequest{
 				Id:      withdrawIdParsed,
-				Address: args[0],
-				Amount:  args[1],
-				Fee:     args[2],
+				Address: address,
+				Amount:  amount,
+				Fee:     fee,
 				FeeType: withdrawFeeType,
 			}
 			if withdrawMetainfoString != "" {
@@ -46,7 +53,7 @@ func init() {
 				log.Fatal(err)
 			}
 			resp, err := http.Post(
-				urljoin(apiURL, "/withdraw"),
+				urljoin(apiURL, url),
 				"application/json",
 				bytes.NewBuffer(requestBody),
 			)
@@ -55,12 +62,29 @@ func init() {
 			}
 			defer resp.Body.Close()
 			showResponse(resp.Body)
-		},
+		}
 	}
 
-	cmdWithdraw.Flags().StringVarP(&withdrawId, "id", "i", "", "id of withdraw transaction")
-	cmdWithdraw.Flags().StringVarP(&withdrawFeeType, "fee-type", "t", "", "transaction fee type")
-	cmdWithdraw.Flags().StringVarP(&withdrawMetainfoString, "metainfo", "m", "", "metainfo to attach to withdraw")
+	var cmdWithdraw = &cobra.Command{
+		Use:     "withdraw ADDRESS AMOUNT FEE",
+		Example: "withdraw mv4rnyY3Su5gjcDNzbMLKBQkBicCtHUtFB 0.3 0.002",
+		Short:   "Withdraw money to bitcoin address",
+		Args:    cobra.ExactArgs(3),
+		Run:     makeWithdrawCommmandRunner("/withdraw", false),
+	}
 
-	cli.AddCommand(cmdWithdraw)
+	var cmdWithdrawToColdStorage = &cobra.Command{
+		Use:     "withdraw_to_cold_storage [ADDRESS] AMOUNT FEE",
+		Example: "withdraw_to_cold_storage mv4rnyY3Su5gjcDNzbMLKBQkBicCtHUtFB 0.3 0.002",
+		Short:   "Withdraw money from processing wallet to cold storage",
+		Args:    cobra.RangeArgs(2, 3),
+		Run:     makeWithdrawCommmandRunner("/withdraw_to_cold_storage", true),
+	}
+
+	for _, cmd := range []*cobra.Command{cmdWithdraw, cmdWithdrawToColdStorage} {
+		cmd.Flags().StringVarP(&withdrawId, "id", "i", "", "id of withdraw transaction")
+		cmd.Flags().StringVarP(&withdrawFeeType, "fee-type", "t", "", "transaction fee type")
+		cmd.Flags().StringVarP(&withdrawMetainfoString, "metainfo", "m", "", "metainfo to attach to withdraw")
+		cli.AddCommand(cmd)
+	}
 }

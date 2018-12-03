@@ -15,7 +15,7 @@ import (
 
 type WithdrawRequest struct {
 	Id       uuid.UUID   `json:"id,omitempty"`
-	Address  string      `json:"address"`
+	Address  string      `json:"address,omitempty"`
 	Amount   string      `json:"amount"`
 	Fee      string      `json:"fee,omitempty"`
 	FeeType  string      `json:"fee_type,omitempty"`
