@@ -48,7 +48,7 @@ var transactionStatusToStringMap map[TransactionStatus]string = map[TransactionS
 	FullyConfirmedTransaction:            "fully-confirmed",
 	PendingTransaction:                   "pending",
 	PendingColdStorageTransaction:        "pending-cold-storage",
-	PendingManualConfirmationTransaction: "pending-manual-confirmaion",
+	PendingManualConfirmationTransaction: "pending-manual-confirmation",
 	CancelledTransaction:                 "cancelled",
 }
 
