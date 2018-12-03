@@ -22,6 +22,11 @@ type WithdrawRequest struct {
 	Metainfo interface{} `json:"metainfo"`
 }
 
+type GetTransactionsFilter struct {
+	Direction string `json:"direction,omitempty"`
+	Status    string `json:"status,omitempty"`
+}
+
 type httpAPIResponse struct {
 	Error  string      `json:"error"`
 	Result interface{} `json:"result"`
@@ -147,10 +152,7 @@ func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *
 }
 
 func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.Request) {
-	var txFilter struct {
-		Direction string
-		Status    string
-	}
+	var txFilter GetTransactionsFilter
 	var body []byte
 	var err error
 
