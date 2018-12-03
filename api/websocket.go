@@ -8,8 +8,8 @@ import (
 	"net/http"
 )
 
-type subscribeMessage struct {
-	Seq int
+type SubscribeMessage struct {
+	Seq int `json:"seq"`
 }
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -24,8 +24,8 @@ func shutdownConnection(conn *websocket.Conn) {
 	}
 }
 
-func readSeqFromClient(conn *websocket.Conn) (subscribeMessage, error) {
-	var decodedMessage subscribeMessage
+func readSeqFromClient(conn *websocket.Conn) (SubscribeMessage, error) {
+	var decodedMessage SubscribeMessage
 
 	messageType, message, err := conn.ReadMessage()
 
