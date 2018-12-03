@@ -13,6 +13,15 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
+type WithdrawRequest struct {
+	Id       uuid.UUID   `json:"id,omitempty"`
+	Address  string      `json:"address"`
+	Amount   string      `json:"amount"`
+	Fee      string      `json:"fee,omitempty"`
+	FeeType  string      `json:"fee_type,omitempty"`
+	Metainfo interface{} `json:"metainfo"`
+}
+
 type httpAPIResponse struct {
 	Error  string      `json:"error"`
 	Result interface{} `json:"result"`
@@ -81,13 +90,7 @@ func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, re
 }
 
 func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
-	var req struct {
-		Id      uuid.UUID
-		Address string
-		Amount  string
-		Fee     string
-		FeeType string `json:"fee_type"`
-	}
+	var req WithdrawRequest
 	var withdrawReq wallet.WithdrawRequest
 	var body []byte
 	var err error
@@ -123,6 +126,7 @@ func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, r
 	} else {
 		withdrawReq.FeeType = req.FeeType
 	}
+	withdrawReq.Metainfo = req.Metainfo
 	if err = s.wallet.Withdraw(&withdrawReq, toColdStorage); err != nil {
 		s.respond(response, nil, err)
 		return
