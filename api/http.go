@@ -228,6 +228,31 @@ func (s *APIServer) confirmPendingTransaction(response http.ResponseWriter, requ
 	s.respond(response, nil, nil)
 }
 
+func (s *APIServer) getEvents(response http.ResponseWriter, request *http.Request) {
+	var body []byte
+	var err error
+	var seq int
+	var subscription SubscribeMessage
+
+	if body, err = ioutil.ReadAll(request.Body); err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+	if len(body) > 0 {
+		if err = json.Unmarshal(body, &subscription); err != nil {
+			s.respond(response, nil, err)
+			return
+		}
+		seq = subscription.Seq
+	}
+	events, err := s.eventBroker.GetEventsFromSeq(seq)
+
+	if err != nil {
+		s.respond(response, nil, err)
+	}
+	s.respond(response, events, nil)
+}
+
 func (s *APIServer) initHTTPAPIServer() {
 	m := s.httpServer.Handler.(*http.ServeMux)
 	m.HandleFunc("/new_wallet", s.newBitcoinAddress)
@@ -240,4 +265,5 @@ func (s *APIServer) initHTTPAPIServer() {
 	m.HandleFunc("/cancel_pending", s.cancelPending)
 	m.HandleFunc("/withdraw_to_cold_storage", s.withdrawToColdStorage)
 	m.HandleFunc("/confirm", s.confirmPendingTransaction)
+	m.HandleFunc("/get_events", s.getEvents)
 }

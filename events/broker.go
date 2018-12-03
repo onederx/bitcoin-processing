@@ -71,6 +71,10 @@ func (e *EventBroker) Unsubscribe(eventChannel <-chan *NotificationWithSeq) {
 	e.eventBroadcaster.Unsubscribe(eventChannel)
 }
 
+func (e *EventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) {
+	return e.storage.GetEventsFromSeq(seq)
+}
+
 func (e *EventBroker) Run() {
 	e.sendHTTPCallbackNotifications()
 }
