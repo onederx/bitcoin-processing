@@ -1,6 +1,5 @@
 cmd/bitcoin-processing/bitcoin-processing.yml
 cmd/bitcoin-processing/bitcoin-processing
-tools/test-ws-subscribe
 inventory
 .bitcoin
 .env
