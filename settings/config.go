@@ -15,9 +15,10 @@ func locateAndReadConfigFile() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Search config in current directory
+		// Search config in current directory and /etc/bitcoin-processing
+		viper.AddConfigPath("/etc/bitcoin-processing")
 		viper.AddConfigPath(".")
-		viper.SetConfigName("bitcoin-processing")
+		viper.SetConfigName("config")
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
