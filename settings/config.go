@@ -10,7 +10,7 @@ import (
 
 var cfgFile string
 
-func locateAndReadConfigFile() {
+func LocateAndReadConfigFile() error {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -21,13 +21,13 @@ func locateAndReadConfigFile() {
 		viper.SetConfigName("config")
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatal("Can't read config:", err)
-	}
+	return viper.ReadInConfig()
 }
 
 func initConfig() {
-	locateAndReadConfigFile()
+	if err := LocateAndReadConfigFile(); err != nil {
+		log.Fatal("Can't read config:", err)
+	}
 
 	// let CLI args override config params
 	viper.BindPFlag("transaction.callback.url", cli.Flags().Lookup("transaction-callback-url"))
