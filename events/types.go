@@ -39,21 +39,20 @@ func init() {
 
 func (et EventType) String() string {
 	eventTypeStr, ok := eventTypeToStringMap[et]
-	if ok {
-		return eventTypeStr
+	if !ok {
+		return "invalid"
 	}
-	return "invalid"
+	return eventTypeStr
 }
 
 func EventTypeFromString(eventTypeStr string) (EventType, error) {
 	et, ok := stringToEventTypeMap[eventTypeStr]
-
-	if ok {
-		return et, nil
+	if !ok {
+		return InvalidEvent, errors.New(
+			"Failed to convert string '" + eventTypeStr + "' to event type",
+		)
 	}
-	return InvalidEvent, errors.New(
-		"Failed to convert string '" + eventTypeStr + "' to event type",
-	)
+	return et, nil
 }
 
 func (e EventType) MarshalJSON() ([]byte, error) {

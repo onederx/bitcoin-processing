@@ -90,8 +90,10 @@ func (b *broadcasterWithStorage) CheckIfSubscribed(subch <-chan broadcastedEvent
 	return ok
 }
 
-func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChannel chan broadcastedEvent, readEventChannel <-chan broadcastedEvent, storedEvents, eventBuffer []broadcastedEvent) {
+func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChannel chan broadcastedEvent,
+	readEventChannel <-chan broadcastedEvent, storedEvents, eventBuffer []broadcastedEvent) {
 	defer close(resultEventChannel)
+
 	lastEventSeq := 0
 	for _, storedEvent := range storedEvents {
 		lastEventSeq = storedEvent.Seq
@@ -106,6 +108,7 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		}
 
 	}
+
 	for _, newEvent := range eventBuffer {
 		if newEvent.Seq <= lastEventSeq {
 			// skip events that were already in DB
@@ -121,6 +124,7 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 			return
 		}
 	}
+
 	for event := range readEventChannel {
 		select {
 		case resultEventChannel <- event:
@@ -150,8 +154,9 @@ func (b *broadcasterWithStorage) SubscribeFromSeq(seq int) <-chan broadcastedEve
 		if err != nil {
 			log.Printf("Error: failed to get events from storage: %s", err)
 			eventsFromStorage <- make([]broadcastedEvent, 0)
+		} else {
+			eventsFromStorage <- events
 		}
-		eventsFromStorage <- events
 	}()
 
 waitingForStorage:
@@ -163,6 +168,7 @@ waitingForStorage:
 			break waitingForStorage
 		}
 	}
+
 	go b.sendOldAndPipeNewEventsToClient(
 		resultEventChannel,
 		readEventChannel,
@@ -178,7 +184,6 @@ func (b *broadcasterWithStorage) unsubscribeFromSeq(subch <-chan broadcastedEven
 	defer b.seqM.Unlock()
 
 	readEventChannel, ok := b.seqSubs[subch]
-
 	if !ok {
 		return
 	}

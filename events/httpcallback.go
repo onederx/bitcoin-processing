@@ -14,16 +14,14 @@ import (
 )
 
 func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
-	var flatNotificationData map[string]interface{}
 	notificationDataJSON, err := json.Marshal(event.Data)
-
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for webhook", err)
 		return
 	}
 
+	var flatNotificationData map[string]interface{}
 	err = json.Unmarshal(notificationDataJSON, &flatNotificationData)
-
 	if err != nil {
 		log.Printf("Error: could not json-decode notificationDataJSON", err)
 		return
@@ -33,7 +31,6 @@ func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
 	flatNotificationData["type"] = event.Type
 
 	flatNotificationJSON, err := json.Marshal(flatNotificationData)
-
 	if err != nil {
 		log.Printf("Error: could not json-encode flat notification", err)
 		return
@@ -55,22 +52,24 @@ func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		errorText := fmt.Sprintf(
-			"Got response with code %d calling HTTP callback %s",
-			resp.StatusCode,
-			e.callbackUrl,
-		)
-		body, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			return errors.New(errorText + " server replied " + string(body))
-		} else {
-			return errors.New(
-				errorText + " also failed to read response body " + err.Error(),
-			)
-		}
+
+	if resp.StatusCode == 200 {
+		return nil
 	}
-	return nil
+
+	errorText := fmt.Sprintf(
+		"Got response with code %d calling HTTP callback %s",
+		resp.StatusCode,
+		e.callbackUrl,
+	)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		errorText += " also failed to read response body " + err.Error()
+	} else {
+		errorText += " server replied " + string(body)
+	}
+
+	return errors.New(errorText)
 }
 
 func (e *EventBroker) sendHTTPCallbackNotifications() {

@@ -28,26 +28,24 @@ func newPostgresEventStorage() *PostgresEventStorage {
 		log.Fatal(err)
 	}
 
-	storage := &PostgresEventStorage{
-		db: db,
-	}
-	return storage
+	return &PostgresEventStorage{db: db}
 }
 
 func (s *PostgresEventStorage) StoreEvent(event Notification) (*storedEvent, error) {
-	var seq int
-	var err error
 	eventDataJSON, err := json.Marshal(&event.Data)
 	if err != nil {
 		return nil, err
 	}
+
 	// XXX: warning: seq can have gaps in case of rollback
+	var seq int
 	err = s.db.QueryRow(`INSERT INTO events (type, data)
         VALUES ($1, $2) RETURNING seq`, event.Type.String(), eventDataJSON,
 	).Scan(&seq)
 	if err != nil {
 		return nil, err
 	}
+
 	return &storedEvent{Notification: event, Seq: seq}, nil
 }
 

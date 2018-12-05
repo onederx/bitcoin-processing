@@ -40,8 +40,8 @@ func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 		e.notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
 	}
-	notificationData, err := e.storage.StoreEvent(Notification{eventType, data})
 
+	notificationData, err := e.storage.StoreEvent(Notification{eventType, data})
 	if err != nil {
 		log.Printf(
 			"Error: failed to store event type %s with data %v: %s",

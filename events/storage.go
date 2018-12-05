@@ -13,16 +13,19 @@ type EventStorage interface {
 }
 
 func newEventStorage(storageType string) EventStorage {
+	var storage EventStorage
+
 	switch storageType {
 	case "memory":
-		return &InMemoryEventStorage{
+		storage = &InMemoryEventStorage{
 			mutex:  &sync.Mutex{},
 			events: make([]*storedEvent, 0),
 		}
 	case "postgres":
-		return newPostgresEventStorage()
+		storage = newPostgresEventStorage()
 	default:
 		log.Fatal("Error: unsupported storage type ", storageType)
-		return nil
 	}
+
+	return storage
 }
