@@ -3,9 +3,10 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
 
 type SubscribeMessage struct {
@@ -107,7 +108,6 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 				return
 			}
 		}
-
 	}
 }
 

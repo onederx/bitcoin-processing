@@ -3,10 +3,11 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/satori/go.uuid"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
