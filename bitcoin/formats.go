@@ -1,8 +1,9 @@
 package bitcoin
 
 import (
-	"github.com/shopspring/decimal"
 	"log"
+
+	"github.com/shopspring/decimal"
 )
 
 type BitcoinAmount uint64
@@ -38,16 +39,16 @@ func (amount BitcoinAmount) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + amount.ToStringedFloat() + "\""), nil
 }
 
+func BitcoinAmountFromFloat(amountF64 float64) BitcoinAmount {
+	return BitcoinAmount(
+		decimal.NewFromFloat(amountF64).Mul(satoshiInBTCDecimal).IntPart(),
+	)
+}
+
 func BitcoinAmountFromStringedFloat(amountSF string) (BitcoinAmount, error) {
 	amountDecimal, err := decimal.NewFromString(amountSF)
 	if err != nil {
 		return 0, err
 	}
 	return BitcoinAmount(amountDecimal.Mul(satoshiInBTCDecimal).IntPart()), nil
-}
-
-func BitcoinAmountFromFloat(amountF64 float64) BitcoinAmount {
-	return BitcoinAmount(
-		decimal.NewFromFloat(amountF64).Mul(satoshiInBTCDecimal).IntPart(),
-	)
 }

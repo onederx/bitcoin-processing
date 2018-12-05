@@ -2,6 +2,7 @@ package bitcoin
 
 import (
 	"errors"
+
 	"github.com/btcsuite/btcutil"
 )
 
@@ -31,21 +32,20 @@ func init() {
 
 func (ft FeeType) String() string {
 	feeTypeStr, ok := feeTypeToStringMap[ft]
-	if ok {
-		return feeTypeStr
+	if !ok {
+		return "invalid"
 	}
-	return "invalid"
+	return feeTypeStr
 }
 
 func FeeTypeFromString(feeTypeStr string) (FeeType, error) {
 	ft, ok := stringToFeeTypeMap[feeTypeStr]
-
-	if ok {
-		return ft, nil
+	if !ok {
+		return InvalidFee, errors.New(
+			"Failed to convert string '" + feeTypeStr + "' to fee type",
+		)
 	}
-	return InvalidFee, errors.New(
-		"Failed to convert string '" + feeTypeStr + "' to fee type",
-	)
+	return ft, nil
 }
 
 func (ft FeeType) MarshalJSON() ([]byte, error) {
