@@ -21,7 +21,7 @@ func init() {
 		Use:   "websocket",
 		Short: "Subscribe to events via websocket",
 		Run: func(cmd *cobra.Command, args []string) {
-			seqRequest, err := json.Marshal(api.SubscribeMessage{startSeq})
+			seqRequest, err := json.Marshal(api.SubscribeMessage{Seq: startSeq})
 
 			if err != nil {
 				log.Fatal(err)

@@ -17,7 +17,7 @@ func init() {
 		Use:   "get_events",
 		Short: "Request events (optionally starting with given seq)",
 		Run: func(cmd *cobra.Command, args []string) {
-			seqRequest, err := json.Marshal(api.SubscribeMessage{startSeq})
+			seqRequest, err := json.Marshal(api.SubscribeMessage{Seq: startSeq})
 
 			if err != nil {
 				log.Fatal(err)

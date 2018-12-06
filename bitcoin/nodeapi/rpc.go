@@ -309,7 +309,7 @@ func (n *NodeAPI) transformTxToSetFixedFee(rawTxFunded *fundRawTransactionResult
 	if len(decodedRawTx.Vout) != expectedOutputNumber {
 		return nil, fmt.Errorf(
 			errorPrefix+"expected exacly %d outputs for tx %#v",
-			rawTxFunded,
+			expectedOutputNumber, rawTxFunded,
 		)
 	}
 

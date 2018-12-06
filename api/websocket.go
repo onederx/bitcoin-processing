@@ -97,10 +97,7 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 		case event := <-eventQueue:
 			marshaledEvent, err := json.Marshal(&event)
 			if err != nil {
-				log.Printf(
-					"Error: could not json-encode notification for ws",
-					err,
-				)
+				log.Printf("Error: could not json-encode notification for ws: %s", err)
 				continue
 			}
 			err = conn.WriteMessage(websocket.TextMessage, marshaledEvent)
