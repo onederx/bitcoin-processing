@@ -250,6 +250,7 @@ func (n *NodeAPI) createRawTransaction(inputs []btcjson.TransactionInput, output
 	return response.Result, nil
 }
 
+// todo: this func is unused ?
 func (n *NodeAPI) getRawChangeAddress() (string, error) {
 	// there is no GetRawChangeAddress in btcd/rpcclient, but it doesn't work:
 	// it accepts one string argument "account" while real
@@ -286,6 +287,9 @@ func (n *NodeAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOp
 		Error  *JsonRPCError
 	}
 	err = json.Unmarshal(fundRawTxJSONResp, &response)
+	if err != nil {
+		return nil, err
+	}
 	if response.Error != nil {
 		return nil, response.Error
 	}
@@ -297,11 +301,8 @@ func (n *NodeAPI) transformTxToSetFixedFee(rawTxFunded *fundRawTransactionResult
 	const errorPrefix = "Failed to transform tx to set fixed fee: "
 	decodedRawTx, err := n.decodeRawTransaction(rawTxFunded.Hex)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf(
-			"Failed to decode tx %s: %s",
-			string(rawTxFunded.Hex),
-			err,
-		))
+		return nil, fmt.Errorf("Failed to decode tx %s: %s",
+			string(rawTxFunded.Hex), err)
 	}
 
 	changePos := rawTxFunded.Changepos
@@ -328,29 +329,22 @@ func (n *NodeAPI) transformTxToSetFixedFee(rawTxFunded *fundRawTransactionResult
 	}
 
 	if len(decodedRawTx.Vout) != expectedOutputNumber {
-		return nil, errors.New(fmt.Sprintf(
+		return nil, fmt.Errorf(
 			errorPrefix+"expected exacly %d outputs for tx %#v",
 			rawTxFunded,
-		))
+		)
 	}
 
 	recipientOut := &decodedRawTx.Vout[recipientPos]
 	if len(recipientOut.ScriptPubKey.Addresses) != 1 {
-		return nil, errors.New(fmt.Sprintf(
-			errorPrefix+"expected that recipient output will contain one "+
-				"destination address, but it contains %d. Tx %#v",
-			len(recipientOut.ScriptPubKey.Addresses),
-			decodedRawTx,
-		))
+		return nil, fmt.Errorf(errorPrefix+"expected that recipient output will contain one "+
+			"destination address, but it contains %d. Tx %#v",
+			len(recipientOut.ScriptPubKey.Addresses), decodedRawTx)
 	}
 	if recipientOut.ScriptPubKey.Addresses[0] != address {
-		return nil, errors.New(fmt.Sprintf(
-			errorPrefix+"address %s in recipient output does not match "+
-				"destination address of payment %s. Tx %#v",
-			recipientOut.ScriptPubKey.Addresses[0],
-			address,
-			decodedRawTx,
-		))
+		return nil, fmt.Errorf(errorPrefix+"address %s in recipient output does not match "+
+			"destination address of payment %s. Tx %#v",
+			recipientOut.ScriptPubKey.Addresses[0], address, decodedRawTx)
 	}
 
 	recipientOutAmount, err := btcutil.NewAmount(recipientOut.Value)
@@ -373,13 +367,9 @@ func (n *NodeAPI) encodeTransformedTransaction(tx *btcjson.TxRawResult) (string,
 	finalOutputs := make(map[string]float64)
 	for i := range tx.Vout {
 		if len(tx.Vout[i].ScriptPubKey.Addresses) != 1 {
-			return "", errors.New(fmt.Sprintf(
-				"Expected that tx outputs will have 1 destination address, "+
-					"but %#v has %d. Tx %#v",
-				tx.Vout[i],
-				len(tx.Vout[i].ScriptPubKey.Addresses),
-				tx,
-			))
+			return "", fmt.Errorf("Expected that tx outputs will have 1 destination address, "+
+				"but %#v has %d. Tx %#v",
+				tx.Vout[i], len(tx.Vout[i].ScriptPubKey.Addresses), tx)
 		}
 		destinationAddress := tx.Vout[i].ScriptPubKey.Addresses[0]
 		finalOutputs[destinationAddress] = tx.Vout[i].Value
@@ -441,13 +431,10 @@ func (n *NodeAPI) SendWithFixedFee(address string, amount, fee bitcoin.BitcoinAm
 
 	if recipientPaysFee {
 		if amount < fee {
-			return "", errors.New(fmt.Sprintf(
+			return "", fmt.Errorf(
 				"Error: Recipient (%s) should pay fee %s satoshi, but amount sent"+
 					" is less: %s",
-				address,
-				fee,
-				amount,
-			))
+				address, fee, amount)
 		}
 	} else {
 		amount += fee
@@ -504,6 +491,9 @@ func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 		Error  *JsonRPCError
 	}
 	err = json.Unmarshal(getAddressInfoJSONResp, &response)
+	if err != nil {
+		return nil, err
+	}
 	if response.Error != nil {
 		return nil, response.Error
 	}
@@ -534,6 +524,9 @@ func (n *NodeAPI) getUnconfirmedBalance() (uint64, error) {
 		Error  *JsonRPCError
 	}
 	err = json.Unmarshal(getUnconfirmedBalanceJSONResp, &response)
+	if err != nil {
+		return 0, err
+	}
 	if response.Error != nil {
 		return 0, response.Error
 	}

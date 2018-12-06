@@ -29,6 +29,10 @@ func readSeqFromClient(conn *websocket.Conn) (SubscribeMessage, error) {
 	var decodedMessage SubscribeMessage
 
 	messageType, message, err := conn.ReadMessage()
+	if err != nil {
+		log.Printf("Failed to read message from client: %v", err)
+		return decodedMessage, err
+	}
 
 	if messageType != websocket.TextMessage {
 		log.Printf("Unexpected type of subscribe message: %v", messageType)
@@ -36,28 +40,26 @@ func readSeqFromClient(conn *websocket.Conn) (SubscribeMessage, error) {
 	}
 
 	err = json.Unmarshal(message, &decodedMessage)
-
 	if err != nil {
 		log.Printf("Failed to decode message from client: %s", message)
 		shutdownConnection(conn)
 		return decodedMessage, err
 	}
+
 	return decodedMessage, nil
 }
 
 func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
 	log.Print("Got new websocket subscriber")
-	conn, err := upgrader.Upgrade(w, r, nil)
 
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("Upgrade:", err)
 		return
 	}
-
 	defer conn.Close()
 
 	subscribeMessage, err := readSeqFromClient(conn)
-
 	if err != nil {
 		return
 	}
@@ -68,7 +70,6 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 	defer s.eventBroker.Unsubscribe(eventQueue)
 
 	clientClosedConnection := make(chan struct{})
-
 	go func() {
 		defer close(clientClosedConnection)
 		for {

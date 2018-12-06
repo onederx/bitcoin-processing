@@ -3,7 +3,6 @@ package wallet
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"runtime/debug"
@@ -246,8 +245,8 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			existingTransaction.Id,
 		)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("Update of tx data in DB failed: %s. Tx %#v",
-				err, transaction))
+			return nil, fmt.Errorf("Update of tx data in DB failed: %s. Tx %#v",
+				err, transaction)
 		}
 		existingTransaction.update(transaction)
 		return existingTransaction, nil
@@ -290,8 +289,8 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		transaction.reportedConfirmations,
 	)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed to insert new tx into DB: %s. Tx %#v",
-			err, transaction))
+		return nil, fmt.Errorf("Failed to insert new tx into DB: %s. Tx %#v",
+			err, transaction)
 	}
 	return transaction, nil
 }
