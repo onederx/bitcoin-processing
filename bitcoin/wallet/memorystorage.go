@@ -2,8 +2,9 @@ package wallet
 
 import (
 	"errors"
-	"github.com/satori/go.uuid"
 	"log"
+
+	"github.com/satori/go.uuid"
 )
 
 type InMemoryWalletStorage struct {
@@ -55,11 +56,13 @@ func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 	if err != nil {
 		return nil, err
 	}
+
 	if existingTransaction != nil {
 		transaction.fresh = false
 		existingTransaction.update(transaction)
 		return existingTransaction, nil
 	}
+
 	transaction.fresh = true
 	if transaction.Id == uuid.Nil {
 		if transaction.Direction == OutgoingDirection {
@@ -101,6 +104,7 @@ func (s *InMemoryWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(
 			result = append(result, transaction)
 		}
 	}
+
 	return result, nil
 }
 
@@ -109,6 +113,7 @@ func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transac
 	if err != nil {
 		return err
 	}
+
 	storedTransaction.reportedConfirmations = reportedConfirmations
 	return nil
 }
@@ -131,6 +136,7 @@ func (s *InMemoryWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 			result = append(result, transaction)
 		}
 	}
+
 	return result, nil
 }
 
@@ -141,10 +147,13 @@ func (s *InMemoryWalletStorage) GetTransactionsWithFilter(directionFilter string
 		if directionFilter != "" && directionFilter != transaction.Direction.String() {
 			continue
 		}
+
 		if statusFilter != "" && statusFilter != transaction.Status.String() {
 			continue
 		}
+
 		result = append(result, transaction)
 	}
+
 	return result, nil
 }

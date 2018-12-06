@@ -65,39 +65,38 @@ func init() {
 
 func (td TransactionDirection) String() string {
 	tdStr, ok := transactionDirectionToStringMap[td]
-	if ok {
-		return tdStr
+	if !ok {
+		return "invalid"
 	}
-	return "invalid"
+	return tdStr
 }
 
 func (ts TransactionStatus) String() string {
 	tsStr, ok := transactionStatusToStringMap[ts]
-	if ok {
-		return tsStr
+	if !ok {
+		return "invalid"
 	}
-	return "invalid"
+	return tsStr
 }
 
 func TransactionDirectionFromString(txDirectionStr string) (TransactionDirection, error) {
 	td, ok := stringToTransactionDirectionMap[txDirectionStr]
-
-	if ok {
-		return td, nil
+	if !ok {
+		return InvalidDirection, errors.New(
+			"Invalid transaction direction: " + txDirectionStr,
+		)
 	}
-	return InvalidDirection, errors.New(
-		"Invalid transaction direction: " + txDirectionStr,
-	)
+	return td, nil
 }
 
 func TransactionStatusFromString(txStatusStr string) (TransactionStatus, error) {
 	ts, ok := stringToTransactionStatusMap[txStatusStr]
-	if ok {
-		return ts, nil
+	if !ok {
+		return InvalidTransaction, errors.New(
+			"Invalid transaction status: " + txStatusStr,
+		)
 	}
-	return InvalidTransaction, errors.New(
-		"Invalid transaction status: " + txStatusStr,
-	)
+	return ts, nil
 }
 
 func (td TransactionDirection) MarshalJSON() ([]byte, error) {
@@ -146,7 +145,6 @@ func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult)
 
 func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transaction {
 	var direction TransactionDirection
-	var amount bitcoin.BitcoinAmount
 	if btcNodeTransaction.Category == "receive" {
 		direction = IncomingDirection
 	} else if btcNodeTransaction.Category == "send" {
@@ -178,8 +176,8 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		)
 	}
 
+	var amount bitcoin.BitcoinAmount
 	btcutilAmount, err := btcutil.NewAmount(btcNodeTransaction.Amount)
-
 	if err != nil {
 		log.Printf(
 			"Error: failed to convert amount %v to btcutil amount for tx %s."+

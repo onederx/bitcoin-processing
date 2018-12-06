@@ -1,13 +1,13 @@
 package wallet
 
 import (
-	"github.com/onederx/bitcoin-processing/settings"
 	"log"
+
+	"github.com/onederx/bitcoin-processing/settings"
 )
 
 func (w *Wallet) initColdWallet() {
 	w.coldWalletAddress = settings.GetString("wallet.cold_wallet_address")
-
 	if w.coldWalletAddress == "" {
 		return
 	}

@@ -2,8 +2,9 @@ package wallet
 
 import (
 	"errors"
-	"github.com/onederx/bitcoin-processing/settings"
 	"log"
+
+	"github.com/onederx/bitcoin-processing/settings"
 )
 
 func (w *Wallet) generateHotWalletAddress() (string, error) {
@@ -13,12 +14,14 @@ func (w *Wallet) generateHotWalletAddress() (string, error) {
 			"Error generating hot wallet address " + err.Error(),
 		)
 	}
+
 	err = w.storage.SetHotWalletAddress(newHotWalletAddress)
 	if err != nil {
 		return "", errors.New(
 			"Error storing generated hot wallet address " + err.Error(),
 		)
 	}
+
 	return newHotWalletAddress, nil
 }
 
@@ -31,6 +34,7 @@ func (w *Wallet) getOrCreateHotWallet() string {
 		)
 		return addressFromSettings
 	}
+
 	addressFromStorage := w.storage.GetHotWalletAddress()
 	if addressFromStorage != "" {
 		log.Printf(
@@ -39,10 +43,12 @@ func (w *Wallet) getOrCreateHotWallet() string {
 		)
 		return addressFromStorage
 	}
+
 	newHotWalletAddress, err := w.generateHotWalletAddress()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("Generated a new hot wallet address %s", newHotWalletAddress)
 	return newHotWalletAddress
 }
@@ -56,6 +62,7 @@ func (w *Wallet) checkHotWalletAddress() {
 			err,
 		)
 	}
+
 	if !addressInfo.IsMine {
 		log.Fatalf(
 			"Error checking hot wallet address %s: address does not belong "+
@@ -63,6 +70,7 @@ func (w *Wallet) checkHotWalletAddress() {
 			w.hotWalletAddress,
 		)
 	}
+
 	log.Printf("Checking hot wallet address: OK")
 }
 

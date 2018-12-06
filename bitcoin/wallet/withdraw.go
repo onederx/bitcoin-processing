@@ -2,10 +2,12 @@ package wallet
 
 import (
 	"errors"
+	"log"
+
+	"github.com/satori/go.uuid"
+
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
-	"github.com/satori/go.uuid"
-	"log"
 )
 
 type WithdrawRequest struct {
@@ -38,11 +40,10 @@ func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 
 func isInsufficientFundsError(err error) bool {
 	rpcError, ok := err.(*nodeapi.JsonRPCError)
-
-	if ok {
-		return rpcError.Message == "Insufficient funds"
+	if !ok {
+		return false
 	}
-	return false
+	return rpcError.Message == "Insufficient funds"
 }
 
 func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.FeeType) (needManualConfirmation bool, err error) {
@@ -53,6 +54,7 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 				w.minWithdraw.String(),
 		)
 	}
+
 	if feeType == bitcoin.PerKBRateFee && request.Fee < w.minFeePerKb {
 		return false, errors.New(
 			"Error: refusing to withdraw with fee " + request.Fee.String() +
@@ -60,6 +62,7 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 				w.minFeePerKb.String() + " for fee type " + feeType.String(),
 		)
 	}
+
 	if feeType == bitcoin.FixedFee && request.Fee < w.minFeeFixed {
 		return false, errors.New(
 			"Error: refusing to withdraw with fee " + request.Fee.String() +
@@ -67,9 +70,11 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 				w.minFeeFixed.String() + " for fee type " + feeType.String(),
 		)
 	}
+
 	if request.Amount > w.minWithdrawWithoutManualConfirmation {
 		return true, nil
 	}
+
 	return false, nil
 }
 
@@ -150,7 +155,6 @@ func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
 
 func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
-
 	if err != nil {
 		return err
 	}
@@ -158,7 +162,6 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	logWithdrawRequest(request, feeType)
 
 	needManualConfirmation, err := w.checkWithdrawLimits(request, feeType)
-
 	if err != nil {
 		return err
 	}

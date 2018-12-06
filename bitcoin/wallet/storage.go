@@ -28,16 +28,19 @@ type WalletStorage interface {
 }
 
 func newStorage(storageType string) WalletStorage {
+	var storage WalletStorage
+
 	switch storageType {
 	case "memory":
-		return &InMemoryWalletStorage{
+		storage = &InMemoryWalletStorage{
 			accounts:     make([]*Account, 0),
 			transactions: make([]*Transaction, 0),
 		}
 	case "postgres":
-		return newPostgresWalletStorage()
+		storage = newPostgresWalletStorage()
 	default:
 		log.Fatal("Error: unsupported storage type ", storageType)
-		return nil
 	}
+
+	return storage
 }

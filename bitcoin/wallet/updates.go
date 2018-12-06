@@ -1,12 +1,14 @@
 package wallet
 
 import (
+	"log"
+	"time"
+
+	"github.com/btcsuite/btcutil"
+
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/onederx/bitcoin-processing/util"
-	"github.com/btcsuite/btcutil"
-	"log"
-	"time"
 )
 
 var unknownAccountError = map[string]interface{}{"error": "account not found"}
@@ -80,13 +82,16 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 			tx.Metainfo = hotStorageMeta
 		}
 	}
+
 	oldStatus := tx.Status
 	w.setTxStatusByConfirmations(tx)
+
 	tx, err := w.storage.StoreTransaction(tx)
 	if err != nil {
 		log.Printf("Error: failed to store tx data in database: %s", err)
 		return false
 	}
+
 	txInfoChanged := tx.fresh || (oldStatus != tx.Status)
 	if tx.fresh {
 		log.Printf("New tx %s", tx.Hash)
@@ -103,18 +108,17 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 	if !isHotStorageTx && !tx.ColdStorage { // don't notify about internal txns
 		w.notifyTransaction(tx)
 	}
+
 	return txInfoChanged
 }
 
 func (w *Wallet) checkForNewTransactions() {
 	lastSeenBlock := w.storage.GetLastSeenBlockHash()
 	lastTxData, err := w.nodeAPI.ListTransactionsSinceBlock(lastSeenBlock)
-	anyTxInfoChanged := false
 	if err != nil {
 		log.Print("Error: Checking for wallet updates failed: ", err)
 		return
 	}
-
 	if lastTxData.LastBlock != lastSeenBlock {
 		log.Printf(
 			"Got %d transactions from node. Last block hash is %s",
@@ -122,6 +126,8 @@ func (w *Wallet) checkForNewTransactions() {
 			lastTxData.LastBlock,
 		)
 	}
+
+	anyTxInfoChanged := false
 	for _, btcNodeTransaction := range lastTxData.Transactions {
 		tx := newTransaction(&btcNodeTransaction)
 		currentTxInfoChanged := w.updateTxInfo(tx)
@@ -163,8 +169,6 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 	transactionsToCheck, err := w.storage.GetBroadcastedTransactionsWithLessConfirmations(
 		w.maxConfirmations,
 	)
-	anyTxInfoChanged := false
-
 	if err != nil {
 		log.Printf(
 			"Error: failed to fetch transactions from storage for update: %s",
@@ -173,9 +177,9 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 		return
 	}
 
+	anyTxInfoChanged := false
 	for _, tx := range transactionsToCheck {
 		fullTxInfo, err := w.nodeAPI.GetTransaction(tx.Hash)
-
 		if err != nil {
 			log.Printf(
 				"Error: could not get tx %s from node for update",
