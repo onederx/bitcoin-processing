@@ -250,28 +250,6 @@ func (n *NodeAPI) createRawTransaction(inputs []btcjson.TransactionInput, output
 	return response.Result, nil
 }
 
-// todo: this func is unused ?
-func (n *NodeAPI) getRawChangeAddress() (string, error) {
-	// there is no GetRawChangeAddress in btcd/rpcclient, but it doesn't work:
-	// it accepts one string argument "account" while real
-	// createrawchangeaddress RPC call does not accept it - which results in
-	// error
-	responseJSON, err := n.sendRequestToNode("getrawchangeaddress", nil)
-	if err != nil {
-		return "", err
-	}
-
-	var response jsonRPCStringResponse
-	err = json.Unmarshal(responseJSON, &response)
-	if err != nil {
-		return "", err
-	}
-	if response.Error != nil {
-		return "", response.Error
-	}
-	return response.Result, nil
-}
-
 func (n *NodeAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOptions) (*fundRawTransactionResult, error) {
 	// there is no FundRawTransaction in btcd/rpcclient
 	fundRawTxJSONResp, err := n.sendRequestToNode(
