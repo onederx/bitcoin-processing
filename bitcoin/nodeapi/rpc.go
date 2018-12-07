@@ -52,10 +52,10 @@ type AddressInfo struct {
 	Hex          string
 	Pubkey       string
 	Embedded     struct {
-		IsScript       bool   `json:"isscript"`
-		IsWitness      bool   `json:"iswitness"`
-		WitnessVersion bool   `json:"witness_version"`
-		WitnessProgram string `json:"witness_program"`
+		IsScript       bool    `json:"isscript"`
+		IsWitness      bool    `json:"iswitness"`
+		WitnessVersion float64 `json:"witness_version"`
+		WitnessProgram string  `json:"witness_program"`
 		Pubkey         string
 		Address        string
 		ScriptPubKey   string
