@@ -3,6 +3,7 @@ package events
 import (
 	"log"
 	"sync"
+	"time"
 )
 
 type broadcastedEvent = *NotificationWithSeq
@@ -19,7 +20,8 @@ type broadcasterWithStorage struct {
 	seqSubs map[<-chan broadcastedEvent]<-chan broadcastedEvent
 }
 
-const channelSize = 1000
+const channelSize = 10000
+const sendEventTimeout = time.Second
 
 func newBroadcaster() *broadcaster {
 	return &broadcaster{subs: make(map[<-chan broadcastedEvent]chan broadcastedEvent)}
@@ -100,9 +102,11 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		select {
 		case resultEventChannel <- storedEvent:
 
-		default:
-			// maybe client has unsubscribed already
-			// then this is a no-op
+		case <-time.After(sendEventTimeout):
+			log.Printf(
+				"Event broadcaster: timed out sending event to client." +
+					" Closing event queue",
+			)
 			b.unsubscribeFromSeq(resultEventChannel)
 			return
 		}
@@ -117,9 +121,11 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		select {
 		case resultEventChannel <- newEvent:
 
-		default:
-			// maybe client has unsubscribed already
-			// then this is a no-op
+		case <-time.After(sendEventTimeout):
+			log.Printf(
+				"Event broadcaster: timed out sending event to client." +
+					" Closing event queue",
+			)
 			b.unsubscribeFromSeq(resultEventChannel)
 			return
 		}
@@ -129,7 +135,11 @@ func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChan
 		select {
 		case resultEventChannel <- event:
 
-		default:
+		case <-time.After(sendEventTimeout):
+			log.Printf(
+				"Event broadcaster: timed out sending event to client." +
+					" Closing event queue",
+			)
 			b.unsubscribeFromSeq(resultEventChannel)
 			return
 		}

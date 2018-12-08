@@ -94,7 +94,14 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 		select {
 		case <-clientClosedConnection:
 			return
-		case event := <-eventQueue:
+		case event, ok := <-eventQueue:
+			if !ok {
+				log.Printf(
+					"Websocket event sender: event queue closed for some " +
+						"reason. Closing connection.",
+				)
+				return
+			}
 			marshaledEvent, err := json.Marshal(&event)
 			if err != nil {
 				log.Printf("Error: could not json-encode notification for ws: %s", err)
