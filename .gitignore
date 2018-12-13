@@ -1,6 +1,7 @@
 cmd/bitcoin-processing/bitcoin-processing.yml
 cmd/bitcoin-processing/bitcoin-processing
 cmd/bitcoin-processing-client/bitcoin-processing-client
+tools/regtest/auto-paying-proxy
 inventory
 .bitcoin
 .env
