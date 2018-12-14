@@ -63,12 +63,12 @@ func (e *EventBroker) Subscribe() <-chan *NotificationWithSeq {
 	return e.eventBroadcaster.Subscribe()
 }
 
-func (e *EventBroker) SubscribeFromSeq(seq int) <-chan *NotificationWithSeq {
+func (e *EventBroker) SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq {
 	return e.eventBroadcaster.SubscribeFromSeq(seq)
 }
 
-func (e *EventBroker) Unsubscribe(eventChannel <-chan *NotificationWithSeq) {
-	e.eventBroadcaster.Unsubscribe(eventChannel)
+func (e *EventBroker) UnsubscribeFromSeq(eventChannel <-chan []*NotificationWithSeq) {
+	e.eventBroadcaster.UnsubscribeFromSeq(eventChannel)
 }
 
 func (e *EventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) {

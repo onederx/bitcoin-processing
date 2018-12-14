@@ -7,6 +7,7 @@ import (
 )
 
 type broadcastedEvent = *NotificationWithSeq
+type broadcastedEventSequence = []broadcastedEvent
 
 type broadcaster struct {
 	m    sync.Mutex
@@ -17,7 +18,7 @@ type broadcasterWithStorage struct {
 	broadcaster
 	storage EventStorage
 	seqM    sync.Mutex
-	seqSubs map[<-chan broadcastedEvent]<-chan broadcastedEvent
+	seqSubs map[<-chan broadcastedEventSequence]<-chan broadcastedEvent
 }
 
 const channelSize = 10000
@@ -31,7 +32,7 @@ func newBroadcasterWithStorage(storage EventStorage) *broadcasterWithStorage {
 	return &broadcasterWithStorage{
 		broadcaster: *newBroadcaster(),
 		storage:     storage,
-		seqSubs:     make(map[<-chan broadcastedEvent]<-chan broadcastedEvent),
+		seqSubs:     make(map[<-chan broadcastedEventSequence]<-chan broadcastedEvent),
 	}
 }
 
@@ -84,86 +85,61 @@ func (b *broadcaster) Close() {
 	}
 }
 
-func (b *broadcasterWithStorage) CheckIfSubscribed(subch <-chan broadcastedEvent) bool {
-	b.seqM.Lock()
-	defer b.seqM.Unlock()
-
-	_, ok := b.seqSubs[subch]
-	return ok
-}
-
-func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChannel chan broadcastedEvent,
+func (b *broadcasterWithStorage) sendOldAndPipeNewEventsToClient(resultEventChannel chan broadcastedEventSequence,
 	readEventChannel <-chan broadcastedEvent, storedEvents, eventBuffer []broadcastedEvent) {
 	defer close(resultEventChannel)
 
-	lastEventSeq := 0
-	for _, storedEvent := range storedEvents {
-		lastEventSeq = storedEvent.Seq
-		select {
-		case resultEventChannel <- storedEvent:
+	if len(storedEvents) > 0 {
+		lastEventSeq := storedEvents[len(storedEvents)-1].Seq
 
-		case <-time.After(sendEventTimeout):
-			log.Printf(
-				"Event broadcaster: timed out sending event to client." +
-					" Closing event queue",
-			)
-			b.unsubscribeFromSeq(resultEventChannel)
-			return
+		resultEventChannel <- storedEvents
+
+		for i, newEvent := range eventBuffer {
+			if newEvent.Seq <= lastEventSeq {
+				// skip events that were already in DB
+				continue
+			} else {
+				resultEventChannel <- eventBuffer[i:]
+				break
+			}
 		}
-
-	}
-
-	for _, newEvent := range eventBuffer {
-		if newEvent.Seq <= lastEventSeq {
-			// skip events that were already in DB
-			continue
-		}
-		select {
-		case resultEventChannel <- newEvent:
-
-		case <-time.After(sendEventTimeout):
-			log.Printf(
-				"Event broadcaster: timed out sending event to client." +
-					" Closing event queue",
-			)
-			b.unsubscribeFromSeq(resultEventChannel)
-			return
-		}
+	} else if len(eventBuffer) > 0 {
+		resultEventChannel <- eventBuffer
 	}
 
 	for event := range readEventChannel {
 		select {
-		case resultEventChannel <- event:
+		case resultEventChannel <- broadcastedEventSequence{event}:
 
-		case <-time.After(sendEventTimeout):
+		default:
 			log.Printf(
-				"Event broadcaster: timed out sending event to client." +
-					" Closing event queue",
+				"Event broadcaster: event queue overflowed, probably client" +
+					" is too slow. Closing event queue",
 			)
-			b.unsubscribeFromSeq(resultEventChannel)
+			b.UnsubscribeFromSeq(resultEventChannel)
 			return
 		}
 	}
 }
 
-func (b *broadcasterWithStorage) SubscribeFromSeq(seq int) <-chan broadcastedEvent {
-	var storedEvents []broadcastedEvent
+func (b *broadcasterWithStorage) SubscribeFromSeq(seq int) <-chan broadcastedEventSequence {
+	var storedEvents broadcastedEventSequence
 
 	b.seqM.Lock()
 	defer b.seqM.Unlock()
 
 	readEventChannel := b.Subscribe()
-	resultEventChannel := make(chan broadcastedEvent, channelSize)
+	resultEventChannel := make(chan broadcastedEventSequence, channelSize)
 	b.seqSubs[resultEventChannel] = readEventChannel
 
-	eventBuffer := make([]broadcastedEvent, 0, 100)
-	eventsFromStorage := make(chan []broadcastedEvent)
+	eventBuffer := make(broadcastedEventSequence, 0, 100)
+	eventsFromStorage := make(chan broadcastedEventSequence)
 
 	go func() {
 		events, err := b.storage.GetEventsFromSeq(seq)
 		if err != nil {
 			log.Printf("Error: failed to get events from storage: %s", err)
-			eventsFromStorage <- make([]broadcastedEvent, 0)
+			eventsFromStorage <- make(broadcastedEventSequence, 0)
 		} else {
 			eventsFromStorage <- events
 		}
@@ -189,7 +165,7 @@ waitingForStorage:
 	return resultEventChannel
 }
 
-func (b *broadcasterWithStorage) unsubscribeFromSeq(subch <-chan broadcastedEvent) {
+func (b *broadcasterWithStorage) UnsubscribeFromSeq(subch <-chan broadcastedEventSequence) {
 	b.seqM.Lock()
 	defer b.seqM.Unlock()
 
@@ -197,21 +173,18 @@ func (b *broadcasterWithStorage) unsubscribeFromSeq(subch <-chan broadcastedEven
 	if !ok {
 		return
 	}
-
 	b.Unsubscribe(readEventChannel)
 	delete(b.seqSubs, subch)
 }
 
 func (b *broadcasterWithStorage) Unsubscribe(subch <-chan broadcastedEvent) {
 	b.m.Lock()
+	defer b.m.Unlock()
 
 	ch, ok := b.subs[subch]
 	if !ok {
-		b.m.Unlock()
-		b.unsubscribeFromSeq(subch)
 		return
 	}
-	defer b.m.Unlock()
 
 	close(ch)
 	delete(b.subs, subch)

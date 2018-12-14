@@ -66,8 +66,8 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 
 	log.Print("Subscriber requested messages from seq ", subscribeMessage.Seq)
 
-	eventQueue := s.eventBroker.SubscribeFromSeq(subscribeMessage.Seq)
-	defer s.eventBroker.Unsubscribe(eventQueue)
+	eventSequenceQueue := s.eventBroker.SubscribeFromSeq(subscribeMessage.Seq)
+	defer s.eventBroker.UnsubscribeFromSeq(eventSequenceQueue)
 
 	clientClosedConnection := make(chan struct{})
 	go func() {
@@ -94,7 +94,7 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 		select {
 		case <-clientClosedConnection:
 			return
-		case event, ok := <-eventQueue:
+		case eventSequence, ok := <-eventSequenceQueue:
 			if !ok {
 				log.Printf(
 					"Websocket event sender: event queue closed for some " +
@@ -102,15 +102,17 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 				)
 				return
 			}
-			marshaledEvent, err := json.Marshal(&event)
-			if err != nil {
-				log.Printf("Error: could not json-encode notification for ws: %s", err)
-				continue
-			}
-			err = conn.WriteMessage(websocket.TextMessage, marshaledEvent)
-			if err != nil {
-				log.Println("write:", err)
-				return
+			for _, event := range eventSequence {
+				marshaledEvent, err := json.Marshal(&event)
+				if err != nil {
+					log.Printf("Error: could not json-encode notification for ws: %s", err)
+					continue
+				}
+				err = conn.WriteMessage(websocket.TextMessage, marshaledEvent)
+				if err != nil {
+					log.Println("write:", err)
+					return
+				}
 			}
 		}
 	}
