@@ -19,15 +19,13 @@ func getTransactionNotificationType(confirmations int64, tx *Transaction) events
 	case IncomingDirection:
 		if confirmations == 0 {
 			return events.NewIncomingTxEvent
-		} else {
-			return events.IncomingTxConfirmedEvent
 		}
+		return events.IncomingTxConfirmedEvent
 	case OutgoingDirection:
 		if confirmations == 0 {
 			return events.NewOutgoingTxEvent
-		} else {
-			return events.OutgoingTxConfirmedEvent
 		}
+		return events.OutgoingTxConfirmedEvent
 	default:
 		panic("Unexpected tx direction " + tx.Direction.String())
 	}
@@ -36,16 +34,11 @@ func getTransactionNotificationType(confirmations int64, tx *Transaction) events
 func (w *Wallet) getAccountMetainfo(tx *Transaction) map[string]interface{} {
 	account, err := w.storage.GetAccountByAddress(tx.Address)
 	if err != nil {
-		log.Printf(
-			"Error: failed to match account by address %s "+
-				"(transaction %s) for incoming payment",
-			tx.Address,
-			tx.Hash,
-		)
+		log.Printf("Error: failed to match account by address %s "+
+			"(transaction %s) for incoming payment", tx.Address, tx.Hash)
 		return unknownAccountError
-	} else {
-		return account.Metainfo
 	}
+	return account.Metainfo
 }
 
 func (w *Wallet) notifyTransaction(tx *Transaction) {
@@ -65,9 +58,7 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 		if err != nil {
 			log.Printf(
 				"Error: failed to update count of reported transaction "+
-					"confirmations in storage: %s",
-				err,
-			)
+					"confirmations in storage: %s", err)
 			return
 		}
 	}

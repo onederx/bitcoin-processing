@@ -208,7 +208,6 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	if !needManualConfirmation || toColdStorage {
 		// withdraw to cold storage does not need confirmation
 		return w.sendWithdrawalViaWalletUpdater(outgoingTx)
-	} else {
-		return w.holdWithdrawalUntilConfirmed(outgoingTx)
 	}
+	return w.holdWithdrawalUntilConfirmed(outgoingTx)
 }
