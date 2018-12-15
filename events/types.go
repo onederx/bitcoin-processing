@@ -55,8 +55,8 @@ func EventTypeFromString(eventTypeStr string) (EventType, error) {
 	return et, nil
 }
 
-func (e EventType) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + e.String() + "\""), nil
+func (et EventType) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + et.String() + "\""), nil
 }
 
 type Notification struct {
