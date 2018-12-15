@@ -9,6 +9,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// SubscribeMessage simply holds one integer - a sequence number to send events
+// from - and is used to describe JSON struct sent from client to request
+// events starting with this sequence number
 type SubscribeMessage struct {
 	Seq int `json:"seq"`
 }

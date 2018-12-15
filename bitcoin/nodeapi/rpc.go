@@ -20,6 +20,10 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
+// NodeAPI is responsible for communication with Bitcoin node using RPC API
+// Currently, some requests are implemented using btcsuite
+// (github.com/btcsuite) and some by manually constructing request data,
+// sending it in HTTP request with net/http and parsing the response
 type NodeAPI struct {
 	btcrpc  *rpcclient.Client
 	address string
@@ -46,6 +50,8 @@ type JSONRPCError struct {
 	Message string
 }
 
+// AddressInfo is a structure with verbose information about Bitcoin address
+// returned by Bitcoin node RPC API in response to getaddressinfo call
 type AddressInfo struct {
 	Address      string
 	ScriptPubKey string
@@ -107,10 +113,16 @@ func (err JSONRPCError) Error() string {
 	)
 }
 
+// CreateNewAddress creates new Bitcoin address belonging to current wallet
+// Address is returned as type btcutil.Address
 func (n *NodeAPI) CreateNewAddress() (btcutil.Address, error) {
 	return n.btcrpc.GetNewAddress("")
 }
 
+// ListTransactionsSinceBlock fetches a list of transactions relevant to current
+// wallet that belong to blocks newer than block with specified hash or are
+// unconfirmed (not in any block, not yet mined). Transactions in block with
+// specified hash are NOT included.
 func (n *NodeAPI) ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error) {
 	var blockHashInChainhashFormat *chainhash.Hash
 	var err error
@@ -130,6 +142,7 @@ func (n *NodeAPI) ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSin
 	return n.btcrpc.ListSinceBlock(blockHashInChainhashFormat)
 }
 
+// GetTransaction fetches information about bitcoin tx by its hash. Data
 func (n *NodeAPI) GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
 	txHashInChainhashFormat, err := chainhash.NewHashFromStr(hash)
 	if err != nil {
@@ -151,6 +164,10 @@ func (n *NodeAPI) decodeRawTransaction(rawTxHex string) (*btcjson.TxRawResult, e
 	return n.btcrpc.DecodeRawTransaction(rawTxBytes)
 }
 
+// GetRawTransaction fetches raw transaction (in binary form) and decodes it.
+// Data obtained by this call is more low-level than returned by GetTransaction
+// and contains more details specific to bitcoin network. For example, it
+// contains lists of inputs and outputs used by transaction
 func (n *NodeAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
 	transaction, err := n.GetTransaction(hash)
 	if err != nil {
@@ -482,6 +499,9 @@ func (n *NodeAPI) SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount
 	return n.sendRawTransaction(signedTx)
 }
 
+// GetAddressInfo gets verbose info about Bitcoin address. This can be used to
+// check if given address belongs to current wallet, which is a primary usage
+// of this function for now.
 func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 	// there is no GetAddressInfo in btcd/rpcclient
 
@@ -544,6 +564,10 @@ func (n *NodeAPI) getUnconfirmedBalance() (uint64, error) {
 	return uint64(amount), nil
 }
 
+// GetConfirmedAndUnconfirmedBalance gets value of confirmed balance (which is
+// a sum of unspent outputs of all transactions that are already mined and that
+// we can spend) and unconfirmed balance (which is a sum of unspent outputs of
+// transactions not yet mined to blockchain that we could spend).
 func (n *NodeAPI) GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
@@ -561,6 +585,8 @@ func (n *NodeAPI) GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error) {
 	return confirmedBalance, unconfirmedBalance, nil
 }
 
+// NewNodeAPI creates new instance of NodeAPI. It reads information about a
+// connection to Bitcoin node from settings
 func NewNodeAPI() *NodeAPI {
 	// prepare bitcoind RPC connection
 	// Connect to remote bitcoin core RPC server using HTTP POST mode.

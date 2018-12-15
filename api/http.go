@@ -14,6 +14,11 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
+// WithdrawRequest describes data sent by client to create new withdrawal
+// Fields ID, FeeType and Metainfo are optional
+// Address can be optional for withdrawals to hot storage (because hot storage
+// address can be set in config)
+// Amount and Fee are strings because they are sent by client as stringed floats
 type WithdrawRequest struct {
 	ID       uuid.UUID   `json:"id,omitempty"`
 	Address  string      `json:"address,omitempty"`
@@ -23,6 +28,9 @@ type WithdrawRequest struct {
 	Metainfo interface{} `json:"metainfo"`
 }
 
+// GetTransactionsFilter describes data sent by client to set up filters in
+// /get_transactions request. Currently, filtering by direction and status
+// is supported, empty value means do not filter
 type GetTransactionsFilter struct {
 	Direction string `json:"direction,omitempty"`
 	Status    string `json:"status,omitempty"`

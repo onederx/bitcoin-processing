@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // Enable postgresql driver
 
 	"github.com/onederx/bitcoin-processing/settings"
 )

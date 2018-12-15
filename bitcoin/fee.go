@@ -6,11 +6,26 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+// MinimalFeeRate is minimal fee rate per kilobyte that can be set in satoshis.
+// Internally bitcoin node counts fee in satoshis per byte and minimal amount
+// of BTC is 1 satoshi, so for 1000 bytes minimal rate is 1000 satoshis
 const MinimalFeeRate = 1000 // 1 satoshi per byte
+
+// MinimalFeeRateBTC is mimimal fee rate per kilobyte in BTC
 var MinimalFeeRateBTC = btcutil.Amount(MinimalFeeRate).ToBTC()
 
+// FeeType is an enum for setting how fee should be calculated for outgoing
+// transactions (withdrawals). There are two possible types: rate per kilobyte
+// (which is traditional and used by Bitcoin Core by default, with it given
+// fee value will be multiplied by tx size in kilobytes) and fixed (resulting
+// fee value will be equal to given fee value)
 type FeeType int
 
+// Possible fee types.
+// PerKBRateFee means fee paid will equal given fee value times tx size in KB
+// FixedFee means fee paid will be exatly equal to given fee value
+// InvalidFee means fee type is invalid and is used for unknown, uninitialized
+// values, and conversions from other types when source value is invalid
 const (
 	InvalidFee FeeType = iota
 	PerKBRateFee
@@ -38,6 +53,9 @@ func (ft FeeType) String() string {
 	return feeTypeStr
 }
 
+// FeeTypeFromString converts string to FeeType. "fixed" is converted to
+// FixedFee, "per-kb-rate" is converted to PerKBRateFee, all other values
+// produce InvalidFee and an error
 func FeeTypeFromString(feeTypeStr string) (FeeType, error) {
 	ft, ok := stringToFeeTypeMap[feeTypeStr]
 	if !ok {
@@ -48,6 +66,8 @@ func FeeTypeFromString(feeTypeStr string) (FeeType, error) {
 	return ft, nil
 }
 
+// MarshalJSON is use to serialize FeeType to JSON and simply returns string
+// representation of given FeeType
 func (ft FeeType) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + ft.String() + "\""), nil
 }

@@ -4,6 +4,10 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 )
 
+// GetTransactionsWithFilter fetches transactions from storage filtered by
+// status and direction. Empty filter string means do not filter, nonempty
+// string means only transactions with equal value of corresponding parameter
+// will be included
 func (w *Wallet) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error) {
 	return w.storage.GetTransactionsWithFilter(directionFilter, statusFilter)
 }

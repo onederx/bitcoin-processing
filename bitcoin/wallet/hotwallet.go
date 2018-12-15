@@ -74,6 +74,10 @@ func (w *Wallet) checkHotWalletAddress() {
 	log.Printf("Checking hot wallet address: OK")
 }
 
+// GetHotWalletAddress returns hot wallet address. Hot wallet address is a
+// Bitcoin address belonging to current wallet that should be used for intput of
+// money to processing app's wallet (for example, to transfer money from cold
+// storage to be able to fund large withdraw)
 func (w *Wallet) GetHotWalletAddress() string {
 	return w.hotWalletAddress
 }
