@@ -15,7 +15,7 @@ import (
 )
 
 type WithdrawRequest struct {
-	Id       uuid.UUID   `json:"id,omitempty"`
+	ID       uuid.UUID   `json:"id,omitempty"`
 	Address  string      `json:"address,omitempty"`
 	Amount   string      `json:"amount"`
 	Fee      string      `json:"fee,omitempty"`
@@ -33,7 +33,7 @@ type httpAPIResponse struct {
 	Result interface{} `json:"result"`
 }
 
-func (s *APIServer) respond(response http.ResponseWriter, data interface{}, err error) {
+func (s *Server) respond(response http.ResponseWriter, data interface{}, err error) {
 	var responseBody []byte
 	if err != nil {
 		responseBody, err = json.Marshal(httpAPIResponse{Error: err.Error()})
@@ -64,7 +64,7 @@ func (s *APIServer) respond(response http.ResponseWriter, data interface{}, err 
 	}
 }
 
-func (s *APIServer) newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
+func (s *Server) newBitcoinAddress(response http.ResponseWriter, request *http.Request) {
 	var metainfo map[string]interface{}
 	var body []byte
 	var err error
@@ -90,12 +90,12 @@ func (s *APIServer) newBitcoinAddress(response http.ResponseWriter, request *htt
 	s.respond(response, account, nil)
 }
 
-func (s *APIServer) notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
+func (s *Server) notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
 	s.eventBroker.Notify(events.CheckTxStatusEvent, "")
 	s.respond(response, nil, nil)
 }
 
-func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
+func (s *Server) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
 	var req WithdrawRequest
 	var withdrawReq wallet.WithdrawRequest
 	var body []byte
@@ -110,21 +110,21 @@ func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, r
 		return
 	}
 	withdrawReq.Address = req.Address
-	withdrawReq.Amount, err = bitcoin.BitcoinAmountFromStringedFloat(req.Amount)
+	withdrawReq.Amount, err = bitcoin.BTCAmountFromStringedFloat(req.Amount)
 	if err != nil {
 		s.respond(response, nil, err)
 		return
 	}
-	withdrawReq.Fee, err = bitcoin.BitcoinAmountFromStringedFloat(req.Fee)
+	withdrawReq.Fee, err = bitcoin.BTCAmountFromStringedFloat(req.Fee)
 	if err != nil {
 		s.respond(response, nil, err)
 		return
 	}
-	if req.Id == uuid.Nil {
-		withdrawReq.Id = uuid.Must(uuid.NewV4())
-		log.Printf("Generated new withdrawal id %s", withdrawReq.Id)
+	if req.ID == uuid.Nil {
+		withdrawReq.ID = uuid.Must(uuid.NewV4())
+		log.Printf("Generated new withdrawal id %s", withdrawReq.ID)
 	} else {
-		withdrawReq.Id = req.Id
+		withdrawReq.ID = req.ID
 	}
 	if req.FeeType == "" {
 		log.Printf("Fee type not specified: setting to 'fixed' by default")
@@ -140,19 +140,19 @@ func (s *APIServer) withdraw(toColdStorage bool, response http.ResponseWriter, r
 	s.respond(response, withdrawReq, nil)
 }
 
-func (s *APIServer) withdrawRegular(response http.ResponseWriter, request *http.Request) {
+func (s *Server) withdrawRegular(response http.ResponseWriter, request *http.Request) {
 	s.withdraw(false, response, request)
 }
 
-func (s *APIServer) withdrawToColdStorage(response http.ResponseWriter, request *http.Request) {
+func (s *Server) withdrawToColdStorage(response http.ResponseWriter, request *http.Request) {
 	s.withdraw(true, response, request)
 }
 
-func (s *APIServer) getHotStorageAddress(response http.ResponseWriter, request *http.Request) {
+func (s *Server) getHotStorageAddress(response http.ResponseWriter, request *http.Request) {
 	s.respond(response, s.wallet.GetHotWalletAddress(), nil)
 }
 
-func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.Request) {
+func (s *Server) getTransactions(response http.ResponseWriter, request *http.Request) {
 	var txFilter GetTransactionsFilter
 	var body []byte
 	var err error
@@ -172,10 +172,10 @@ func (s *APIServer) getTransactions(response http.ResponseWriter, request *http.
 	s.respond(response, txns, err)
 }
 
-func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Request) {
+func (s *Server) getBalance(response http.ResponseWriter, request *http.Request) {
 	var respData struct {
-		Balance           bitcoin.BitcoinAmount `json:"balance"`
-		BalanceWithUnconf bitcoin.BitcoinAmount `json:"balance_including_unconfirmed"`
+		Balance           bitcoin.BTCAmount `json:"balance"`
+		BalanceWithUnconf bitcoin.BTCAmount `json:"balance_including_unconfirmed"`
 	}
 	var err error
 	respData.Balance, respData.BalanceWithUnconf, err = s.wallet.GetBalance()
@@ -183,11 +183,11 @@ func (s *APIServer) getBalance(response http.ResponseWriter, request *http.Reque
 	s.respond(response, respData, err)
 }
 
-func (s *APIServer) getRequiredFromColdStorage(response http.ResponseWriter, request *http.Request) {
+func (s *Server) getRequiredFromColdStorage(response http.ResponseWriter, request *http.Request) {
 	s.respond(response, s.wallet.GetMoneyRequiredFromColdStorage(), nil)
 }
 
-func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Request) {
+func (s *Server) cancelPending(response http.ResponseWriter, request *http.Request) {
 	var id uuid.UUID
 	var body []byte
 	var err error
@@ -208,7 +208,7 @@ func (s *APIServer) cancelPending(response http.ResponseWriter, request *http.Re
 	s.respond(response, nil, nil)
 }
 
-func (s *APIServer) confirmPendingTransaction(response http.ResponseWriter, request *http.Request) {
+func (s *Server) confirmPendingTransaction(response http.ResponseWriter, request *http.Request) {
 	var id uuid.UUID
 	var body []byte
 	var err error
@@ -229,7 +229,7 @@ func (s *APIServer) confirmPendingTransaction(response http.ResponseWriter, requ
 	s.respond(response, nil, nil)
 }
 
-func (s *APIServer) getEvents(response http.ResponseWriter, request *http.Request) {
+func (s *Server) getEvents(response http.ResponseWriter, request *http.Request) {
 	var body []byte
 	var err error
 	var seq int
@@ -254,7 +254,7 @@ func (s *APIServer) getEvents(response http.ResponseWriter, request *http.Reques
 	s.respond(response, events, nil)
 }
 
-func (s *APIServer) initHTTPAPIServer() {
+func (s *Server) initHTTPAPIServer() {
 	m := s.httpServer.Handler.(*http.ServeMux)
 	m.HandleFunc("/new_wallet", s.newBitcoinAddress)
 	m.HandleFunc("/notify_wallet", s.notifyWalletTxStatusChanged)

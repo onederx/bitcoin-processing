@@ -108,18 +108,18 @@ func (ts TransactionStatus) MarshalJSON() ([]byte, error) {
 }
 
 type Transaction struct {
-	Id            uuid.UUID             `json:"id"`
-	Hash          string                `json:"hash"`
-	BlockHash     string                `json:"blockhash"`
-	Confirmations int64                 `json:"confirmations"`
-	Address       string                `json:"address"`
-	Direction     TransactionDirection  `json:"direction"`
-	Status        TransactionStatus     `json:"status"`
-	Amount        bitcoin.BitcoinAmount `json:"amount"`
-	Metainfo      interface{}           `json:"metainfo"`
-	Fee           bitcoin.BitcoinAmount `json:"fee"`
-	FeeType       bitcoin.FeeType       `json:"fee_type"`
-	ColdStorage   bool                  `json:"cold_storage"`
+	ID            uuid.UUID            `json:"id"`
+	Hash          string               `json:"hash"`
+	BlockHash     string               `json:"blockhash"`
+	Confirmations int64                `json:"confirmations"`
+	Address       string               `json:"address"`
+	Direction     TransactionDirection `json:"direction"`
+	Status        TransactionStatus    `json:"status"`
+	Amount        bitcoin.BTCAmount    `json:"amount"`
+	Metainfo      interface{}          `json:"metainfo"`
+	Fee           bitcoin.BTCAmount    `json:"fee"`
+	FeeType       bitcoin.FeeType      `json:"fee_type"`
+	ColdStorage   bool                 `json:"cold_storage"`
 
 	fresh                 bool
 	reportedConfirmations int64
@@ -176,7 +176,7 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		)
 	}
 
-	var amount bitcoin.BitcoinAmount
+	var amount bitcoin.BTCAmount
 	btcutilAmount, err := btcutil.NewAmount(btcNodeTransaction.Amount)
 	if err != nil {
 		log.Printf(
@@ -188,7 +188,7 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		)
 		amount = 0
 	} else {
-		amount = bitcoin.BitcoinAmount(util.Abs64(int64(btcutilAmount)))
+		amount = bitcoin.BTCAmount(util.Abs64(int64(btcutilAmount)))
 	}
 
 	return &Transaction{

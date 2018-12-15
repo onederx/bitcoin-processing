@@ -37,14 +37,14 @@ func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
 	}
 
 	select {
-	case e.callbackUrlQueue <- flatNotificationJSON:
+	case e.callbackURLQueue <- flatNotificationJSON:
 	default:
 	}
 }
 
 func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
 	resp, err := http.Post(
-		e.callbackUrl,
+		e.callbackURL,
 		"application/json",
 		bytes.NewReader(data),
 	)
@@ -60,7 +60,7 @@ func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
 	errorText := fmt.Sprintf(
 		"Got response with code %d calling HTTP callback %s",
 		resp.StatusCode,
-		e.callbackUrl,
+		e.callbackURL,
 	)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -75,7 +75,7 @@ func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
 func (e *EventBroker) sendHTTPCallbackNotifications() {
 	backoff := settings.GetInt("transaction.callback.backoff")
 
-	for notification := range e.callbackUrlQueue {
+	for notification := range e.callbackURLQueue {
 		delay := time.Second
 		for attempts := 0; backoff <= 0 || attempts < backoff; attempts++ {
 			err := e.sendDataToHTTPCallback(notification)

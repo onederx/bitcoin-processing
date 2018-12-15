@@ -14,7 +14,7 @@ func main() {
 		nodeAPI := nodeapi.NewNodeAPI()
 		eventBroker := events.NewEventBroker()
 		bitcoinWallet := wallet.NewWallet(nodeAPI, eventBroker)
-		apiServer := api.NewAPIServer(
+		apiServer := api.NewServer(
 			settings.GetString("api.http.address"),
 			bitcoinWallet,
 			eventBroker,

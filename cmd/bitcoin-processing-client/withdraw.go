@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	var withdrawId string
+	var withdrawID string
 	var withdrawFeeType string
 	var withdrawMetainfoString string
 
@@ -20,7 +20,7 @@ func init() {
 			var withdrawMetainfo interface{}
 			var address, amount, fee string
 
-			withdrawIdParsed, _ := uuid.FromString(withdrawId)
+			withdrawIDParsed, _ := uuid.FromString(withdrawID)
 
 			if len(args) == 3 {
 				address, amount, fee = args[0], args[1], args[2]
@@ -32,7 +32,7 @@ func init() {
 			}
 
 			var requestData = api.WithdrawRequest{
-				Id:      withdrawIdParsed,
+				ID:      withdrawIDParsed,
 				Address: address,
 				Amount:  amount,
 				Fee:     fee,
@@ -82,7 +82,7 @@ func init() {
 	}
 
 	for _, cmd := range []*cobra.Command{cmdWithdraw, cmdWithdrawToColdStorage} {
-		cmd.Flags().StringVarP(&withdrawId, "id", "i", "", "id of withdraw transaction")
+		cmd.Flags().StringVarP(&withdrawID, "id", "i", "", "id of withdraw transaction")
 		cmd.Flags().StringVarP(&withdrawFeeType, "fee-type", "t", "", "transaction fee type")
 		cmd.Flags().StringVarP(&withdrawMetainfoString, "metainfo", "m", "", "metainfo to attach to withdraw")
 		cli.AddCommand(cmd)

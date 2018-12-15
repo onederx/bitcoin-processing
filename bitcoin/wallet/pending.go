@@ -114,7 +114,7 @@ func (w *Wallet) updatePendingTxns() {
 }
 
 func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
-	tx, err := w.storage.GetTransactionById(id)
+	tx, err := w.storage.GetTransactionByID(id)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (w *Wallet) CancelPendingTx(id uuid.UUID) error {
 }
 
 func (w *Wallet) ConfirmPendingTransaction(id uuid.UUID) error {
-	tx, err := w.storage.GetTransactionById(id)
+	tx, err := w.storage.GetTransactionByID(id)
 	if err != nil {
 		return err
 	}

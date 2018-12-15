@@ -42,9 +42,9 @@ func (s *InMemoryWalletStorage) GetTransactionByHash(hash string) (*Transaction,
 	return nil, errors.New("Transaction with hash " + hash + " not found")
 }
 
-func (s *InMemoryWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, error) {
+func (s *InMemoryWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, error) {
 	for _, transaction := range s.transactions {
-		if transaction.Id == id {
+		if transaction.ID == id {
 			return transaction, nil
 		}
 	}
@@ -64,7 +64,7 @@ func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 	}
 
 	transaction.fresh = true
-	if transaction.Id == uuid.Nil {
+	if transaction.ID == uuid.Nil {
 		if transaction.Direction == OutgoingDirection {
 			log.Printf(
 				"Warning: generating new id for new unseen outgoing tx. "+
@@ -73,7 +73,7 @@ func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 				transaction,
 			)
 		}
-		transaction.Id = uuid.Must(uuid.NewV4())
+		transaction.ID = uuid.Must(uuid.NewV4())
 	}
 	s.transactions = append(s.transactions, transaction)
 	return transaction, nil

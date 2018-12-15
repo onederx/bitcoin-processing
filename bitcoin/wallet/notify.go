@@ -10,7 +10,7 @@ type txNotification struct {
 	StatusStr  string `json:"status_name"`
 	IpnType    string `json:"ipn_type"`
 	Currency   string `json:"currency"`
-	IpnId      string `json:"ipn_id"`
+	IpnID      string `json:"ipn_id"`
 }
 
 func (w *Wallet) NotifyTransaction(eventType events.EventType, tx Transaction) {
@@ -20,6 +20,6 @@ func (w *Wallet) NotifyTransaction(eventType events.EventType, tx Transaction) {
 		StatusStr:   tx.Status.String(),
 		IpnType:     tx.Direction.ToCoinpaymentsLikeType(),
 		Currency:    "BTC",
-		IpnId:       tx.Id.String(),
+		IpnID:       tx.ID.String(),
 	})
 }

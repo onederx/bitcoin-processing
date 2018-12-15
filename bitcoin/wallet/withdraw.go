@@ -11,12 +11,12 @@ import (
 )
 
 type WithdrawRequest struct {
-	Id       uuid.UUID             `json:"id"`
-	Address  string                `json:"address"`
-	Amount   bitcoin.BitcoinAmount `json:"amount"`
-	Fee      bitcoin.BitcoinAmount `json:"fee"`
-	FeeType  string                `json:"fee_type"`
-	Metainfo interface{}           `json:"metainfo"`
+	ID       uuid.UUID         `json:"id"`
+	Address  string            `json:"address"`
+	Amount   bitcoin.BTCAmount `json:"amount"`
+	Fee      bitcoin.BTCAmount `json:"fee"`
+	FeeType  string            `json:"fee_type"`
+	Metainfo interface{}       `json:"metainfo"`
 }
 
 type internalWithdrawRequest struct {
@@ -29,7 +29,7 @@ func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 		"Got withdraw request with id %s, to address %s, "+
 			"amount %s (%d satoshi) and fee %s (%d satoshi) (type %s)."+
 			"Metainfo: %v",
-		request.Id,
+		request.ID,
 		request.Address,
 		request.Amount, request.Amount,
 		request.Fee, request.Fee,
@@ -39,7 +39,7 @@ func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 }
 
 func isInsufficientFundsError(err error) bool {
-	rpcError, ok := err.(*nodeapi.JsonRPCError)
+	rpcError, ok := err.(*nodeapi.JSONRPCError)
 	if !ok {
 		return false
 	}
@@ -79,7 +79,7 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 }
 
 func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
-	var sendMoneyFunc func(string, bitcoin.BitcoinAmount, bitcoin.BitcoinAmount, bool) (string, error)
+	var sendMoneyFunc func(string, bitcoin.BTCAmount, bitcoin.BTCAmount, bool) (string, error)
 
 	switch tx.FeeType {
 	case bitcoin.PerKBRateFee:
@@ -192,7 +192,7 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	}
 
 	outgoingTx := &Transaction{
-		Id:                    request.Id,
+		ID:                    request.ID,
 		Confirmations:         0,
 		Address:               request.Address,
 		Direction:             OutgoingDirection,

@@ -49,7 +49,7 @@ func readSeqFromClient(conn *websocket.Conn) (SubscribeMessage, error) {
 	return decodedMessage, nil
 }
 
-func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleWebsocketConnection(w http.ResponseWriter, r *http.Request) {
 	log.Print("Got new websocket subscriber")
 
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -118,7 +118,7 @@ func (s *APIServer) handleWebsocketConnection(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (s *APIServer) initWebsocketAPIServer() {
+func (s *Server) initWebsocketAPIServer() {
 	requestDispatcher := s.httpServer.Handler.(*http.ServeMux)
 	requestDispatcher.HandleFunc("/ws", s.handleWebsocketConnection)
 }

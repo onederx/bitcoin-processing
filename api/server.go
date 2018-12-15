@@ -8,19 +8,22 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
-type APIServer struct {
+// Server runs http and websocket servers providing API. All user interaction
+// with processing app goes through it
+type Server struct {
 	wallet        *wallet.Wallet
 	eventBroker   *events.EventBroker
 	listenAddress string
 	httpServer    *http.Server
 }
 
-func NewAPIServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker *events.EventBroker) *APIServer {
+// NewServer creates new instance of API server
+func NewServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker *events.EventBroker) *Server {
 	httpServer := &http.Server{
 		Addr:    listenAddress,
 		Handler: http.NewServeMux(),
 	}
-	server := &APIServer{
+	server := &Server{
 		wallet:        btcWallet,
 		eventBroker:   eventBroker,
 		listenAddress: listenAddress,
@@ -31,7 +34,8 @@ func NewAPIServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker *e
 	return server
 }
 
-func (s *APIServer) Run() {
+// Run starts HTTP and websocket server
+func (s *Server) Run() {
 	log.Printf("Starting API server on %s", s.listenAddress)
 	log.Fatal(s.httpServer.ListenAndServe())
 }

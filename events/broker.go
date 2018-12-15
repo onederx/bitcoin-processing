@@ -6,14 +6,14 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
-const callbackUrlQueueSize = 100000
+const callbackURLQueueSize = 100000
 
 type EventBroker struct {
 	storage                 EventStorage
 	eventBroadcaster        *broadcasterWithStorage
 	ExternalTxNotifications chan string
-	callbackUrl             string
-	callbackUrlQueue        chan []byte
+	callbackURL             string
+	callbackURLQueue        chan []byte
 }
 
 func NewEventBroker() *EventBroker {
@@ -23,8 +23,8 @@ func NewEventBroker() *EventBroker {
 		storage:                 storage,
 		eventBroadcaster:        newBroadcasterWithStorage(storage),
 		ExternalTxNotifications: make(chan string, 3),
-		callbackUrl:             settings.GetURL("transaction.callback.url"),
-		callbackUrlQueue:        make(chan []byte, callbackUrlQueueSize),
+		callbackURL:             settings.GetURL("transaction.callback.url"),
+		callbackURLQueue:        make(chan []byte, callbackURLQueueSize),
 	}
 }
 

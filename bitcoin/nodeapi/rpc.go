@@ -36,7 +36,12 @@ type NodeAPI struct {
 	moneySendLock sync.Mutex
 }
 
-type JsonRPCError struct {
+// JSONRPCError is a structure returned by Bitcoin node RPC API describing
+// happened error.
+// It has two fields - numeric code and human-readable text message. Experiments
+// show that numeric code can be ambigous, so text message is usually used to
+// determine what error happened
+type JSONRPCError struct {
 	Code    int
 	Message string
 }
@@ -63,8 +68,8 @@ type AddressInfo struct {
 	Label         string
 	Timestamp     uint64
 	HdKeyPath     string `json:"hdkeypath"`
-	HdSeedId      string `json:"hdseedid"`
-	HdMasterKeyId string `json:"hdmasterkeyid"`
+	HdSeedID      string `json:"hdseedid"`
+	HdMasterKeyID string `json:"hdmasterkeyid"`
 	Labels        []struct {
 		Name    string
 		Purpose string
@@ -79,7 +84,7 @@ type jsonRPCRequest struct {
 
 type jsonRPCStringResponse struct {
 	Result string
-	Error  *JsonRPCError
+	Error  *JSONRPCError
 }
 
 type fundRawTransactionOptions struct {
@@ -94,7 +99,7 @@ type fundRawTransactionResult struct {
 	Hex       string
 }
 
-func (err JsonRPCError) Error() string {
+func (err JSONRPCError) Error() string {
 	return fmt.Sprintf(
 		"Bitcoin node returned error code %d message %s",
 		err.Code,
@@ -213,7 +218,13 @@ func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee 
 	return response.Result, nil
 }
 
-func (n *NodeAPI) SendWithPerKBFee(address string, amount, fee bitcoin.BitcoinAmount,
+// SendWithPerKBFee sends given amount of bitcoins to given address with per
+// kilobyte fee (meaning that given amount of fee will be multiplied by size of
+// resulting TX in kilobytes). Boolean argument recipientPaysFee determines if
+// fee is paid by recipient (meaning it will be subtracted from amount sent) or
+// by sender (meaning that recipient will get the exact amount specified, but
+// more money will be spent to create this tx).
+func (n *NodeAPI) SendWithPerKBFee(address string, amount, fee bitcoin.BTCAmount,
 	recipientPaysFee bool) (hash string, err error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
@@ -262,7 +273,7 @@ func (n *NodeAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOp
 
 	var response struct {
 		Result *fundRawTransactionResult
-		Error  *JsonRPCError
+		Error  *JSONRPCError
 	}
 	err = json.Unmarshal(fundRawTxJSONResp, &response)
 	if err != nil {
@@ -370,7 +381,7 @@ func (n *NodeAPI) signRawTransactionWithWallet(rawTx string) (string, error) {
 			Complete bool
 			Hex      string
 		}
-		Error *JsonRPCError
+		Error *JSONRPCError
 	}
 	err = json.Unmarshal(signRawTxJSONResp, &response)
 	if err != nil {
@@ -402,7 +413,25 @@ func (n *NodeAPI) sendRawTransaction(rawTx string) (string, error) {
 	return response.Result, nil
 }
 
-func (n *NodeAPI) SendWithFixedFee(address string, amount, fee bitcoin.BitcoinAmount,
+// SendWithFixedFee sends given amount of bitcoins to given address with fixed
+// fee (meaning fee paid is specified exactly by "fee" argument). Boolean
+// argument recipientPaysFee determines if fee is paid by recipient
+// (meaning it will be subtracted from amount sent) or by sender (meaning that
+//recipient will get the exact amount specified, but more money will be spent to
+// create this tx).
+// Implementation of this function is relatively complex because Bitcoin Core
+// node does not support this type of fee, so payment transaction is created
+// "manually", using low-level functions. Following algorithm is used: first,
+// transaction with no inputs and one output - paying money to destination
+// address - is created. Then, call fundrawtransaction call is used to Bitcoin
+// node to find inputs to fund the transacion. This also adds change output if
+// needed and changes sent amounts to apply auto-calculated per-kb fee.
+// These changes are un-done (for example, is recipient pays fee,
+// auto-calculated fee is added back to output amount) and then given constant
+// fee is applied (if recipient pays fee, it is subtracted from the amount
+// he gets). Resulting transaction is then signed and broadcasted to bitcoin
+// network.
+func (n *NodeAPI) SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount,
 	recipientPaysFee bool) (hash string, err error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
@@ -466,7 +495,7 @@ func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 
 	var response struct {
 		Result *AddressInfo
-		Error  *JsonRPCError
+		Error  *JSONRPCError
 	}
 	err = json.Unmarshal(getAddressInfoJSONResp, &response)
 	if err != nil {
@@ -499,7 +528,7 @@ func (n *NodeAPI) getUnconfirmedBalance() (uint64, error) {
 
 	var response struct {
 		Result *float64
-		Error  *JsonRPCError
+		Error  *JSONRPCError
 	}
 	err = json.Unmarshal(getUnconfirmedBalanceJSONResp, &response)
 	if err != nil {

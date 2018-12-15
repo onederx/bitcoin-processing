@@ -102,7 +102,7 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 			tx.Amount,
 			btcutil.Amount(tx.Amount).String(),
 			tx.Hash,
-			tx.Id,
+			tx.ID,
 		)
 	}
 	if !isHotStorageTx && !tx.ColdStorage { // don't notify about internal txns

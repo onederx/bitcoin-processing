@@ -83,6 +83,6 @@ func GetStringMandatory(key string) string {
 	return value
 }
 
-func GetBitcoinAmount(key string) bitcoin.BitcoinAmount {
-	return bitcoin.BitcoinAmountFromFloat(viper.GetFloat64(key))
+func GetBTCAmount(key string) bitcoin.BTCAmount {
+	return bitcoin.BTCAmountFromFloat(viper.GetFloat64(key))
 }

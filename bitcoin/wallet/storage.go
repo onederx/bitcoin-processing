@@ -6,12 +6,12 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type WalletStorage interface {
+type Storage interface {
 	GetLastSeenBlockHash() string
 	SetLastSeenBlockHash(blockHash string) error
 	StoreTransaction(transaction *Transaction) (*Transaction, error)
 	GetTransactionByHash(hash string) (*Transaction, error)
-	GetTransactionById(id uuid.UUID) (*Transaction, error)
+	GetTransactionByID(id uuid.UUID) (*Transaction, error)
 	GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error)
 	GetPendingTransactions() ([]*Transaction, error)
 	updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error
@@ -27,8 +27,8 @@ type WalletStorage interface {
 	SetMoneyRequiredFromColdStorage(amount uint64) error
 }
 
-func newStorage(storageType string) WalletStorage {
-	var storage WalletStorage
+func newStorage(storageType string) Storage {
+	var storage Storage
 
 	switch storageType {
 	case "memory":

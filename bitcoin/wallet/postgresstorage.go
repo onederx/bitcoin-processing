@@ -159,16 +159,16 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 	}
 
 	tx := &Transaction{
-		Id:                    id,
+		ID:                    id,
 		Hash:                  hash,
 		BlockHash:             blockHash,
 		Confirmations:         confirmations,
 		Address:               address,
 		Direction:             transactionDirection,
 		Status:                transactionStatus,
-		Amount:                bitcoin.BitcoinAmount(amount),
+		Amount:                bitcoin.BTCAmount(amount),
 		Metainfo:              metainfo,
-		Fee:                   bitcoin.BitcoinAmount(fee),
+		Fee:                   bitcoin.BTCAmount(fee),
 		FeeType:               transactionFeeType,
 		ColdStorage:           coldStorage,
 		fresh:                 false,
@@ -195,7 +195,7 @@ func (s *PostgresWalletStorage) GetTransactionByHashAndDirection(hash string, di
 	return transactionFromDatabaseRow(row)
 }
 
-func (s *PostgresWalletStorage) GetTransactionById(id uuid.UUID) (*Transaction, error) {
+func (s *PostgresWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE id = $1`,
 		transactionFields,
@@ -210,8 +210,8 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 
 	txIsNew := true
 
-	if transaction.Id != uuid.Nil {
-		existingTransaction, err = s.GetTransactionById(transaction.Id)
+	if transaction.ID != uuid.Nil {
+		existingTransaction, err = s.GetTransactionByID(transaction.ID)
 		switch err {
 		case nil: // tx already in database
 			txIsNew = false
@@ -242,7 +242,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			transaction.BlockHash,
 			transaction.Confirmations,
 			transaction.Status.String(),
-			existingTransaction.Id,
+			existingTransaction.ID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("Update of tx data in DB failed: %s. Tx %#v",
@@ -252,7 +252,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		return existingTransaction, nil
 	}
 
-	if transaction.Id == uuid.Nil {
+	if transaction.ID == uuid.Nil {
 		if transaction.Direction == OutgoingDirection {
 			log.Printf(
 				"Warning: generating new id for new unseen outgoing tx. "+
@@ -262,7 +262,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			)
 			debug.PrintStack()
 		}
-		transaction.Id = uuid.Must(uuid.NewV4())
+		transaction.ID = uuid.Must(uuid.NewV4())
 	}
 	metainfoJSON, err := json.Marshal(transaction.Metainfo)
 	if err != nil {
@@ -274,7 +274,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 	)
 	_, err = s.db.Exec(
 		query,
-		transaction.Id,
+		transaction.ID,
 		transaction.Hash,
 		transaction.BlockHash,
 		transaction.Confirmations,
@@ -356,7 +356,7 @@ func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transac
 	_, err := s.db.Exec(
 		`UPDATE transactions SET reported_confirmations = $1 WHERE id = $2`,
 		reportedConfirmations,
-		transaction.Id,
+		transaction.ID,
 	)
 	if err != nil {
 		return err
