@@ -18,7 +18,7 @@ const (
 	InvalidEvent
 )
 
-var eventTypeToStringMap map[EventType]string = map[EventType]string{
+var eventTypeToStringMap = map[EventType]string{
 	NewAddressEvent:           "new-address",
 	CheckTxStatusEvent:        "check-tx-status",
 	NewIncomingTxEvent:        "new-incoming-tx",
@@ -29,7 +29,7 @@ var eventTypeToStringMap map[EventType]string = map[EventType]string{
 	PendingTxCancelledEvent:   "pending-tx-cancelled",
 }
 
-var stringToEventTypeMap map[string]EventType = make(map[string]EventType)
+var stringToEventTypeMap = make(map[string]EventType)
 
 func init() {
 	for eventType, eventTypeStr := range eventTypeToStringMap {

@@ -32,12 +32,12 @@ const (
 	FixedFee
 )
 
-var feeTypeToStringMap map[FeeType]string = map[FeeType]string{
+var feeTypeToStringMap = map[FeeType]string{
 	FixedFee:     "fixed",
 	PerKBRateFee: "per-kb-rate",
 }
 
-var stringToFeeTypeMap map[string]FeeType = make(map[string]FeeType)
+var stringToFeeTypeMap = make(map[string]FeeType)
 
 func init() {
 	for feeType, feeTypeStr := range feeTypeToStringMap {

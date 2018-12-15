@@ -34,15 +34,15 @@ const (
 	InvalidTransaction
 )
 
-var transactionDirectionToStringMap map[TransactionDirection]string = map[TransactionDirection]string{
+var transactionDirectionToStringMap = map[TransactionDirection]string{
 	IncomingDirection: "incoming",
 	OutgoingDirection: "outgoing",
 	UnknownDirection:  "unknown",
 }
 
-var stringToTransactionDirectionMap map[string]TransactionDirection = make(map[string]TransactionDirection)
+var stringToTransactionDirectionMap = make(map[string]TransactionDirection)
 
-var transactionStatusToStringMap map[TransactionStatus]string = map[TransactionStatus]string{
+var transactionStatusToStringMap = map[TransactionStatus]string{
 	NewTransaction:                       "new",
 	ConfirmedTransaction:                 "confirmed",
 	FullyConfirmedTransaction:            "fully-confirmed",
@@ -52,7 +52,7 @@ var transactionStatusToStringMap map[TransactionStatus]string = map[TransactionS
 	CancelledTransaction:                 "cancelled",
 }
 
-var stringToTransactionStatusMap map[string]TransactionStatus = make(map[string]TransactionStatus)
+var stringToTransactionStatusMap = make(map[string]TransactionStatus)
 
 func init() {
 	for txDirection, txDirectionStr := range transactionDirectionToStringMap {
