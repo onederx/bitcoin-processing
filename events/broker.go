@@ -8,14 +8,23 @@ import (
 
 const callbackURLQueueSize = 100000
 
+// EventBroker is responsible for processing events - sending them to client
+// via http callback and websocket and storing them in DB
 type EventBroker struct {
-	storage                 EventStorage
-	eventBroadcaster        *broadcasterWithStorage
+	storage          EventStorage
+	eventBroadcaster *broadcasterWithStorage
+
+	// Channel ExternalTxNotifications can be used to notify wallet that there
+	// are relevant tx updates and that it should get updates from Bitcoin node
+	// immediately (without it, updates are polled periodically). Wallet updater
+	// reads this channel to get notification
 	ExternalTxNotifications chan string
-	callbackURL             string
-	callbackURLQueue        chan []byte
+
+	callbackURL      string
+	callbackURLQueue chan []byte
 }
 
+// NewEventBroker creates new instance of EventBroker
 func NewEventBroker() *EventBroker {
 	storageType := settings.GetStringMandatory("storage.type")
 	storage := newEventStorage(storageType)
@@ -35,6 +44,8 @@ func (e *EventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
 	}
 }
 
+// Notify creates new event with given type and associated data. The event will
+// be processed depending on its type.
 func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 	if eventType == CheckTxStatusEvent {
 		e.notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
@@ -59,22 +70,32 @@ func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 	}
 }
 
-func (e *EventBroker) Subscribe() <-chan *NotificationWithSeq {
-	return e.eventBroadcaster.Subscribe()
-}
-
+// SubscribeFromSeq allows to get old events starting with given sequence number
+// and new ones. It returns a channel of SLICES of events. When loading old
+// events from DB, all events that were fetched simultaneously will be written
+// to a channel in one slice, not one by one. Otherwise, with large number of
+// events channel may overflow. Subscriber should iterate over each slice to
+// get all events.
+// This method is used for websocket subscription
 func (e *EventBroker) SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq {
 	return e.eventBroadcaster.SubscribeFromSeq(seq)
 }
 
+// UnsubscribeFromSeq cancels subscription created by SubscribeFromSeq. Channel
+// given to it as an argument must be one returned by SubscribeFromSeq
 func (e *EventBroker) UnsubscribeFromSeq(eventChannel <-chan []*NotificationWithSeq) {
 	e.eventBroadcaster.UnsubscribeFromSeq(eventChannel)
 }
 
+// GetEventsFromSeq returns a slice of old events starting with given sequence
+// number. This method is used by HTTP API endpoint /get_events
 func (e *EventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) {
 	return e.storage.GetEventsFromSeq(seq)
 }
 
+// Run starts event broker. Most of the broker is event-driven, routine started
+// by Run is http callback notifier, which works in background because it has
+// to retry requests with backoff and maintains a queue of requests
 func (e *EventBroker) Run() {
 	e.sendHTTPCallbackNotifications()
 }

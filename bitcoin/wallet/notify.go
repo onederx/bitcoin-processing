@@ -13,6 +13,12 @@ type txNotification struct {
 	IpnID      string `json:"ipn_id"`
 }
 
+// NotifyTransaction is used to send a notification about a new or updated
+// transaction. In fact it is a wrapper around EventBroker.Notify that
+// transforms notification into coinpayments-like format. Before moving to that
+// format, EventBroker.Notify was called directly and this may become the case
+// in future after API change (Transaction itself is JSON-serializable and can
+// act as data field of event)
 func (w *Wallet) NotifyTransaction(eventType events.EventType, tx Transaction) {
 	w.eventBroker.Notify(eventType, txNotification{
 		Transaction: tx,

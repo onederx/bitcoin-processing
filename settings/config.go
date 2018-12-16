@@ -10,6 +10,11 @@ import (
 
 var cfgFile string
 
+// LocateAndReadConfigFile does what its name implies - locates and reads config
+// file. Its name may either be set by variable cfgFile (that will be populated
+// by value given on command line, if any) or located by viper library itself
+// by searching in default locations. It returns nil if config file was loaded
+// and error with reason otherwise.
 func LocateAndReadConfigFile() error {
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -46,10 +51,13 @@ func initConfig() {
 	viper.SetDefault("transaction.callback.backoff", 100)
 }
 
+// GetString takes a string value from config. It simply calls viper.GetString.
+// If value is absent or has wrong type, it
 func GetString(key string) string {
 	return viper.GetString(key)
 }
 
+// GetString takes a string value from config. It simply calls viper.GetString
 func GetInt(key string) int {
 	return viper.GetInt(key)
 }

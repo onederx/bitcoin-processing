@@ -6,6 +6,10 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+// Storage is responsible for storing and fetching wallet-related information:
+// transactions, accounts, and various metainformation about current wallet or
+// its state. Currently, metainformation includes hot wallet address, last seen
+// bitcoin block hash and amount of money required to transfer from cold storage
 type Storage interface {
 	GetLastSeenBlockHash() string
 	SetLastSeenBlockHash(blockHash string) error

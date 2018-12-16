@@ -10,6 +10,9 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 )
 
+// WithdrawRequest is a structure with parameters that can be set for new
+// withdrawal. In order to make a withdraw, caller must initialize this
+// structire and pass it to Withdraw method
 type WithdrawRequest struct {
 	ID       uuid.UUID         `json:"id"`
 	Address  string            `json:"address"`
@@ -153,6 +156,24 @@ func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
 	return w.updatePendingTxStatus(tx, PendingManualConfirmationTransaction)
 }
 
+// Withdraw makes a new withdrawal using parameters set in given WithdrawRequest
+// This method makes several checks on request and then either rejects it or
+// tries to perform a withdrawal.
+// Withdrawal to hot wallet address are not allowed.
+// Regular withdrawal may require manual confirmation if its amount exceeds a
+// certain value ("wallet.min_withdraw_without_manual_confirmation" in config).
+// There are restrictions on minimal withdrawal amount and fee value (set in
+// config by "wallet.min_withdraw", "wallet.min_fee.per_kb",
+// "wallet.min_fee.fixed")
+// If withdrawal is allowed, but there is not enough money to send it, it
+// becomes pending (it will receive status 'pending' which may be then changed
+// to 'pending-cold-storage')
+// In any case, actual withdrawal if performed in a wallet updater goroutine
+// Argument toColdStorage tells whether this is a withdraw to cold storage - if
+// so, address can be taken from config (intead of being set in request), also,
+// withdrawals to cold storage never require manual confirmation and can't
+// become pending (which means they fail immediately if there is not enough
+// money to fund such withdrawal right now.)
 func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 	feeType, err := bitcoin.FeeTypeFromString(request.FeeType)
 	if err != nil {
