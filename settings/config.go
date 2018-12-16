@@ -91,6 +91,18 @@ func GetStringMandatory(key string) string {
 	return value
 }
 
+// GetBTCAmount takes amount of bitcoins from config and returns it as
+// bitcoin.BTCAmount. It reads amount as a string (with viper.GetString) and
+// then tries to convert it using bitcoin.BTCAmountFromStringedFloat, any
+// error encountered during convertion is fatal. This means that absent value
+// or value of incompatible type will lead to fatal error. This also means
+// bitcoin amounts can be given in config as strings instead of floats to
+// bypass possible loss of precision due to floating-point representation errors
 func GetBTCAmount(key string) bitcoin.BTCAmount {
-	return bitcoin.BTCAmountFromFloat(viper.GetFloat64(key))
+	value, err := bitcoin.BTCAmountFromStringedFloat(viper.GetString(key))
+	if err != nil {
+		log.Fatalf("Error converting value of setting %s to bitcoin amount: %s",
+			key, err)
+	}
+	return value
 }
