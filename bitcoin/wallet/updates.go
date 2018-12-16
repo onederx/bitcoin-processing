@@ -205,6 +205,9 @@ func (w *Wallet) pollWalletUpdates() {
 		case cancelRequest := <-w.cancelQueue:
 			cancelRequest.result <- w.cancelPendingTx(cancelRequest.id)
 			close(cancelRequest.result)
+		case confirmRequest := <-w.confirmQueue:
+			confirmRequest.result <- w.confirmPendingTx(confirmRequest.id)
+			close(confirmRequest.result)
 		}
 		w.checkForWalletUpdates()
 	}

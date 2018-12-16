@@ -23,6 +23,7 @@ type Wallet struct {
 
 	withdrawQueue chan internalWithdrawRequest
 	cancelQueue   chan internalCancelRequest
+	confirmQueue  chan internalConfirmRequest
 }
 
 func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Wallet {
@@ -40,6 +41,7 @@ func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Walle
 		maxConfirmations:                     maxConfirmations,
 		withdrawQueue:                        make(chan internalWithdrawRequest, internalQueueSize),
 		cancelQueue:                          make(chan internalCancelRequest, internalQueueSize),
+		confirmQueue:                         make(chan internalConfirmRequest, internalQueueSize),
 	}
 }
 
