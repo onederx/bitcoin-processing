@@ -8,7 +8,7 @@ import (
 )
 
 // InMemoryWalletStorage is a Storage implementation that stores data in memory.
-// It does not provide any king of persistence, safety or efficiency (all
+// It does not provide any kind of persistence, safety or efficiency (all
 // methods are implemented naively) and exists only for testing purposes (to get
 // a working Storage implementation without external dependencies). Only
 // PostgresWalletStorage should be used in production.
