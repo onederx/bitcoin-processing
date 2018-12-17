@@ -10,6 +10,8 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
+// PostgresEventStorage stores events in postgresql database. Methods directly
+// execute SQL queries that store/fetch required data.
 type PostgresEventStorage struct {
 	db *sql.DB
 }
@@ -31,13 +33,19 @@ func newPostgresEventStorage() *PostgresEventStorage {
 	return &PostgresEventStorage{db: db}
 }
 
+// StoreEvent stores event in database, assigning a sequence number to it.
+// Retuned storedEvent has the same type and data as event arg, but also has a
+// sequence number.
+// XXX: warning: sequence numbers can have gaps in case of rollback. Sequence
+// number is an auto-incrementing private key of type SERIAL in table with
+// events and, if transaction incremented it and then was rolled back, it won't
+// decrement back creating a hole.
 func (s *PostgresEventStorage) StoreEvent(event Notification) (*storedEvent, error) {
 	eventDataJSON, err := json.Marshal(&event.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	// XXX: warning: seq can have gaps in case of rollback
 	var seq int
 	err = s.db.QueryRow(`INSERT INTO events (type, data)
         VALUES ($1, $2) RETURNING seq`, event.Type.String(), eventDataJSON,
@@ -49,6 +57,8 @@ func (s *PostgresEventStorage) StoreEvent(event Notification) (*storedEvent, err
 	return &storedEvent{Notification: event, Seq: seq}, nil
 }
 
+// GetEventsFromSeq fetches events from DB starting with given sequence number
+// and returns them as a slice.
 func (s *PostgresEventStorage) GetEventsFromSeq(seq int) ([]*storedEvent, error) {
 	var eventSeq int
 	var eventTypeStr, marshaledData string

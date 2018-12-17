@@ -11,6 +11,10 @@ var cli = &cobra.Command{
 	Short: "Gateway for accepting and sending bitcoin payments",
 }
 
+// ReadSettingsAndRun reads settings processing both command-line options and
+// configuration file and then call given func funcToRun. It should be used by
+// entry point of whatever program uses settings, any code that uses settings
+// should be called from funcToRun
 func ReadSettingsAndRun(funcToRun func()) {
 	cli.Run = func(cmd *cobra.Command, args []string) {
 		funcToRun()

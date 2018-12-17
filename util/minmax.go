@@ -1,5 +1,6 @@
 package util
 
+// Min returns minimum of two int numbers
 func Min(a, b int) int {
 	if a < b {
 		return a
@@ -7,6 +8,7 @@ func Min(a, b int) int {
 	return b
 }
 
+// Max returns maximum of two int numbers
 func Max(a, b int) int {
 	if a > b {
 		return a
@@ -14,6 +16,7 @@ func Max(a, b int) int {
 	return b
 }
 
+// Min64 returns minimum of two int64 numbers
 func Min64(a, b int64) int64 {
 	if a < b {
 		return a
@@ -21,6 +24,7 @@ func Min64(a, b int64) int64 {
 	return b
 }
 
+// Max64 returns maximum of two int64 numbers
 func Max64(a, b int64) int64 {
 	if a > b {
 		return a

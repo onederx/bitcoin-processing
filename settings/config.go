@@ -52,24 +52,40 @@ func initConfig() {
 }
 
 // GetString takes a string value from config. It simply calls viper.GetString.
-// If value is absent or has wrong type, it
+// If value is absent or has incompatible type (for example array), it will
+// return empty string
 func GetString(key string) string {
 	return viper.GetString(key)
 }
 
-// GetString takes a string value from config. It simply calls viper.GetString
+// GetInt takes int value from config. It simply calls viper.GetInt.
+// If value is absent or has incompatible type (for example 'x'), it will
+// return 0
 func GetInt(key string) int {
 	return viper.GetInt(key)
 }
 
+// GetInt64 takes int64 value from config. It simply calls viper.GetInt64.
+// If value is absent or has incompatible type (for example 'x'), it will
+// return 0
 func GetInt64(key string) int64 {
 	return viper.GetInt64(key)
 }
 
+// GetBool takes boolean value from config. It simply calls viper.GetBool.
+// If value is absent or has incompatible type (for example 'nottruefalse'),
+// it will return false. It should be noted that compatibility rules are rather
+// complex, for example strings '1', 't', 'T', 'TRUE' evaluate to true,
+// strings '2', 'tr', 'TRU', 'yes' evaluate to false
 func GetBool(key string) bool {
 	return viper.GetBool(key)
 }
 
+// GetURL takes URL value from config. It is a wrapper around viper.GetString
+// that calls ParseRequestURI to check that resulting value is a valid url.
+// Any error from ParseRequestURI is fatal. As a result, if value in config
+// is absent or has incompatible, this function will fail because empty string
+// is not a valid URL
 func GetURL(key string) string {
 	urlValue := viper.GetString(key)
 	if _, err := url.ParseRequestURI(urlValue); err != nil {
@@ -82,6 +98,10 @@ func GetURL(key string) string {
 	return urlValue
 }
 
+// GetStringMandatory takes a string value from config ensuring it is not empty.
+// It calls viper.GetString and if that returns an empty string (which will
+// happen if value in config IS empty string, or if it is absent or has
+// incompatible type) this function will crash.
 func GetStringMandatory(key string) string {
 	value := viper.GetString(key)
 
