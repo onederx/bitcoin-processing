@@ -16,8 +16,8 @@ type PostgresEventStorage struct {
 	db *sql.DB
 }
 
-func newPostgresEventStorage() *PostgresEventStorage {
-	dsn := settings.GetStringMandatory("storage.dsn")
+func newPostgresEventStorage(s settings.Settings) *PostgresEventStorage {
+	dsn := s.GetStringMandatory("storage.dsn")
 
 	db, err := sql.Open("postgres", dsn)
 

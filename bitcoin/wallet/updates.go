@@ -7,7 +7,6 @@ import (
 	"github.com/btcsuite/btcutil"
 
 	"github.com/onederx/bitcoin-processing/events"
-	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/onederx/bitcoin-processing/util"
 )
 
@@ -193,12 +192,13 @@ func (w *Wallet) checkForWalletUpdates() {
 }
 
 func (w *Wallet) pollWalletUpdates() {
-	pollInterval := time.Duration(settings.GetInt("bitcoin.poll_interval"))
+	pollInterval := time.Duration(w.settings.GetInt("bitcoin.poll_interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
+	externalTxNotifications := w.eventBroker.GetExternalTxNotificationChannel()
 	for {
 		select {
 		case <-ticker:
-		case <-w.eventBroker.ExternalTxNotifications:
+		case <-externalTxNotifications:
 		case withdrawRequest := <-w.withdrawQueue:
 			withdrawRequest.result <- w.sendWithdrawal(withdrawRequest.tx, true)
 			close(withdrawRequest.result)

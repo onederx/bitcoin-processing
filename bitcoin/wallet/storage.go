@@ -4,6 +4,8 @@ import (
 	"log"
 
 	"github.com/satori/go.uuid"
+
+	"github.com/onederx/bitcoin-processing/settings"
 )
 
 // Storage is responsible for storing and fetching wallet-related information:
@@ -31,7 +33,7 @@ type Storage interface {
 	SetMoneyRequiredFromColdStorage(amount uint64) error
 }
 
-func newStorage(storageType string) Storage {
+func newStorage(storageType string, s settings.Settings) Storage {
 	var storage Storage
 
 	switch storageType {
@@ -41,7 +43,7 @@ func newStorage(storageType string) Storage {
 			transactions: make([]*Transaction, 0),
 		}
 	case "postgres":
-		storage = newPostgresWalletStorage()
+		storage = newPostgresWalletStorage(s)
 	default:
 		log.Fatal("Error: unsupported storage type ", storageType)
 	}

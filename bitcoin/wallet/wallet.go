@@ -16,8 +16,9 @@ const internalQueueSize = 10000
 // txns and processes requests that make changes to wallet (making withdrawals,
 // cancelling or confirming txns etc.)
 type Wallet struct {
-	nodeAPI                              *nodeapi.NodeAPI
-	eventBroker                          *events.EventBroker
+	settings                             settings.Settings
+	nodeAPI                              nodeapi.NodeAPI
+	eventBroker                          events.EventBroker
 	storage                              Storage
 	hotWalletAddress                     string
 	coldWalletAddress                    string
@@ -36,17 +37,18 @@ type Wallet struct {
 // interact with Bitcoin node and EventBroker instance to work with events.
 // It will also create new Storage, parameters for which will be read from
 // settings
-func NewWallet(nodeAPI *nodeapi.NodeAPI, eventBroker *events.EventBroker) *Wallet {
-	storageType := settings.GetStringMandatory("storage.type")
-	maxConfirmations := int64(settings.GetInt("transaction.max_confirmations"))
-	minWithdrawWithoutManualConfirmation := settings.GetBTCAmount("wallet.min_withdraw_without_manual_confirmation")
+func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.EventBroker) *Wallet {
+	storageType := s.GetStringMandatory("storage.type")
+	maxConfirmations := int64(s.GetInt("transaction.max_confirmations"))
+	minWithdrawWithoutManualConfirmation := s.GetBTCAmount("wallet.min_withdraw_without_manual_confirmation")
 	return &Wallet{
+		settings:                             s,
 		nodeAPI:                              nodeAPI,
 		eventBroker:                          eventBroker,
-		storage:                              newStorage(storageType),
-		minWithdraw:                          settings.GetBTCAmount("wallet.min_withdraw"),
-		minFeePerKb:                          settings.GetBTCAmount("wallet.min_fee.per_kb"),
-		minFeeFixed:                          settings.GetBTCAmount("wallet.min_fee.fixed"),
+		storage:                              newStorage(storageType, s),
+		minWithdraw:                          s.GetBTCAmount("wallet.min_withdraw"),
+		minFeePerKb:                          s.GetBTCAmount("wallet.min_fee.per_kb"),
+		minFeeFixed:                          s.GetBTCAmount("wallet.min_fee.fixed"),
 		minWithdrawWithoutManualConfirmation: minWithdrawWithoutManualConfirmation,
 		maxConfirmations:                     maxConfirmations,
 		withdrawQueue:                        make(chan internalWithdrawRequest, internalQueueSize),

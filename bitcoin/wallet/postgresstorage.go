@@ -46,8 +46,8 @@ const transactionFields string = `
 	reported_confirmations
 `
 
-func newPostgresWalletStorage() *PostgresWalletStorage {
-	dsn := settings.GetStringMandatory("storage.dsn")
+func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
+	dsn := s.GetStringMandatory("storage.dsn")
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

@@ -8,9 +8,9 @@ import (
 
 const callbackURLQueueSize = 100000
 
-// EventBroker is responsible for processing events - sending them to client
+// eventBroker is responsible for processing events - sending them to client
 // via http callback and websocket and storing them in DB
-type EventBroker struct {
+type eventBroker struct {
 	storage          EventStorage
 	eventBroadcaster *broadcasterWithStorage
 
@@ -20,24 +20,26 @@ type EventBroker struct {
 	// reads this channel to get notification
 	ExternalTxNotifications chan string
 
-	callbackURL      string
-	callbackURLQueue chan []byte
+	callbackURL         string
+	callbackURLQueue    chan []byte
+	httpCallbackBackoff int
 }
 
-// NewEventBroker creates new instance of EventBroker
-func NewEventBroker() *EventBroker {
-	storageType := settings.GetStringMandatory("storage.type")
-	storage := newEventStorage(storageType)
-	return &EventBroker{
+// NewEventBroker creates new instance of eventBroker
+func NewEventBroker(s settings.Settings) EventBroker {
+	storageType := s.GetStringMandatory("storage.type")
+	storage := newEventStorage(storageType, s)
+	return &eventBroker{
 		storage:                 storage,
 		eventBroadcaster:        newBroadcasterWithStorage(storage),
 		ExternalTxNotifications: make(chan string, 3),
-		callbackURL:             settings.GetURL("transaction.callback.url"),
+		callbackURL:             s.GetURL("transaction.callback.url"),
 		callbackURLQueue:        make(chan []byte, callbackURLQueueSize),
+		httpCallbackBackoff:     s.GetInt("transaction.callback.backoff"),
 	}
 }
 
-func (e *EventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
+func (e *eventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
 	select {
 	case e.ExternalTxNotifications <- data:
 	default:
@@ -46,7 +48,7 @@ func (e *EventBroker) notifyWalletMayHaveUpdatedWithoutBlocking(data string) {
 
 // Notify creates new event with given type and associated data. The event will
 // be processed depending on its type.
-func (e *EventBroker) Notify(eventType EventType, data interface{}) {
+func (e *eventBroker) Notify(eventType EventType, data interface{}) {
 	if eventType == CheckTxStatusEvent {
 		e.notifyWalletMayHaveUpdatedWithoutBlocking(data.(string))
 		return
@@ -77,25 +79,34 @@ func (e *EventBroker) Notify(eventType EventType, data interface{}) {
 // events channel may overflow. Subscriber should iterate over each slice to
 // get all events.
 // This method is used for websocket subscription
-func (e *EventBroker) SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq {
+func (e *eventBroker) SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq {
 	return e.eventBroadcaster.SubscribeFromSeq(seq)
 }
 
 // UnsubscribeFromSeq cancels subscription created by SubscribeFromSeq. Channel
 // given to it as an argument must be one returned by SubscribeFromSeq
-func (e *EventBroker) UnsubscribeFromSeq(eventChannel <-chan []*NotificationWithSeq) {
+func (e *eventBroker) UnsubscribeFromSeq(eventChannel <-chan []*NotificationWithSeq) {
 	e.eventBroadcaster.UnsubscribeFromSeq(eventChannel)
 }
 
 // GetEventsFromSeq returns a slice of old events starting with given sequence
 // number. This method is used by HTTP API endpoint /get_events
-func (e *EventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) {
+func (e *eventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) {
 	return e.storage.GetEventsFromSeq(seq)
+}
+
+// GetExternalTxNotificationChannel returns a channel that can be used to
+// subscribe on events that Bitcoin node should be checked for updates because
+// there are new relevant txns or there are updates on existing ones.
+// For every new CheckTxStatusEvent an element will be sent to this channel
+// (an element is it's data argument which should be a tx id)
+func (e *eventBroker) GetExternalTxNotificationChannel() chan string {
+	return e.ExternalTxNotifications
 }
 
 // Run starts event broker. Most of the broker is event-driven, routine started
 // by Run is http callback notifier, which works in background because it has
 // to retry requests with backoff and maintains a queue of requests
-func (e *EventBroker) Run() {
+func (e *eventBroker) Run() {
 	e.sendHTTPCallbackNotifications()
 }

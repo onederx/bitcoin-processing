@@ -4,6 +4,17 @@ import (
 	"errors"
 )
 
+// EventBroker is responsible for processing events - sending them to client
+// via http callback and websocket and storing them in DB
+type EventBroker interface {
+	Notify(eventType EventType, data interface{})
+	SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq
+	UnsubscribeFromSeq(<-chan []*NotificationWithSeq)
+	GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error)
+	GetExternalTxNotificationChannel() chan string
+	Run()
+}
+
 // Notification is a structure describing an event. It holds Type field telling
 // what kind of event it is and Data which is an arbitrary data attached to
 // this event.

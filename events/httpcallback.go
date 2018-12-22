@@ -9,11 +9,9 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/onederx/bitcoin-processing/settings"
 )
 
-func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
+func (e *eventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
 	notificationDataJSON, err := json.Marshal(event.Data)
 	if err != nil {
 		log.Printf("Error: could not json-encode notification for webhook: %s", err)
@@ -42,7 +40,7 @@ func (e *EventBroker) notifyHTTPCallback(event *NotificationWithSeq) {
 	}
 }
 
-func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
+func (e *eventBroker) sendDataToHTTPCallback(data []byte) error {
 	resp, err := http.Post(
 		e.callbackURL,
 		"application/json",
@@ -72,8 +70,8 @@ func (e *EventBroker) sendDataToHTTPCallback(data []byte) error {
 	return errors.New(errorText)
 }
 
-func (e *EventBroker) sendHTTPCallbackNotifications() {
-	backoff := settings.GetInt("transaction.callback.backoff")
+func (e *eventBroker) sendHTTPCallbackNotifications() {
+	backoff := e.httpCallbackBackoff
 
 	for notification := range e.callbackURLQueue {
 		delay := time.Second

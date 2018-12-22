@@ -20,11 +20,11 @@ import (
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
-// NodeAPI is responsible for communication with Bitcoin node using RPC API
-// Currently, some requests are implemented using btcsuite
+// bitcoinNodeRPCAPI is responsible for communication with Bitcoin node using
+// RPC API. Currently, some requests are implemented using btcsuite
 // (github.com/btcsuite) and some by manually constructing request data,
 // sending it in HTTP request with net/http and parsing the response
-type NodeAPI struct {
+type bitcoinNodeRPCAPI struct {
 	btcrpc  *rpcclient.Client
 	address string
 	nodeURL string
@@ -115,7 +115,7 @@ func (err JSONRPCError) Error() string {
 
 // CreateNewAddress creates new Bitcoin address belonging to current wallet
 // Address is returned as type btcutil.Address
-func (n *NodeAPI) CreateNewAddress() (btcutil.Address, error) {
+func (n *bitcoinNodeRPCAPI) CreateNewAddress() (btcutil.Address, error) {
 	return n.btcrpc.GetNewAddress("")
 }
 
@@ -123,7 +123,7 @@ func (n *NodeAPI) CreateNewAddress() (btcutil.Address, error) {
 // wallet that belong to blocks newer than block with specified hash or are
 // unconfirmed (not in any block, not yet mined). Transactions in block with
 // specified hash are NOT included.
-func (n *NodeAPI) ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error) {
+func (n *bitcoinNodeRPCAPI) ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error) {
 	var blockHashInChainhashFormat *chainhash.Hash
 	var err error
 
@@ -143,7 +143,7 @@ func (n *NodeAPI) ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSin
 }
 
 // GetTransaction fetches information about bitcoin tx by its hash. Data
-func (n *NodeAPI) GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
+func (n *bitcoinNodeRPCAPI) GetTransaction(hash string) (*btcjson.GetTransactionResult, error) {
 	txHashInChainhashFormat, err := chainhash.NewHashFromStr(hash)
 	if err != nil {
 		return nil, errors.New(
@@ -155,7 +155,7 @@ func (n *NodeAPI) GetTransaction(hash string) (*btcjson.GetTransactionResult, er
 	return n.btcrpc.GetTransaction(txHashInChainhashFormat)
 }
 
-func (n *NodeAPI) decodeRawTransaction(rawTxHex string) (*btcjson.TxRawResult, error) {
+func (n *bitcoinNodeRPCAPI) decodeRawTransaction(rawTxHex string) (*btcjson.TxRawResult, error) {
 	rawTxBytes, err := hex.DecodeString(rawTxHex)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (n *NodeAPI) decodeRawTransaction(rawTxHex string) (*btcjson.TxRawResult, e
 // Data obtained by this call is more low-level than returned by GetTransaction
 // and contains more details specific to bitcoin network. For example, it
 // contains lists of inputs and outputs used by transaction
-func (n *NodeAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
+func (n *bitcoinNodeRPCAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
 	transaction, err := n.GetTransaction(hash)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (n *NodeAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult, error) {
 	return n.decodeRawTransaction(transaction.Hex)
 }
 
-func (n *NodeAPI) sendRequestToNode(method string, params []interface{}) ([]byte, error) {
+func (n *bitcoinNodeRPCAPI) sendRequestToNode(method string, params []interface{}) ([]byte, error) {
 	rpcRequest := jsonRPCRequest{
 		JSONRPCVersion: "1.0",
 		Method:         method,
@@ -207,7 +207,7 @@ func (n *NodeAPI) sendRequestToNode(method string, params []interface{}) ([]byte
 	return ioutil.ReadAll(response.Body)
 }
 
-func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee bool) (hash string, err error) {
+func (n *bitcoinNodeRPCAPI) sendToAddress(address string, amount uint64, recipientPaysFee bool) (hash string, err error) {
 	// there is SendToAddress in btcd/rpcclient, but it does not have
 	// "Subtract Fee From Amount" argument
 	responseJSON, err := n.sendRequestToNode(
@@ -241,7 +241,7 @@ func (n *NodeAPI) sendToAddress(address string, amount uint64, recipientPaysFee 
 // fee is paid by recipient (meaning it will be subtracted from amount sent) or
 // by sender (meaning that recipient will get the exact amount specified, but
 // more money will be spent to create this tx).
-func (n *NodeAPI) SendWithPerKBFee(address string, amount, fee bitcoin.BTCAmount,
+func (n *bitcoinNodeRPCAPI) SendWithPerKBFee(address string, amount, fee bitcoin.BTCAmount,
 	recipientPaysFee bool) (hash string, err error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
@@ -254,7 +254,7 @@ func (n *NodeAPI) SendWithPerKBFee(address string, amount, fee bitcoin.BTCAmount
 	return n.sendToAddress(address, uint64(amount), recipientPaysFee)
 }
 
-func (n *NodeAPI) createRawTransaction(inputs []btcjson.TransactionInput, outputs map[string]float64) (string, error) {
+func (n *bitcoinNodeRPCAPI) createRawTransaction(inputs []btcjson.TransactionInput, outputs map[string]float64) (string, error) {
 	// there is CreateRawTransaction in btcd/rpcclient, but it does not work
 	// with empty list of inputs. Wireshark shows that the request itself is
 	// successful and node correctly returns JSON with created transaction,
@@ -278,7 +278,7 @@ func (n *NodeAPI) createRawTransaction(inputs []btcjson.TransactionInput, output
 	return response.Result, nil
 }
 
-func (n *NodeAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOptions) (*fundRawTransactionResult, error) {
+func (n *bitcoinNodeRPCAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOptions) (*fundRawTransactionResult, error) {
 	// there is no FundRawTransaction in btcd/rpcclient
 	fundRawTxJSONResp, err := n.sendRequestToNode(
 		"fundrawtransaction",
@@ -302,7 +302,7 @@ func (n *NodeAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOp
 	return response.Result, nil
 }
 
-func (n *NodeAPI) transformTxToSetFixedFee(rawTxFunded *fundRawTransactionResult, address string,
+func (n *bitcoinNodeRPCAPI) transformTxToSetFixedFee(rawTxFunded *fundRawTransactionResult, address string,
 	fixedFee uint64) (*btcjson.TxRawResult, error) {
 	const errorPrefix = "Failed to transform tx to set fixed fee: "
 	decodedRawTx, err := n.decodeRawTransaction(rawTxFunded.Hex)
@@ -363,7 +363,7 @@ func (n *NodeAPI) transformTxToSetFixedFee(rawTxFunded *fundRawTransactionResult
 	return decodedRawTx, nil
 }
 
-func (n *NodeAPI) encodeTransformedTransaction(tx *btcjson.TxRawResult) (string, error) {
+func (n *bitcoinNodeRPCAPI) encodeTransformedTransaction(tx *btcjson.TxRawResult) (string, error) {
 	finalInputs := make([]btcjson.TransactionInput, len(tx.Vin))
 	for i := range tx.Vin {
 		finalInputs[i].Txid = tx.Vin[i].Txid
@@ -384,7 +384,7 @@ func (n *NodeAPI) encodeTransformedTransaction(tx *btcjson.TxRawResult) (string,
 	return n.createRawTransaction(finalInputs, finalOutputs)
 }
 
-func (n *NodeAPI) signRawTransactionWithWallet(rawTx string) (string, error) {
+func (n *bitcoinNodeRPCAPI) signRawTransactionWithWallet(rawTx string) (string, error) {
 	signRawTxJSONResp, err := n.sendRequestToNode(
 		"signrawtransactionwithwallet",
 		[]interface{}{rawTx},
@@ -410,7 +410,7 @@ func (n *NodeAPI) signRawTransactionWithWallet(rawTx string) (string, error) {
 	return response.Result.Hex, nil
 }
 
-func (n *NodeAPI) sendRawTransaction(rawTx string) (string, error) {
+func (n *bitcoinNodeRPCAPI) sendRawTransaction(rawTx string) (string, error) {
 	sendRawTxJSONResp, err := n.sendRequestToNode(
 		"sendrawtransaction",
 		[]interface{}{rawTx},
@@ -448,7 +448,7 @@ func (n *NodeAPI) sendRawTransaction(rawTx string) (string, error) {
 // fee is applied (if recipient pays fee, it is subtracted from the amount
 // he gets). Resulting transaction is then signed and broadcasted to bitcoin
 // network.
-func (n *NodeAPI) SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount,
+func (n *bitcoinNodeRPCAPI) SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount,
 	recipientPaysFee bool) (hash string, err error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
@@ -502,7 +502,7 @@ func (n *NodeAPI) SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount
 // GetAddressInfo gets verbose info about Bitcoin address. This can be used to
 // check if given address belongs to current wallet, which is a primary usage
 // of this function for now.
-func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
+func (n *bitcoinNodeRPCAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 	// there is no GetAddressInfo in btcd/rpcclient
 
 	getAddressInfoJSONResp, err := n.sendRequestToNode(
@@ -527,7 +527,7 @@ func (n *NodeAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 	return response.Result, nil
 }
 
-func (n *NodeAPI) getBalance() (uint64, error) {
+func (n *bitcoinNodeRPCAPI) getBalance() (uint64, error) {
 	balance, err := n.btcrpc.GetBalance("*")
 	if err != nil {
 		return 0, err
@@ -535,7 +535,7 @@ func (n *NodeAPI) getBalance() (uint64, error) {
 	return uint64(balance), nil
 }
 
-func (n *NodeAPI) getUnconfirmedBalance() (uint64, error) {
+func (n *bitcoinNodeRPCAPI) getUnconfirmedBalance() (uint64, error) {
 	// there is GetUnconfirmedBalance in btcd/rpcclient, but it is broken:
 	// it sends one positional argument while Bitcoin Core expects no args
 	getUnconfirmedBalanceJSONResp, err := n.sendRequestToNode(
@@ -568,7 +568,7 @@ func (n *NodeAPI) getUnconfirmedBalance() (uint64, error) {
 // a sum of unspent outputs of all transactions that are already mined and that
 // we can spend) and unconfirmed balance (which is a sum of unspent outputs of
 // transactions not yet mined to blockchain that we could spend).
-func (n *NodeAPI) GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error) {
+func (n *bitcoinNodeRPCAPI) GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error) {
 	n.moneySendLock.Lock()
 	defer n.moneySendLock.Unlock()
 
@@ -585,15 +585,15 @@ func (n *NodeAPI) GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error) {
 	return confirmedBalance, unconfirmedBalance, nil
 }
 
-// NewNodeAPI creates new instance of NodeAPI. It reads information about a
-// connection to Bitcoin node from settings
-func NewNodeAPI() *NodeAPI {
+// NewNodeAPI creates new instance of bitcoinNodeRPCAPI. It reads information
+// about a connection to Bitcoin node from settings
+func NewNodeAPI(s settings.Settings) NodeAPI {
 	// prepare bitcoind RPC connection
 	// Connect to remote bitcoin core RPC server using HTTP POST mode.
-	host := settings.GetStringMandatory("bitcoin.node.address")
-	user := settings.GetStringMandatory("bitcoin.node.user")
-	pass := settings.GetStringMandatory("bitcoin.node.password")
-	useTLS := settings.GetBool("bitcoin.node.tls")
+	host := s.GetStringMandatory("bitcoin.node.address")
+	user := s.GetStringMandatory("bitcoin.node.user")
+	pass := s.GetStringMandatory("bitcoin.node.password")
+	useTLS := s.GetBool("bitcoin.node.tls")
 	connCfg := &rpcclient.ConnConfig{
 		Host:         host,
 		User:         user,
@@ -621,7 +621,7 @@ func NewNodeAPI() *NodeAPI {
 		nodeURLScheme = "http"
 	}
 
-	return &NodeAPI{
+	return &bitcoinNodeRPCAPI{
 		address: host,
 		nodeURL: fmt.Sprintf("%s://%s/", nodeURLScheme, host),
 		user:    user,

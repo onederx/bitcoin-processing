@@ -9,13 +9,12 @@ import (
 )
 
 func main() {
-	settings.ReadSettingsAndRun(func() {
-
-		nodeAPI := nodeapi.NewNodeAPI()
-		eventBroker := events.NewEventBroker()
-		bitcoinWallet := wallet.NewWallet(nodeAPI, eventBroker)
+	settings.ReadSettingsAndRun(func(loadedSettings settings.Settings) {
+		nodeAPI := nodeapi.NewNodeAPI(loadedSettings)
+		eventBroker := events.NewEventBroker(loadedSettings)
+		bitcoinWallet := wallet.NewWallet(loadedSettings, nodeAPI, eventBroker)
 		apiServer := api.NewServer(
-			settings.GetString("api.http.address"),
+			loadedSettings.GetString("api.http.address"),
 			bitcoinWallet,
 			eventBroker,
 		)
