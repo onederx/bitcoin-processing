@@ -26,9 +26,7 @@ type eventBroker struct {
 }
 
 // NewEventBroker creates new instance of eventBroker
-func NewEventBroker(s settings.Settings) EventBroker {
-	storageType := s.GetStringMandatory("storage.type")
-	storage := newEventStorage(storageType, s)
+func NewEventBroker(s settings.Settings, storage EventStorage) EventBroker {
 	return &eventBroker{
 		storage:                 storage,
 		eventBroadcaster:        newBroadcasterWithStorage(storage),

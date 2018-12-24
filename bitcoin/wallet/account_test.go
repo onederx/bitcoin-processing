@@ -16,6 +16,7 @@ import (
 
 const testAddress = "1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX"
 const createAddressFailedErrorMsg = "Failed to generate address"
+const storeAccountError = "Failed to store account"
 
 var testMetainfo = map[string]interface{}{
 	"testing": "testtest",
@@ -92,10 +93,23 @@ func (s *settingsMock) GetBTCAmount(key string) bitcoin.BTCAmount {
 	return a
 }
 
+type accountStoreFailureMock struct {
+	Storage
+}
+
+func (s *accountStoreFailureMock) StoreAccount(account *Account) error {
+	return errors.New(storeAccountError)
+}
+
 func TestCreateAccountSuccessful(t *testing.T) {
-	s := &settingsMock{data: make(map[string]interface{})}
-	s.data["storage.type"] = "memory"
-	w := NewWallet(s, &nodeAPICreateNewAddressMock{}, &eventBrokerMock{})
+	s := &settingsMock{}
+
+	w := NewWallet(
+		s,
+		&nodeAPICreateNewAddressMock{},
+		&eventBrokerMock{},
+		NewStorage("memory", s),
+	)
 
 	account, err := w.CreateAccount(testMetainfo)
 	if err != nil {
@@ -113,9 +127,14 @@ func TestCreateAccountSuccessful(t *testing.T) {
 }
 
 func TestCreateAccountAddressGenerationFailure(t *testing.T) {
-	s := &settingsMock{data: make(map[string]interface{})}
-	s.data["storage.type"] = "memory"
-	w := NewWallet(s, &nodeAPICreateNewAddressErrorMock{}, &eventBrokerMock{})
+	s := &settingsMock{}
+
+	w := NewWallet(
+		s,
+		&nodeAPICreateNewAddressErrorMock{},
+		&eventBrokerMock{},
+		NewStorage("memory", s),
+	)
 
 	_, err := w.CreateAccount(testMetainfo)
 	if err == nil {
@@ -125,6 +144,26 @@ func TestCreateAccountAddressGenerationFailure(t *testing.T) {
 		)
 	}
 	if got, want := err.Error(), createAddressFailedErrorMsg; got != want {
+		t.Errorf("Unexpected error message %s", got)
+	}
+}
+
+func TestCreateAccountStorageFailure(t *testing.T) {
+	s := &settingsMock{}
+
+	w := NewWallet(
+		s,
+		&nodeAPICreateNewAddressMock{},
+		&eventBrokerMock{},
+		&accountStoreFailureMock{},
+	)
+
+	_, err := w.CreateAccount(testMetainfo)
+	if err == nil {
+		t.Errorf(
+			"CreateAccount did not return error in case of storage failure")
+	}
+	if got, want := err.Error(), storeAccountError; got != want {
 		t.Errorf("Unexpected error message %s", got)
 	}
 }

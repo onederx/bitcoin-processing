@@ -1,7 +1,6 @@
 package events
 
 import (
-	"log"
 	"sync"
 
 	"github.com/onederx/bitcoin-processing/settings"
@@ -32,7 +31,7 @@ type EventStorage interface {
 	GetEventsFromSeq(seq int) ([]*storedEvent, error)
 }
 
-func newEventStorage(storageType string, s settings.Settings) EventStorage {
+func NewEventStorage(storageType string, s settings.Settings) EventStorage {
 	var storage EventStorage
 
 	switch storageType {
@@ -44,7 +43,7 @@ func newEventStorage(storageType string, s settings.Settings) EventStorage {
 	case "postgres":
 		storage = newPostgresEventStorage(s)
 	default:
-		log.Fatal("Error: unsupported storage type ", storageType)
+		panic("Error: unsupported storage type " + storageType)
 	}
 
 	return storage

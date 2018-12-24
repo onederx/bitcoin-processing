@@ -37,15 +37,14 @@ type Wallet struct {
 // interact with Bitcoin node and EventBroker instance to work with events.
 // It will also create new Storage, parameters for which will be read from
 // settings
-func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.EventBroker) *Wallet {
-	storageType := s.GetStringMandatory("storage.type")
+func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.EventBroker, storage Storage) *Wallet {
 	maxConfirmations := int64(s.GetInt("transaction.max_confirmations"))
 	minWithdrawWithoutManualConfirmation := s.GetBTCAmount("wallet.min_withdraw_without_manual_confirmation")
 	return &Wallet{
 		settings:                             s,
 		nodeAPI:                              nodeAPI,
 		eventBroker:                          eventBroker,
-		storage:                              newStorage(storageType, s),
+		storage:                              storage,
 		minWithdraw:                          s.GetBTCAmount("wallet.min_withdraw"),
 		minFeePerKb:                          s.GetBTCAmount("wallet.min_fee.per_kb"),
 		minFeeFixed:                          s.GetBTCAmount("wallet.min_fee.fixed"),

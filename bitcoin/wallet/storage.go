@@ -1,8 +1,6 @@
 package wallet
 
 import (
-	"log"
-
 	"github.com/satori/go.uuid"
 
 	"github.com/onederx/bitcoin-processing/settings"
@@ -33,7 +31,7 @@ type Storage interface {
 	SetMoneyRequiredFromColdStorage(amount uint64) error
 }
 
-func newStorage(storageType string, s settings.Settings) Storage {
+func NewStorage(storageType string, s settings.Settings) Storage {
 	var storage Storage
 
 	switch storageType {
@@ -45,7 +43,7 @@ func newStorage(storageType string, s settings.Settings) Storage {
 	case "postgres":
 		storage = newPostgresWalletStorage(s)
 	default:
-		log.Fatal("Error: unsupported storage type ", storageType)
+		panic("Error: unsupported storage type " + storageType)
 	}
 
 	return storage
