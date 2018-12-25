@@ -1,9 +1,15 @@
 image: golang:1.11
 
 variables:
+  GOCACHE: $CI_PROJECT_DIR/.gobuild
   GOPATH: $CI_PROJECT_DIR/.gotree
   PKG_DIR: $CI_PROJECT_DIR/.gotree/src/github.com/onederx
   PKG: $CI_PROJECT_DIR/.gotree/src/github.com/onederx/bitcoin-processing
+
+cache:
+  paths:
+    - .gobuild/
+    - .gotree/
 
 stages:
   - test
@@ -13,6 +19,9 @@ before_script:
   - ln -s $CI_PROJECT_DIR $PKG
   - cd $PKG
   - go get -v -d ./...
+
+after_script:
+    - rm $PKG
 
 unit_tests:
   stage: test
