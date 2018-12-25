@@ -26,10 +26,15 @@ var testMetainfo = map[string]interface{}{
 
 type nodeAPICreateNewAddressMock struct {
 	nodeapi.NodeAPI
+	address string
 }
 
 func (n *nodeAPICreateNewAddressMock) CreateNewAddress() (btcutil.Address, error) {
-	return btcutil.DecodeAddress(testAddress, &chaincfg.MainNetParams)
+	address := n.address
+	if address == "" {
+		address = testAddress
+	}
+	return btcutil.DecodeAddress(address, &chaincfg.MainNetParams)
 }
 
 type nodeAPICreateNewAddressErrorMock struct {
@@ -48,6 +53,20 @@ type settingsMock struct {
 
 type eventBrokerMock struct {
 	events.EventBroker
+}
+
+func (s *settingsMock) GetString(key string) string {
+	val, ok := s.data[key]
+
+	if !ok {
+		return ""
+	}
+	st, ok := val.(string)
+
+	if !ok {
+		return ""
+	}
+	return st
 }
 
 func (s *settingsMock) GetStringMandatory(key string) string {
