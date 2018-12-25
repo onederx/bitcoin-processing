@@ -1,0 +1,21 @@
+image: golang:1.11
+
+variables:
+  GOPATH: $CI_PROJECT_DIR/.gotree
+  PKG_DIR: $CI_PROJECT_DIR/.gotree/src/github.com/onederx
+  PKG: $CI_PROJECT_DIR/.gotree/src/github.com/onederx/bitcoin-processing
+
+stages:
+  - test
+
+before_script:
+  - mkdir -p $PKG_DIR
+  - ln -s $CI_PROJECT_DIR $PKG
+  - cd $PKG
+  - go get -v -d ./...
+
+unit_tests:
+  stage: test
+  script:
+    - cd $PKG
+    - go test ./...
