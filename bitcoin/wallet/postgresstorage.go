@@ -51,7 +51,7 @@ func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	storage := &PostgresWalletStorage{
@@ -60,12 +60,12 @@ func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
 
 	storage.lastSeenBlockHash, err = storage.getMeta("last_seen_block_hash", "")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	storage.hotWalletAddress, err = storage.getMeta("hot_wallet_address", "")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	moneyRequiredFromColdStorageString, err := storage.getMeta(
@@ -73,7 +73,7 @@ func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
 		"0",
 	)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	storage.moneyRequiredFromColdStorage, err = strconv.ParseUint(
@@ -82,7 +82,7 @@ func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
 		64,
 	)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	return storage

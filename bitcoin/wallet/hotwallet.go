@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"fmt"
 	"log"
 )
 
@@ -44,7 +45,7 @@ func (w *Wallet) getOrCreateHotWallet() string {
 
 	newHotWalletAddress, err := w.generateHotWalletAddress()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	log.Printf("Generated a new hot wallet address %s", newHotWalletAddress)
@@ -54,19 +55,13 @@ func (w *Wallet) getOrCreateHotWallet() string {
 func (w *Wallet) checkHotWalletAddress() {
 	addressInfo, err := w.nodeAPI.GetAddressInfo(w.hotWalletAddress)
 	if err != nil {
-		log.Fatalf(
-			"Error: failed to check hot wallet address %s: %s",
-			w.hotWalletAddress,
-			err,
-		)
+		panic(fmt.Sprintf("Error: failed to check hot wallet address %s: %s",
+			w.hotWalletAddress, err))
 	}
 
 	if !addressInfo.IsMine {
-		log.Fatalf(
-			"Error checking hot wallet address %s: address does not belong "+
-				"to wallet",
-			w.hotWalletAddress,
-		)
+		panic(fmt.Sprintf("Error checking hot wallet address %s: address "+
+			"does not belong to wallet", w.hotWalletAddress))
 	}
 
 	log.Printf("Checking hot wallet address: OK")

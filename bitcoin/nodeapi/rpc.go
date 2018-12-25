@@ -605,12 +605,12 @@ func NewNodeAPI(s settings.Settings) NodeAPI {
 	// not supported in HTTP POST mode.
 	btcrpc, err := rpcclient.New(connCfg, nil)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	blockCount, err := btcrpc.GetBlockCount()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	log.Printf("Testing Bitcoin node connection: block count = %d", blockCount)
 

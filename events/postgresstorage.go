@@ -3,7 +3,6 @@ package events
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
 
 	_ "github.com/lib/pq" // Enable postgresql driver
 
@@ -22,12 +21,12 @@ func newPostgresEventStorage(s settings.Settings) *PostgresEventStorage {
 	db, err := sql.Open("postgres", dsn)
 
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	err = db.Ping()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	return &PostgresEventStorage{db: db}
