@@ -2,6 +2,10 @@ package integrationtests
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -96,13 +100,26 @@ func (e *testEnvironment) start(ctx context.Context) error {
 }
 
 func (e *testEnvironment) stop(ctx context.Context) error {
-	err := e.stopDatabase(ctx)
-	if err != nil {
-		return err
+	foundErrors := make([]string, 0)
+
+	dbStopErr := e.stopDatabase(ctx)
+
+	if dbStopErr != nil {
+		errorMsg := fmt.Sprintf("Error stopping database container: %s.", dbStopErr)
+		log.Printf(errorMsg)
+		foundErrors = append(foundErrors, errorMsg)
 	}
-	err = e.stopRegtest(ctx)
-	if err != nil {
-		return err
+
+	regtestStopErr := e.stopRegtest(ctx)
+
+	if regtestStopErr != nil {
+		errorMsg := fmt.Sprintf("Error stopping regtest containers: %s.", regtestStopErr)
+		log.Printf(errorMsg)
+		foundErrors = append(foundErrors, errorMsg)
+	}
+
+	if len(foundErrors) > 0 {
+		return errors.New(strings.Join(foundErrors, " "))
 	}
 	return nil
 }
