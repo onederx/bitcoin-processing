@@ -1,0 +1,17 @@
+transaction:
+  callback:
+    url: http://127.0.0.1:9000/
+  max_confirmations: {{.MaxConfirmations}}
+api:
+  http:
+    address: 0.0.0.0:8000
+storage:
+  type: postgres
+  dsn: >
+    host=bitcoin-processing-integration-test-db dbname=bitcoin_processing
+    user=bitcoin_processing sslmode=disable
+bitcoin:
+  node:
+    address: bitcoin-processing-integration-test-node-our:18443
+    user: bitcoinrpc
+    password: TEST_BITCOIN_NODE_PASSWORD
