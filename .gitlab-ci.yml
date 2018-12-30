@@ -1,5 +1,9 @@
 image: golang:1.11
 
+stages:
+  - test
+  - build
+
 variables:
   GOCACHE: $CI_PROJECT_DIR/.gobuild
   GOPATH: $CI_PROJECT_DIR/.gotree
@@ -11,9 +15,6 @@ cache:
     - .gobuild/
     - .gotree/
 
-stages:
-  - test
-
 before_script:
   - mkdir -p $PKG_DIR
   - ln -s $CI_PROJECT_DIR $PKG
@@ -22,6 +23,18 @@ before_script:
 
 after_script:
     - rm $PKG
+
+
+build:
+  stage: build
+  script:
+    - (cd cmd/bitcoin-processing && go build)
+    - (cd cmd/bitcoin-processing-client && go build)
+  artifacts:
+    paths:
+      - cmd/bitcoin-processing/bitcoin-processing
+      - cmd/bitcoin-processing-client/bitcoin-processing-client
+
 
 unit_tests:
   stage: test
