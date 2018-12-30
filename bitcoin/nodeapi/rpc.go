@@ -177,7 +177,7 @@ func (n *bitcoinNodeRPCAPI) GetRawTransaction(hash string) (*btcjson.TxRawResult
 	return n.decodeRawTransaction(transaction.Hex)
 }
 
-func (n *bitcoinNodeRPCAPI) sendRequestToNode(method string, params []interface{}) ([]byte, error) {
+func (n *bitcoinNodeRPCAPI) SendRequestToNode(method string, params []interface{}) ([]byte, error) {
 	rpcRequest := jsonRPCRequest{
 		JSONRPCVersion: "1.0",
 		Method:         method,
@@ -210,7 +210,7 @@ func (n *bitcoinNodeRPCAPI) sendRequestToNode(method string, params []interface{
 func (n *bitcoinNodeRPCAPI) sendToAddress(address string, amount uint64, recipientPaysFee bool) (hash string, err error) {
 	// there is SendToAddress in btcd/rpcclient, but it does not have
 	// "Subtract Fee From Amount" argument
-	responseJSON, err := n.sendRequestToNode(
+	responseJSON, err := n.SendRequestToNode(
 		"sendtoaddress",
 		[]interface{}{
 			address,
@@ -259,7 +259,7 @@ func (n *bitcoinNodeRPCAPI) createRawTransaction(inputs []btcjson.TransactionInp
 	// with empty list of inputs. Wireshark shows that the request itself is
 	// successful and node correctly returns JSON with created transaction,
 	// but rpcclient later fails on parsing the result and returns error
-	createRawTxJSONResp, err := n.sendRequestToNode(
+	createRawTxJSONResp, err := n.SendRequestToNode(
 		"createrawtransaction",
 		[]interface{}{inputs, outputs},
 	)
@@ -280,7 +280,7 @@ func (n *bitcoinNodeRPCAPI) createRawTransaction(inputs []btcjson.TransactionInp
 
 func (n *bitcoinNodeRPCAPI) fundRawTransaction(rawTx string, options *fundRawTransactionOptions) (*fundRawTransactionResult, error) {
 	// there is no FundRawTransaction in btcd/rpcclient
-	fundRawTxJSONResp, err := n.sendRequestToNode(
+	fundRawTxJSONResp, err := n.SendRequestToNode(
 		"fundrawtransaction",
 		[]interface{}{rawTx, options},
 	)
@@ -385,7 +385,7 @@ func (n *bitcoinNodeRPCAPI) encodeTransformedTransaction(tx *btcjson.TxRawResult
 }
 
 func (n *bitcoinNodeRPCAPI) signRawTransactionWithWallet(rawTx string) (string, error) {
-	signRawTxJSONResp, err := n.sendRequestToNode(
+	signRawTxJSONResp, err := n.SendRequestToNode(
 		"signrawtransactionwithwallet",
 		[]interface{}{rawTx},
 	)
@@ -411,7 +411,7 @@ func (n *bitcoinNodeRPCAPI) signRawTransactionWithWallet(rawTx string) (string, 
 }
 
 func (n *bitcoinNodeRPCAPI) sendRawTransaction(rawTx string) (string, error) {
-	sendRawTxJSONResp, err := n.sendRequestToNode(
+	sendRawTxJSONResp, err := n.SendRequestToNode(
 		"sendrawtransaction",
 		[]interface{}{rawTx},
 	)
@@ -505,7 +505,7 @@ func (n *bitcoinNodeRPCAPI) SendWithFixedFee(address string, amount, fee bitcoin
 func (n *bitcoinNodeRPCAPI) GetAddressInfo(address string) (*AddressInfo, error) {
 	// there is no GetAddressInfo in btcd/rpcclient
 
-	getAddressInfoJSONResp, err := n.sendRequestToNode(
+	getAddressInfoJSONResp, err := n.SendRequestToNode(
 		"getaddressinfo",
 		[]interface{}{address},
 	)
@@ -538,7 +538,7 @@ func (n *bitcoinNodeRPCAPI) getBalance() (uint64, error) {
 func (n *bitcoinNodeRPCAPI) getUnconfirmedBalance() (uint64, error) {
 	// there is GetUnconfirmedBalance in btcd/rpcclient, but it is broken:
 	// it sends one positional argument while Bitcoin Core expects no args
-	getUnconfirmedBalanceJSONResp, err := n.sendRequestToNode(
+	getUnconfirmedBalanceJSONResp, err := n.SendRequestToNode(
 		"getunconfirmedbalance",
 		nil,
 	)

@@ -17,4 +17,6 @@ type NodeAPI interface {
 	SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount, recipientPaysFee bool) (hash string, err error)
 	GetAddressInfo(address string) (*AddressInfo, error)
 	GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error)
+
+	SendRequestToNode(method string, params []interface{}) ([]byte, error)
 }
