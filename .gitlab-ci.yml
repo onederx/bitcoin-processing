@@ -3,6 +3,7 @@ image: golang:1.11
 stages:
   - test
   - build
+  - integration_test
 
 variables:
   GOCACHE: $CI_PROJECT_DIR/.gobuild
@@ -41,3 +42,18 @@ unit_tests:
   script:
     - cd $PKG
     - go test -v ./...
+
+
+integration_test:
+  tags:
+    - integration-tests
+  stage: integration_test
+  script:
+    - export TSTPREFIX='bitcoin-processing-integration-test'
+    - docker stop ${TSTPREFIX}-db || true && docker rm ${TSTPREFIX}-db || true
+    - docker stop ${TSTPREFIX}-node-our || true && docker rm ${TSTPREFIX}-node-our || true
+    - docker stop ${TSTPREFIX}-node-client || true && docker rm ${TSTPREFIX}-node-client || true
+    - docker stop ${TSTPREFIX}-node-miner || true && docker rm ${TSTPREFIX}-node-miner || true
+    - docker stop ${TSTPREFIX}-main || true && docker rm ${TSTPREFIX}-main || true
+
+    - go test -v -tags integration ./integrationtests
