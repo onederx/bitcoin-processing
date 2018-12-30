@@ -3,14 +3,17 @@ package integrationtests
 import (
 	"fmt"
 	"net"
+	"os"
 	"path"
-	"runtime"
 	"time"
 )
 
 func getFullSourcePath(dirName string) string {
-	_, fileName, _, _ := runtime.Caller(0)
-	return path.Join(path.Dir(path.Dir(fileName)), dirName)
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	return path.Join(path.Dir(cwd), dirName)
 }
 
 func waitForPort(host string, port uint16) {

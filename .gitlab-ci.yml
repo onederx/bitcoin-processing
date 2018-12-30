@@ -31,10 +31,12 @@ build:
   script:
     - (cd cmd/bitcoin-processing && go build)
     - (cd cmd/bitcoin-processing-client && go build)
+    - go test -tags integration -o integrationtests/integration.test -c ./integrationtests
   artifacts:
     paths:
       - cmd/bitcoin-processing/bitcoin-processing
       - cmd/bitcoin-processing-client/bitcoin-processing-client
+      - integrationtests/integration.test
 
 
 unit_tests:
@@ -48,12 +50,13 @@ integration_test:
   tags:
     - integration-tests
   stage: integration_test
-  script:
+  before_script: &integration_test_docker_cleanup
     - export TSTPREFIX='bitcoin-processing-integration-test'
     - docker stop ${TSTPREFIX}-db || true && docker rm ${TSTPREFIX}-db || true
     - docker stop ${TSTPREFIX}-node-our || true && docker rm ${TSTPREFIX}-node-our || true
     - docker stop ${TSTPREFIX}-node-client || true && docker rm ${TSTPREFIX}-node-client || true
     - docker stop ${TSTPREFIX}-node-miner || true && docker rm ${TSTPREFIX}-node-miner || true
     - docker stop ${TSTPREFIX}-main || true && docker rm ${TSTPREFIX}-main || true
-
-    - go test -v -tags integration ./integrationtests
+  after_script: *integration_test_docker_cleanup
+  script:
+    - (cd integrationtests && ./integration.test -test.v)
