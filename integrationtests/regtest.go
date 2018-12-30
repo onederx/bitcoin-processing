@@ -41,7 +41,8 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 			NetworkMode: container.NetworkMode(e.network),
 			AutoRemove:  true,
 			Binds: []string{
-				getFullSourcePath("integrationtests/testdata/regtest/"+node) + ":/bitcoin",
+				getFullSourcePath("integrationtests/testdata/regtest/"+node+"/bitcoin.conf") +
+					":/bitcoin/.bitcoin/bitcoin.conf",
 			},
 		}
 		containerName := nodeNamePrefix + node
@@ -197,10 +198,6 @@ func (e *testEnvironment) stopRegtest(ctx context.Context) error {
 			return err
 		}
 		log.Printf("regtest container stopped: id=%v", container.id)
-		for _, dataDir := range []string{"blocks", "regtest"} {
-			nodeDir := getFullSourcePath("integrationtests/testdata/regtest") + "/" + container.name + "/.bitcoin"
-			os.RemoveAll(nodeDir + "/" + dataDir)
-		}
 	}
 
 	return nil
