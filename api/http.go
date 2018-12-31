@@ -36,7 +36,7 @@ type GetTransactionsFilter struct {
 	Status    string `json:"status,omitempty"`
 }
 
-type httpAPIResponse struct {
+type HttpAPIResponse struct {
 	Error  string      `json:"error"`
 	Result interface{} `json:"result"`
 }
@@ -44,7 +44,7 @@ type httpAPIResponse struct {
 func (s *Server) respond(response http.ResponseWriter, data interface{}, err error) {
 	var responseBody []byte
 	if err != nil {
-		responseBody, err = json.Marshal(httpAPIResponse{Error: err.Error()})
+		responseBody, err = json.Marshal(HttpAPIResponse{Error: err.Error()})
 		if err != nil {
 			panic("Failed to marshal error response for error " + err.Error())
 		}
@@ -58,7 +58,7 @@ func (s *Server) respond(response http.ResponseWriter, data interface{}, err err
 		}
 		return
 	}
-	responseBody, err = json.Marshal(httpAPIResponse{Error: "ok", Result: data})
+	responseBody, err = json.Marshal(HttpAPIResponse{Error: "ok", Result: data})
 	if err != nil {
 		panic("Failed to marshal ok response for error " + err.Error())
 	}
