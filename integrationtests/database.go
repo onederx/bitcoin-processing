@@ -50,12 +50,17 @@ func (e *testEnvironment) startDatabase(ctx context.Context) error {
 
 func (e *testEnvironment) stopDatabase(ctx context.Context) error {
 	log.Printf("trying to stop db container")
+	if e.db == nil {
+		log.Printf("seems that db is not running")
+		return nil
+	}
 
 	if err := e.cli.ContainerStop(ctx, e.db.id, nil); err != nil {
 		return err
 	}
 
 	log.Printf("db container stopped: id=%v", e.db.id)
+	e.db = nil
 	return nil
 }
 

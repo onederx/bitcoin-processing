@@ -192,6 +192,10 @@ func (e *testEnvironment) waitForRegtestLoadAndGenBitcoins() {
 
 func (e *testEnvironment) stopRegtest(ctx context.Context) error {
 	log.Printf("trying to stop regtest containers")
+	if e.regtest == nil {
+		log.Printf("seems that regtest is not running")
+		return nil
+	}
 
 	for _, container := range e.regtest {
 		if err := e.cli.ContainerStop(ctx, container.id, nil); err != nil {
@@ -199,7 +203,7 @@ func (e *testEnvironment) stopRegtest(ctx context.Context) error {
 		}
 		log.Printf("regtest container stopped: id=%v", container.id)
 	}
-
+	e.regtest = nil
 	return nil
 }
 

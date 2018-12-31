@@ -100,11 +100,17 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 func (e *testEnvironment) stopProcessing(ctx context.Context) error {
 	log.Printf("stopping bitcoin processing container")
 
+	if e.processing == nil {
+		log.Printf("seems that processing is not running")
+		return nil
+	}
+
 	if err := e.cli.ContainerStop(ctx, e.processing.id, nil); err != nil {
 		return err
 	}
 
 	log.Printf("bitcoin processing container stopped: id=%v", e.processing.id)
+	e.processing = nil
 	return nil
 }
 
