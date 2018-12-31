@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -127,4 +128,12 @@ func (e *testEnvironment) stop(ctx context.Context) error {
 func (e *testEnvironment) waitForLoad() {
 	e.waitForDatabase()
 	e.waitForRegtest()
+}
+
+func (e *testEnvironment) processingUrl(relative string) string {
+	return (&url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:8000", e.processing.ip),
+		Path:   relative,
+	}).String()
 }
