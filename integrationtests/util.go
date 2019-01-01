@@ -14,6 +14,8 @@ import (
 	"github.com/onederx/bitcoin-processing/api"
 )
 
+const waitForEventRetries = 120
+
 func getFullSourcePath(dirName string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -22,25 +24,42 @@ func getFullSourcePath(dirName string) string {
 	return path.Join(path.Dir(cwd), dirName)
 }
 
-func waitForPort(host string, port uint16) {
-	var err error
-	retries := 120
+func waitForEventOrPanic(callback func() error) {
+	err := waitForEvent(callback)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func waitForEvent(callback func() error) error {
+	retries := waitForEventRetries
 
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+		err := callback()
 		if err != nil {
 			retries--
-			if retries > 0 {
-				continue
+			if retries <= 0 {
+				return err
 			}
+		} else {
+			return nil
+		}
+	}
+	return nil
+}
+
+func waitForPort(host string, port uint16) {
+	waitForEventOrPanic(func() error {
+		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+		if err != nil {
+			return err
 		}
 		conn.Close()
-		return
-	}
-	panic(err)
+		return nil
+	})
 }
 
 func getGoodResponseResultOrFail(t *testing.T, resp *http.Response, err error) interface{} {

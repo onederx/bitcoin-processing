@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -99,64 +98,44 @@ func connectToNode(host string) (result nodeapi.NodeAPI, r interface{}) {
 }
 
 func connectToNodeWithBackoff(host string) (nodeapi.NodeAPI, error) {
-	var r interface{}
 	var api nodeapi.NodeAPI
-	retries := 120
 
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for range ticker.C {
+	err := waitForEvent(func() error {
+		var r interface{}
 		api, r = connectToNode(host)
 		if api != nil {
-			return api, nil
+			return nil
 		}
-		retries--
-		if retries > 0 {
-			continue
-		}
-		break
-	}
-	return nil, fmt.Errorf("Failed to connect to node: %v", r)
+		return fmt.Errorf("Failed to connect to node: %v", r)
+	})
+	return api, err
 }
 
 func sendRequestToNodeWithBackoff(n nodeapi.NodeAPI, method string, params []interface{}) ([]byte, error) {
-	var err error
-	var responseJSON, result []byte
+	var result []byte
 
 	var response struct {
 		Result interface{}
 		Error  *nodeapi.JSONRPCError
 	}
 
-	retries := 120
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		retries--
-		if retries <= 0 {
-			break
-		}
-		responseJSON, err = n.SendRequestToNode(method, params)
+	err := waitForEvent(func() error {
+		responseJSON, err := n.SendRequestToNode(method, params)
 
 		if err != nil {
-			continue
+			return err
 		}
 		err = json.Unmarshal(responseJSON, &response)
 		if err != nil {
-			continue
+			return err
 		}
 		if response.Error != nil {
-			err = response.Error
-			continue
+			return response.Error
 		}
 		result, err = json.MarshalIndent(response.Result, "", "    ")
-		if err == nil {
-			return result, nil
-		}
-	}
-	return nil, err
+		return err
+	})
+	return result, err
 }
 
 func (e *testEnvironment) waitForRegtestLoadAndGenBitcoins() {
