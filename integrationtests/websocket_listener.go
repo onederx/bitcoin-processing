@@ -8,9 +8,6 @@ import (
 	"github.com/onederx/bitcoin-processing/api/client"
 )
 
-const websocketListenerMessageQueueSize = 20000
-const websocketMessageWaitTimeout = time.Minute
-
 type websocketListener struct {
 	interrupt chan<- struct{}
 	done      <-chan struct{}
@@ -24,7 +21,7 @@ func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener
 	log.Println("Starting websocket listener")
 	apiUrl := fmt.Sprintf("http://%s:8000", e.processing.ip)
 	listener := &websocketListener{
-		messages: make(chan []byte, websocketListenerMessageQueueSize),
+		messages: make(chan []byte, listenersMessageQueueSize),
 	}
 	listener.interrupt, listener.done, err = client.NewWebsocketClient(
 		apiUrl, startSeq, listener.processMessage,
@@ -59,7 +56,7 @@ func (l *websocketListener) checkNextMessage(checker func([]byte)) {
 	select {
 	case msg := <-l.messages:
 		checker(msg)
-	case <-time.After(websocketMessageWaitTimeout):
+	case <-time.After(listenersMessageWaitTimeout):
 		panic("No message arrived before timeout")
 	}
 }

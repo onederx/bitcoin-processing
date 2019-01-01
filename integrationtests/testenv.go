@@ -8,17 +8,30 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+
+	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 )
 
-const networkName = "bitcoin-processing-integration-test-network"
+const (
+	networkName = "bitcoin-processing-integration-test-network"
+
+	listenersMessageQueueSize   = 20000
+	listenersMessageWaitTimeout = time.Minute
+)
 
 type containerInfo struct {
 	name string
 	id   string
 	ip   string
+}
+
+type bitcoinNodeContainerInfo struct {
+	containerInfo
+	nodeAPI nodeapi.NodeAPI
 }
 
 type testEnvironment struct {
@@ -28,14 +41,15 @@ type testEnvironment struct {
 
 	db *containerInfo
 
-	regtest         map[string]*containerInfo
+	regtest         map[string]*bitcoinNodeContainerInfo
 	regtestIsLoaded chan error
 
 	processing           *containerInfo
 	processingConfigPath string
 
-	callbackListener *httptest.Server
-	callbackURL      string
+	callbackListener     *httptest.Server
+	callbackURL          string
+	callbackMessageQueue chan *callbackRequest
 
 	websocketListeners []*websocketListener
 }

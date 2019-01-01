@@ -16,6 +16,8 @@ const (
 	baseImageName           = "debian:stretch"
 	processingContainerName = "bitcoin-processing-integration-test-main"
 
+	defaultCallbackURLPath = "/wallets/cb"
+
 	configTemplate = `transaction:
   callback:
     url: {{.CallbackURL}}
@@ -42,7 +44,7 @@ type processingSettings struct {
 
 var defaultSettings = processingSettings{
 	MaxConfirmations: 1,
-	CallbackURL:      "http://127.0.0.1:9000/",
+	CallbackURL:      "http://127.0.0.1:9000" + defaultCallbackURLPath,
 }
 
 func (e *testEnvironment) startProcessingWithDefaultSettings(ctx context.Context) error {
