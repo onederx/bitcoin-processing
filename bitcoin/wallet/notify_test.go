@@ -84,7 +84,7 @@ func TestNotify(t *testing.T) {
 				if got, want := eventType, test.eventType; got != want {
 					t.Errorf("Expected event type %v for notification, got %v", want, got)
 				}
-				notification := data.(txNotification)
+				notification := data.(TxNotification)
 				if got, want := notification.Address, test.address; got != want {
 					t.Errorf("Expected address %s in notification, got %s", want, got)
 				}

@@ -1,6 +1,7 @@
 package bitcoin
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/shopspring/decimal"
@@ -71,4 +72,27 @@ func BTCAmountFromStringedFloat(amountSF string) (BTCAmount, error) {
 		return 0, err
 	}
 	return BTCAmount(amountDecimal.Mul(satoshiInBTCDecimal).IntPart()), nil
+}
+
+// UnmarshalJSON deserializes BTCAmount from JSON string value. It is converted
+// using BTCAmountFromStringedFloat
+func (a *BTCAmount) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*a, err = BTCAmountFromStringedFloat(j)
+	return err
+}
+
+// Must is a helper that wraps a call to a function returning (BTCAmount, error)
+// and panics if the error is non-nil. It is intended for use in variable
+// initializations such as
+// 	bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.5"))
+func Must(amount BTCAmount, err error) BTCAmount {
+	if err != nil {
+		panic(err)
+	}
+	return amount
 }

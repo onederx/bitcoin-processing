@@ -1,6 +1,7 @@
 package bitcoin
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/btcsuite/btcutil"
@@ -35,6 +36,7 @@ const (
 var feeTypeToStringMap = map[FeeType]string{
 	FixedFee:     "fixed",
 	PerKBRateFee: "per-kb-rate",
+	InvalidFee:   "invalid",
 }
 
 var stringToFeeTypeMap = make(map[string]FeeType)
@@ -54,8 +56,11 @@ func (ft FeeType) String() string {
 }
 
 // FeeTypeFromString converts string to FeeType. "fixed" is converted to
-// FixedFee, "per-kb-rate" is converted to PerKBRateFee, all other values
-// produce InvalidFee and an error
+// FixedFee, "per-kb-rate" is converted to PerKBRateFee
+// Value "invalid" is converted to InvalidFee without producing an error
+// because InvalidFee is used in normal conditions when we don't know real
+// fee type (for incoming payments for example)
+// all other values produce InvalidFee and an error
 func FeeTypeFromString(feeTypeStr string) (FeeType, error) {
 	ft, ok := stringToFeeTypeMap[feeTypeStr]
 	if !ok {
@@ -70,4 +75,16 @@ func FeeTypeFromString(feeTypeStr string) (FeeType, error) {
 // representation of given FeeType
 func (ft FeeType) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + ft.String() + "\""), nil
+}
+
+// UnmarshalJSON deserializes FeeType from JSON. Resulting value is
+// mapped from string representation of fee type
+func (ft *FeeType) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*ft, err = FeeTypeFromString(j)
+	return err
 }

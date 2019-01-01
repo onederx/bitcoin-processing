@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 
@@ -228,10 +229,34 @@ func (td TransactionDirection) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + td.String() + "\""), nil
 }
 
+// UnmarshalJSON deserializes TransactionDirection from JSON. Resulting value is
+// mapped from string representation of tx direction
+func (td *TransactionDirection) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*td, err = TransactionDirectionFromString(j)
+	return err
+}
+
 // MarshalJSON serializes TransactionStatus to a JSON value. Resulting value
 // is simply a string representation of status
 func (ts TransactionStatus) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + ts.String() + "\""), nil
+}
+
+// UnmarshalJSON deserializes TransactionStatus from JSON. Resulting value is
+// mapped from string representation of tx status
+func (ts *TransactionStatus) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*ts, err = TransactionStatusFromString(j)
+	return err
 }
 
 func (tx *Transaction) update(other *Transaction) {

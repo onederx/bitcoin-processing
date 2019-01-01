@@ -4,7 +4,7 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
-type txNotification struct {
+type TxNotification struct {
 	Transaction
 	StatusCode int    `json:"status"`
 	StatusStr  string `json:"status_name"`
@@ -20,7 +20,7 @@ type txNotification struct {
 // in future after API change (Transaction itself is JSON-serializable and can
 // act as data field of event)
 func (w *Wallet) NotifyTransaction(eventType events.EventType, tx Transaction) {
-	w.eventBroker.Notify(eventType, txNotification{
+	w.eventBroker.Notify(eventType, TxNotification{
 		Transaction: tx,
 		StatusCode:  tx.Status.ToCoinpaymentsLikeCode(),
 		StatusStr:   tx.Status.String(),
