@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 
@@ -32,6 +33,11 @@ type testEnvironment struct {
 
 	processing           *containerInfo
 	processingConfigPath string
+
+	callbackListener *httptest.Server
+	callbackURL      string
+
+	websocketListeners []*websocketListener
 }
 
 func newTestEnvironment(ctx context.Context) (*testEnvironment, error) {
@@ -113,6 +119,7 @@ func (e *testEnvironment) start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	e.startCallbackListener()
 	return nil
 }
 
@@ -134,6 +141,13 @@ func (e *testEnvironment) stop(ctx context.Context) error {
 		log.Printf(errorMsg)
 		foundErrors = append(foundErrors, errorMsg)
 	}
+
+	e.stopCallbackListener()
+
+	for _, wsListener := range e.websocketListeners {
+		wsListener.stop()
+	}
+	e.websocketListeners = nil
 
 	if len(foundErrors) > 0 {
 		return errors.New(strings.Join(foundErrors, " "))

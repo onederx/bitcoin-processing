@@ -18,7 +18,7 @@ const (
 
 	configTemplate = `transaction:
   callback:
-    url: http://127.0.0.1:9000/
+    url: {{.CallbackURL}}
   max_confirmations: {{.MaxConfirmations}}
 api:
   http:
@@ -37,14 +37,20 @@ bitcoin:
 
 type processingSettings struct {
 	MaxConfirmations int
+	CallbackURL      string
 }
 
 var defaultSettings = processingSettings{
 	MaxConfirmations: 1,
+	CallbackURL:      "http://127.0.0.1:9000/",
 }
 
 func (e *testEnvironment) startProcessingWithDefaultSettings(ctx context.Context) error {
-	return e.startProcessing(ctx, &defaultSettings)
+	settings := defaultSettings
+	if e.callbackURL != "" {
+		settings.CallbackURL = e.callbackURL
+	}
+	return e.startProcessing(ctx, &settings)
 }
 
 func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSettings) error {
