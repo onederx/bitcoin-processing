@@ -1,8 +1,6 @@
 package api
 
 import (
-	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 
@@ -31,24 +29,12 @@ func shutdownConnection(conn *websocket.Conn) {
 func readSeqFromClient(conn *websocket.Conn) (SubscribeMessage, error) {
 	var decodedMessage SubscribeMessage
 
-	messageType, message, err := conn.ReadMessage()
-	if err != nil {
-		log.Printf("Failed to read message from client: %v", err)
-		return decodedMessage, err
-	}
+	err := conn.ReadJSON(&decodedMessage)
 
-	if messageType != websocket.TextMessage {
-		log.Printf("Unexpected type of subscribe message: %v", messageType)
-		return decodedMessage, errors.New("Bad subscribe message type")
-	}
-
-	err = json.Unmarshal(message, &decodedMessage)
 	if err != nil {
-		log.Printf("Failed to decode message from client: %s", message)
 		shutdownConnection(conn)
 		return decodedMessage, err
 	}
-
 	return decodedMessage, nil
 }
 
@@ -106,12 +92,7 @@ func (s *Server) handleWebsocketConnection(w http.ResponseWriter, r *http.Reques
 				return
 			}
 			for _, event := range eventSequence {
-				marshaledEvent, err := json.Marshal(&event)
-				if err != nil {
-					log.Printf("Error: could not json-encode notification for ws: %s", err)
-					continue
-				}
-				err = conn.WriteMessage(websocket.TextMessage, marshaledEvent)
+				err = conn.WriteJSON(event)
 				if err != nil {
 					log.Println("write:", err)
 					return
