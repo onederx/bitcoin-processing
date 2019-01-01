@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -149,7 +148,12 @@ func (e *testEnvironment) waitForRegtestLoadAndGenBitcoins() {
 		e.regtestIsLoaded <- err
 		return
 	}
-	os.Stdout.Write(nodeOutput)
+	var blocks []string
+	err = json.Unmarshal(nodeOutput, &blocks)
+	if err != nil {
+		panic(fmt.Sprintf("Client node API returned malformed JSON %s", nodeOutput))
+	}
+	log.Printf("Client node generated %d blocks", len(blocks))
 	minerNode, err := connectToNodeWithBackoff(e.regtest["node-miner"].ip)
 	if err != nil {
 		e.regtestIsLoaded <- err
@@ -160,7 +164,11 @@ func (e *testEnvironment) waitForRegtestLoadAndGenBitcoins() {
 		e.regtestIsLoaded <- err
 		return
 	}
-	os.Stdout.Write(nodeOutput)
+	err = json.Unmarshal(nodeOutput, &blocks)
+	if err != nil {
+		panic(fmt.Sprintf("Miner node API returned malformed JSON %s", nodeOutput))
+	}
+	log.Printf("Miner node generated %d blocks", len(blocks))
 	_, err = connectToNodeWithBackoff(e.regtest["node-our"].ip)
 	if err != nil {
 		e.regtestIsLoaded <- err
