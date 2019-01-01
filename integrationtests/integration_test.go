@@ -8,6 +8,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
 func TestSmoke(t *testing.T) {
@@ -52,6 +55,10 @@ func TestCommonUsage(t *testing.T) {
 	}
 	defer env.stopProcessing(ctx)
 	env.waitForProcessing()
+	_, err = env.newWebsocketListener(0)
+	if err != nil {
+		t.Fatalf("Failed to connect websocket event listener %v", err)
+	}
 	t.Run("HotWalletGenerated", func(t *testing.T) {
 		testHotWalletGenerated(t, env)
 	})
@@ -73,6 +80,11 @@ func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
 }
 
 func testGenerateClientWallet(t *testing.T, env *testEnvironment) {
+	type newWalletEvent struct {
+		Type events.EventType `json:"type"`
+		Seq  int              `json:"seq"`
+		Data wallet.Account   `json:"data"`
+	}
 	t.Run("EmptyMetainfo", func(t *testing.T) {
 		resp, err := http.Post(
 			env.processingUrl("/new_wallet"),
@@ -84,9 +96,33 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) {
 		if respData["metainfo"] != nil {
 			t.Fatalf("Metainfo unexpectedly non-nil: %v", respData["metainfo"])
 		}
-		if respData["address"].(string) == "" {
+		address := respData["address"].(string)
+		if address == "" {
 			t.Fatalf("Generated address is empty")
 		}
+		env.websocketListeners[0].checkNextMessage(func(message []byte) {
+			var event newWalletEvent
+			err := json.Unmarshal(message, &event)
+			if err != nil {
+				t.Fatalf("Failed to JSON-decode WS notification: %v", err)
+			}
+			if got, want := event.Seq, 1; got != want {
+				t.Errorf("Unxpected sequence number of first event: %d", got)
+			}
+			if got, want := event.Type, events.NewAddressEvent; got != want {
+				t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
+					want, got)
+			}
+			if got, want := event.Data.Address, address; got != want {
+				t.Errorf("Expected address from WS notification to be equal "+
+					"to address from API response (%s), but instead got %s",
+					want, got)
+			}
+			if event.Data.Metainfo != nil {
+				t.Errorf("Account metainfo in WS notification unexpectedly non-nil: %v",
+					event.Data.Metainfo)
+			}
+		})
 	})
 	t.Run("NonEmptyMetainfo", func(t *testing.T) {
 		type testMetainfo struct {
@@ -113,8 +149,29 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) {
 			t.Fatalf("Metainfo unexpectedly nil")
 		}
 		compareMetainfo(t, respData["metainfo"], initialTestMetainfo)
-		if respData["address"].(string) == "" {
+		address := respData["address"].(string)
+		if address == "" {
 			t.Fatalf("Generated address is empty")
 		}
+		env.websocketListeners[0].checkNextMessage(func(message []byte) {
+			var event newWalletEvent
+			err := json.Unmarshal(message, &event)
+			if err != nil {
+				t.Fatalf("Failed to JSON-decode WS notification: %v", err)
+			}
+			if got, want := event.Seq, 2; got != want {
+				t.Errorf("Unxpected sequence number of second event: %d", got)
+			}
+			if got, want := event.Type, events.NewAddressEvent; got != want {
+				t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
+					want, got)
+			}
+			if got, want := event.Data.Address, address; got != want {
+				t.Errorf("Expected address from WS notification to be equal "+
+					"to address from API response (%s), but instead got %s",
+					want, got)
+			}
+			compareMetainfo(t, event.Data.Metainfo, initialTestMetainfo)
+		})
 	})
 }
