@@ -21,8 +21,9 @@ type containerInfo struct {
 }
 
 type testEnvironment struct {
-	cli     *client.Client
-	network string
+	cli            *client.Client
+	network        string
+	networkGateway string
 
 	db *containerInfo
 
@@ -33,44 +34,59 @@ type testEnvironment struct {
 	processingConfigPath string
 }
 
-func setupNetwork(ctx context.Context, cli *client.Client, network string) error {
-	resp, err := cli.NetworkList(ctx, types.NetworkListOptions{})
+func newTestEnvironment(ctx context.Context) (*testEnvironment, error) {
+	env := &testEnvironment{}
+
+	err := env.setupDockerClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return env, nil
+}
+
+func (e *testEnvironment) setupDockerClient(ctx context.Context) error {
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		return err
+	}
+	e.cli = cli
+	cli.NegotiateAPIVersion(ctx)
+	if err := e.setupNetwork(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *testEnvironment) setupNetwork(ctx context.Context) error {
+	e.network = networkName
+
+	resp, err := e.cli.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for i := range resp {
-		if resp[i].Name == network {
+		if resp[i].Name == networkName {
+			e.networkGateway = resp[i].IPAM.Config[0].Gateway
 			return nil
 		}
 	}
 
-	_, err = cli.NetworkCreate(ctx, network, types.NetworkCreate{})
-	return err
-}
+	netInfo, err := e.cli.NetworkCreate(ctx, networkName, types.NetworkCreate{})
 
-func newDockerClient(ctx context.Context) (*client.Client, error) {
-	cli, err := client.NewEnvClient()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	cli.NegotiateAPIVersion(ctx)
-	if err := setupNetwork(ctx, cli, networkName); err != nil {
-		return nil, err
-	}
-	return cli, nil
-}
 
-func newTestEnvironment(ctx context.Context) (*testEnvironment, error) {
-	cli, err := newDockerClient(ctx)
+	netResource, err := e.cli.NetworkInspect(ctx, netInfo.ID, types.NetworkInspectOptions{})
+
 	if err != nil {
-		return nil, err
+		return err
 	}
-	env := &testEnvironment{
-		cli:     cli,
-		network: networkName,
-	}
-	return env, nil
+
+	e.networkGateway = netResource.IPAM.Config[0].Gateway
+
+	return nil
 }
 
 func (e *testEnvironment) getContainerIP(ctx context.Context, id string) string {
