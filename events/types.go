@@ -1,6 +1,7 @@
 package events
 
 import (
+	"encoding/json"
 	"errors"
 )
 
@@ -122,4 +123,16 @@ func EventTypeFromString(eventTypeStr string) (EventType, error) {
 // a string representation of event type
 func (et EventType) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + et.String() + "\""), nil
+}
+
+// UnmarshalJSON deserializes EventType from JSON. Resulting value is mapped
+// from string representation of event type
+func (et *EventType) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*et, err = EventTypeFromString(j)
+	return err
 }
