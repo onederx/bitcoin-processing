@@ -10,6 +10,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/strslice"
+
+	"github.com/onederx/bitcoin-processing/api/client"
 )
 
 const (
@@ -100,6 +102,8 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 		return err
 	}
 	e.processing.ip = e.getContainerIP(ctx, resp.ID)
+
+	e.processingClient = client.NewClient(e.processingURL("/"))
 
 	log.Printf("processing container started: id=%v", e.processing.id)
 	return nil

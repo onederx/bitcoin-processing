@@ -3,10 +3,8 @@
 package integrationtests
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"net/http"
 	"testing"
 
 	"github.com/satori/go.uuid"
@@ -51,9 +49,11 @@ func TestSmoke(t *testing.T) {
 	defer env.stopProcessing(ctx)
 	env.waitForProcessing()
 
-	resp, err := http.Get(env.processingUrl("/get_events"))
+	_, err = env.processingClient.GetEvents(0)
 
-	getGoodResponseResultOrFail(t, resp, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCommonUsage(t *testing.T) {
@@ -88,14 +88,15 @@ func TestCommonUsage(t *testing.T) {
 	t.Run("Deposit", func(t *testing.T) {
 		testDeposit(t, env, clientAddress)
 	})
+	t.Run("Withdraw", func(t *testing.T) {
+		testWithdraw(t, env)
+	})
 }
 
 func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
-	resp, err := http.Get(env.processingUrl("/get_hot_storage_address"))
-	respResult := getGoodResponseResultOrFail(t, resp, err)
-	hotWalletAddress, ok := respResult.(string)
-	if !ok {
-		t.Fatalf("Hot wallet address from get_hot_storage_address API is not a string: %v", respResult)
+	hotWalletAddress, err := env.processingClient.GetHotStorageAddress()
+	if err != nil {
+		t.Fatalf("Failed to request hot wallet address %v", err)
 	}
 	if hotWalletAddress == "" {
 		t.Fatalf("Hot wallet address from get_hot_storage_address API is empty")
@@ -105,17 +106,14 @@ func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
 func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 	var clientAddress string
 	t.Run("EmptyMetainfo", func(t *testing.T) {
-		resp, err := http.Post(
-			env.processingUrl("/new_wallet"),
-			"application/json",
-			nil,
-		)
-		respResult := getGoodResponseResultOrFail(t, resp, err)
-		respData := respResult.(map[string]interface{})
-		if respData["metainfo"] != nil {
-			t.Fatalf("Metainfo unexpectedly non-nil: %v", respData["metainfo"])
+		result, err := env.processingClient.NewWallet(nil)
+		if err != nil {
+			t.Fatal(err)
 		}
-		address := respData["address"].(string)
+		if result.Metainfo != nil {
+			t.Fatalf("Metainfo unexpectedly non-nil: %v", result.Metainfo)
+		}
+		address := result.Address
 		if address == "" {
 			t.Fatalf("Generated address is empty")
 		}
@@ -144,19 +142,15 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 		})
 	})
 	t.Run("NonEmptyMetainfo", func(t *testing.T) {
-		initialTestMetainfoJSON, err := json.Marshal(initialTestMetainfo)
-		resp, err := http.Post(
-			env.processingUrl("/new_wallet"),
-			"application/json",
-			bytes.NewReader(initialTestMetainfoJSON),
-		)
-		respResult := getGoodResponseResultOrFail(t, resp, err)
-		respData := respResult.(map[string]interface{})
-		if respData["metainfo"] == nil {
+		result, err := env.processingClient.NewWallet(initialTestMetainfo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Metainfo == nil {
 			t.Fatalf("Metainfo unexpectedly nil")
 		}
-		compareMetainfo(t, respData["metainfo"], initialTestMetainfo)
-		clientAddress = respData["address"].(string)
+		compareMetainfo(t, result.Metainfo, initialTestMetainfo)
+		clientAddress = result.Address
 		if clientAddress == "" {
 			t.Fatalf("Generated address is empty")
 		}
@@ -332,4 +326,8 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 			checkNotificationFieldsForConfirmedDeposit(t, event.Data)
 		})
 	})
+}
+
+func testWithdraw(t *testing.T, env *testEnvironment) {
+	//http.Post(env.processingUrl("/withdraw"), "application/json")
 }

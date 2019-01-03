@@ -4,14 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/onederx/bitcoin-processing/api"
 )
 
 const waitForEventRetries = 120
@@ -60,31 +57,6 @@ func waitForPort(host string, port uint16) {
 		conn.Close()
 		return nil
 	})
-}
-
-func getGoodResponseResultOrFail(t *testing.T, resp *http.Response, err error) interface{} {
-	url := resp.Request.URL.String()
-
-	if err != nil {
-		t.Fatalf("Request to processing API %s failed %s", url, err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		t.Fatalf("Request to processing API %s returned non-200 status %d", url, resp.StatusCode)
-	}
-
-	var responseData api.HttpAPIResponse
-
-	err = json.NewDecoder(resp.Body).Decode(&responseData)
-	if err != nil {
-		t.Fatalf("Failed to JSON-decode API response from %s %s", url, err)
-	}
-	if responseData.Error != "ok" {
-		t.Fatalf("Unexpected error from %s API %s", url, responseData.Error)
-	}
-	return responseData.Result
 }
 
 func compareMetainfo(t *testing.T, got, want interface{}) {

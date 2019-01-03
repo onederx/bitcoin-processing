@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/docker/docker/client"
 
+	processingapiclient "github.com/onederx/bitcoin-processing/api/client"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 )
 
@@ -35,7 +36,7 @@ type bitcoinNodeContainerInfo struct {
 }
 
 type testEnvironment struct {
-	cli            *client.Client
+	cli            *dockerclient.Client
 	network        string
 	networkGateway string
 
@@ -46,6 +47,7 @@ type testEnvironment struct {
 
 	processing           *containerInfo
 	processingConfigPath string
+	processingClient     *processingapiclient.Client
 
 	callbackListener     *httptest.Server
 	callbackURL          string
@@ -65,7 +67,7 @@ func newTestEnvironment(ctx context.Context) (*testEnvironment, error) {
 }
 
 func (e *testEnvironment) setupDockerClient(ctx context.Context) error {
-	cli, err := client.NewEnvClient()
+	cli, err := dockerclient.NewEnvClient()
 	if err != nil {
 		return err
 	}
@@ -174,7 +176,7 @@ func (e *testEnvironment) waitForLoad() {
 	e.waitForRegtest()
 }
 
-func (e *testEnvironment) processingUrl(relative string) string {
+func (e *testEnvironment) processingURL(relative string) string {
 	return (&url.URL{
 		Scheme: "http",
 		Host:   fmt.Sprintf("%s:8000", e.processing.ip),

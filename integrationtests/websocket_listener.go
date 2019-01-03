@@ -1,7 +1,6 @@
 package integrationtests
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -9,29 +8,24 @@ import (
 )
 
 type websocketListener struct {
-	interrupt chan<- struct{}
-	done      <-chan struct{}
-	stopped   bool
+	wsClient *client.WebsocketClient
+	stopped  bool
 
 	messages chan []byte
 }
 
 func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener, error) {
-	var err error
-	log.Println("Starting websocket listener")
-	apiUrl := fmt.Sprintf("http://%s:8000", e.processing.ip)
 	listener := &websocketListener{
 		messages: make(chan []byte, listenersMessageQueueSize),
 	}
-	listener.interrupt, listener.done, err = client.NewWebsocketClient(
-		apiUrl, startSeq, listener.processMessage,
+	wsClient, err := e.processingClient.NewWebsocketClient(
+		startSeq, listener.processMessage,
 	)
 	if err != nil {
-		log.Printf("Websocket listener start failed: %s", err)
 		return nil, err
 	}
+	listener.wsClient = wsClient
 	e.websocketListeners = append(e.websocketListeners, listener)
-	log.Println("Websocket listener started")
 	return listener, nil
 }
 
@@ -44,10 +38,8 @@ func (l *websocketListener) stop() {
 		log.Println("Websocket listener stop called on already stopped listener")
 		return
 	}
-	l.stopped = true
-	log.Printf("Stopping websocket listener")
-	l.interrupt <- struct{}{}
-	<-l.done
+	l.wsClient.Close()
+	l.wsClient = nil
 	close(l.messages)
 	log.Printf("Websocket listener stopped")
 }
