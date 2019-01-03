@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"github.com/onederx/bitcoin-processing/api"
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/spf13/cobra"
-	"log"
-	"net/http"
+
+	"github.com/onederx/bitcoin-processing/api"
+	"github.com/onederx/bitcoin-processing/api/client"
+	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 )
 
 func init() {
@@ -37,20 +35,8 @@ func init() {
 				Direction: directionFilter,
 				Status:    statusFilter,
 			}
-			filterJSON, err := json.Marshal(filter)
-			if err != nil {
-				log.Fatal(err)
-			}
-			resp, err := http.Post(
-				urljoin(apiURL, "/get_transactions"),
-				"application/json",
-				bytes.NewBuffer(filterJSON),
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer resp.Body.Close()
-			showResponse(resp.Body)
+			cli := client.NewClient(apiURL)
+			showResponse(cli.GetTransactions(&filter))
 		},
 	}
 

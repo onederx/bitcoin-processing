@@ -1,13 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"github.com/onederx/bitcoin-processing/api"
+	"log"
+
 	"github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
-	"log"
-	"net/http"
+
+	"github.com/onederx/bitcoin-processing/api"
+	"github.com/onederx/bitcoin-processing/api/client"
 )
 
 func init() {
@@ -44,24 +45,21 @@ func init() {
 					&withdrawMetainfo,
 				)
 				if err != nil {
-					log.Fatal(err)
+					log.Fatalf(
+						"Checking that metainfo is a valid JSON failed: %s",
+						err,
+					)
 				}
 				requestData.Metainfo = withdrawMetainfo
 			}
-			requestBody, err := json.Marshal(requestData)
-			if err != nil {
-				log.Fatal(err)
+
+			cli := client.NewClient(apiURL)
+
+			if toColdStorage {
+				showResponse(cli.WithdrawToColdStorage(&requestData))
+			} else {
+				showResponse(cli.Withdraw(&requestData))
 			}
-			resp, err := http.Post(
-				urljoin(apiURL, url),
-				"application/json",
-				bytes.NewBuffer(requestBody),
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer resp.Body.Close()
-			showResponse(resp.Body)
 		}
 	}
 

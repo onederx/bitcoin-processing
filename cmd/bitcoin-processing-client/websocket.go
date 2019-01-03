@@ -17,7 +17,8 @@ func init() {
 		Use:   "websocket",
 		Short: "Subscribe to events via websocket",
 		Run: func(cmd *cobra.Command, args []string) {
-			interrupt, done, err := client.NewWebsocketClient(apiURL, startSeq, func(message []byte) {
+			cli := client.NewClient(apiURL)
+			wsClient, err := cli.NewWebsocketClient(startSeq, func(message []byte) {
 				log.Printf("recv: %s", message)
 			})
 
@@ -25,17 +26,15 @@ func init() {
 				log.Fatal(err)
 			}
 
+			defer wsClient.Close()
+
 			sigInt := make(chan os.Signal, 1)
 			signal.Notify(sigInt, os.Interrupt)
 
-			go func() {
-				select {
-				case <-sigInt:
-					interrupt <- struct{}{}
-				case <-done:
-				}
-			}()
-			<-done
+			select {
+			case <-wsClient.Done:
+			case <-sigInt:
+			}
 		},
 	}
 

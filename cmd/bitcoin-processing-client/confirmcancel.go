@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"log"
+
 	"github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
-	"log"
-	"net/http"
+
+	"github.com/onederx/bitcoin-processing/api/client"
 )
 
 func init() {
@@ -25,20 +25,19 @@ func init() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				txIDJSON, err := json.Marshal(txID)
+				cli := client.NewClient(apiURL)
+				switch command {
+				case "confirm":
+					err = cli.Confirm(txID)
+				case "cancel_pending":
+					err = cli.Cancel(txID)
+				default:
+					panic("Unexpected command " + command)
+				}
 				if err != nil {
 					log.Fatal(err)
 				}
-				resp, err := http.Post(
-					urljoin(apiURL, "/"+command),
-					"application/json",
-					bytes.NewBuffer(txIDJSON),
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer resp.Body.Close()
-				showResponse(resp.Body)
+				log.Println("OK")
 			},
 		}
 	}

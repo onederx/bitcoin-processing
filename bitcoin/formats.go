@@ -76,13 +76,13 @@ func BTCAmountFromStringedFloat(amountSF string) (BTCAmount, error) {
 
 // UnmarshalJSON deserializes BTCAmount from JSON string value. It is converted
 // using BTCAmountFromStringedFloat
-func (a *BTCAmount) UnmarshalJSON(b []byte) error {
+func (amount *BTCAmount) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
 	if err != nil {
 		return err
 	}
-	*a, err = BTCAmountFromStringedFloat(j)
+	*amount, err = BTCAmountFromStringedFloat(j)
 	return err
 }
 

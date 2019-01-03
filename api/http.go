@@ -14,6 +14,20 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
+const (
+	NewWalletURL                  = "/new_wallet"
+	NotifyWalletURL               = "/notify_wallet"
+	WithdrawURL                   = "/withdraw"
+	GetHotStorageAddressURL       = "/get_hot_storage_address"
+	GetTransactionsURL            = "/get_transactions"
+	GetBalanceURL                 = "/get_balance"
+	GetRequiredFromColdStorageURL = "/get_required_from_cold_storage"
+	CancelPendingURL              = "/cancel_pending"
+	WithdrawToColdStorageURL      = "/withdraw_to_cold_storage"
+	ConfirmURL                    = "/confirm"
+	GetEventsURL                  = "/get_events"
+)
+
 // WithdrawRequest describes data sent by client to create new withdrawal
 // Fields ID, FeeType and Metainfo are optional
 // Address can be optional for withdrawals to hot storage (because hot storage
@@ -36,15 +50,34 @@ type GetTransactionsFilter struct {
 	Status    string `json:"status,omitempty"`
 }
 
-type HttpAPIResponse struct {
-	Error  string      `json:"error"`
+type HTTPAPIResponseError string
+
+func (err HTTPAPIResponseError) Error() string {
+	return string(err)
+}
+
+type GenericHTTPAPIResponse struct {
+	Error HTTPAPIResponseError `json:"error"`
+}
+
+type BalanceInfo struct {
+	Balance           bitcoin.BTCAmount `json:"balance"`
+	BalanceWithUnconf bitcoin.BTCAmount `json:"balance_including_unconfirmed"`
+}
+
+type httpAPIResponse struct {
+	GenericHTTPAPIResponse
 	Result interface{} `json:"result"`
 }
 
 func (s *Server) respond(response http.ResponseWriter, data interface{}, err error) {
 	var responseBody []byte
 	if err != nil {
-		responseBody, err = json.Marshal(HttpAPIResponse{Error: err.Error()})
+		responseBody, err = json.Marshal(httpAPIResponse{
+			GenericHTTPAPIResponse: GenericHTTPAPIResponse{
+				Error: HTTPAPIResponseError(err.Error()),
+			}},
+		)
 		if err != nil {
 			panic("Failed to marshal error response for error " + err.Error())
 		}
@@ -58,7 +91,10 @@ func (s *Server) respond(response http.ResponseWriter, data interface{}, err err
 		}
 		return
 	}
-	responseBody, err = json.Marshal(HttpAPIResponse{Error: "ok", Result: data})
+	responseBody, err = json.Marshal(httpAPIResponse{
+		GenericHTTPAPIResponse: GenericHTTPAPIResponse{Error: "ok"},
+		Result:                 data,
+	})
 	if err != nil {
 		panic("Failed to marshal ok response for error " + err.Error())
 	}
@@ -181,10 +217,7 @@ func (s *Server) getTransactions(response http.ResponseWriter, request *http.Req
 }
 
 func (s *Server) getBalance(response http.ResponseWriter, request *http.Request) {
-	var respData struct {
-		Balance           bitcoin.BTCAmount `json:"balance"`
-		BalanceWithUnconf bitcoin.BTCAmount `json:"balance_including_unconfirmed"`
-	}
+	var respData BalanceInfo
 	var err error
 	respData.Balance, respData.BalanceWithUnconf, err = s.wallet.GetBalance()
 
@@ -264,15 +297,15 @@ func (s *Server) getEvents(response http.ResponseWriter, request *http.Request) 
 
 func (s *Server) initHTTPAPIServer() {
 	m := s.httpServer.Handler.(*http.ServeMux)
-	m.HandleFunc("/new_wallet", s.newBitcoinAddress)
-	m.HandleFunc("/notify_wallet", s.notifyWalletTxStatusChanged)
-	m.HandleFunc("/withdraw", s.withdrawRegular)
-	m.HandleFunc("/get_hot_storage_address", s.getHotStorageAddress)
-	m.HandleFunc("/get_transactions", s.getTransactions)
-	m.HandleFunc("/get_balance", s.getBalance)
-	m.HandleFunc("/get_required_from_cold_storage", s.getRequiredFromColdStorage)
-	m.HandleFunc("/cancel_pending", s.cancelPending)
-	m.HandleFunc("/withdraw_to_cold_storage", s.withdrawToColdStorage)
-	m.HandleFunc("/confirm", s.confirmPendingTransaction)
-	m.HandleFunc("/get_events", s.getEvents)
+	m.HandleFunc(NewWalletURL, s.newBitcoinAddress)
+	m.HandleFunc(NotifyWalletURL, s.notifyWalletTxStatusChanged)
+	m.HandleFunc(WithdrawURL, s.withdrawRegular)
+	m.HandleFunc(GetHotStorageAddressURL, s.getHotStorageAddress)
+	m.HandleFunc(GetTransactionsURL, s.getTransactions)
+	m.HandleFunc(GetBalanceURL, s.getBalance)
+	m.HandleFunc(GetRequiredFromColdStorageURL, s.getRequiredFromColdStorage)
+	m.HandleFunc(CancelPendingURL, s.cancelPending)
+	m.HandleFunc(WithdrawToColdStorageURL, s.withdrawToColdStorage)
+	m.HandleFunc(ConfirmURL, s.confirmPendingTransaction)
+	m.HandleFunc(GetEventsURL, s.getEvents)
 }

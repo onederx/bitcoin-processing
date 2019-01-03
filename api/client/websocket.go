@@ -10,11 +10,19 @@ import (
 	"github.com/onederx/bitcoin-processing/api"
 )
 
-func NewWebsocketClient(apiURL string, startSeq int, messageCb func([]byte)) (chan<- struct{}, <-chan struct{}, error) {
-	u, err := url.Parse(apiURL)
+type WebsocketClient struct {
+	Done <-chan struct{}
+
+	interrupt chan<- struct{}
+
+	owner *Client
+}
+
+func (cli *Client) NewWebsocketClient(startSeq int, messageCb func([]byte)) (*WebsocketClient, error) {
+	u, err := url.Parse(cli.apiBaseURL)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
@@ -24,7 +32,7 @@ func NewWebsocketClient(apiURL string, startSeq int, messageCb func([]byte)) (ch
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	interrupt := make(chan struct{}, 1)
@@ -72,5 +80,30 @@ func NewWebsocketClient(apiURL string, startSeq int, messageCb func([]byte)) (ch
 			}
 		}
 	}()
-	return interrupt, clientFinished, nil
+
+	wsClient := &WebsocketClient{
+		Done:      clientFinished,
+		interrupt: interrupt,
+		owner:     cli,
+	}
+
+	cli.websocketClients = append(cli.websocketClients, wsClient)
+
+	return wsClient, nil
+}
+
+func (w *WebsocketClient) Close() {
+	if w.owner == nil {
+		log.Println("Close called on already closed websocket client")
+		return
+	}
+	for i, wsClient := range w.owner.websocketClients {
+		if w == wsClient {
+			w.owner.websocketClients = append(w.owner.websocketClients[:i], w.owner.websocketClients[i+1:]...)
+			break
+		}
+	}
+	w.owner = nil
+	close(w.interrupt)
+	<-w.Done
 }

@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/onederx/bitcoin-processing/settings"
-	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/onederx/bitcoin-processing/settings"
 )
 
 var apiURLArg string

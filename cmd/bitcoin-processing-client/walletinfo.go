@@ -1,24 +1,24 @@
 package main
 
 import (
-	"bytes"
 	"github.com/spf13/cobra"
-	"log"
-	"net/http"
+
+	"github.com/onederx/bitcoin-processing/api/client"
 )
 
 func runWalletInfoCommand(cmd *cobra.Command, args []string) {
-	resp, err := http.Post(
-		urljoin(apiURL, "/"+cmd.Use),
-		"application/json",
-		bytes.NewBuffer(nil),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-	showResponse(resp.Body)
+	cli := client.NewClient(apiURL)
 
+	switch cmd.Use {
+	case "get_hot_storage_address":
+		showResponse(cli.GetHotStorageAddress())
+	case "get_balance":
+		showResponse(cli.GetBalance())
+	case "get_required_from_cold_storage":
+		showResponse(cli.GetRequiredFromColdStorage())
+	default:
+		panic("Unknown command " + cmd.Use)
+	}
 }
 
 func init() {

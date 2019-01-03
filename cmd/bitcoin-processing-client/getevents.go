@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"github.com/spf13/cobra"
-	"log"
-	"net/http"
 
-	"github.com/onederx/bitcoin-processing/api"
+	"github.com/onederx/bitcoin-processing/api/client"
 )
 
 func init() {
@@ -17,22 +13,7 @@ func init() {
 		Use:   "get_events",
 		Short: "Request events (optionally starting with given seq)",
 		Run: func(cmd *cobra.Command, args []string) {
-			seqRequest, err := json.Marshal(api.SubscribeMessage{Seq: startSeq})
-
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			resp, err := http.Post(
-				urljoin(apiURL, "/get_events"),
-				"application/json",
-				bytes.NewBuffer([]byte(seqRequest)),
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer resp.Body.Close()
-			showResponse(resp.Body)
+			showResponse(client.NewClient(apiURL).GetEvents(startSeq))
 		},
 	}
 
