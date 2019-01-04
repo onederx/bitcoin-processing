@@ -7,8 +7,9 @@ import (
 	"github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/api/client"
+	"github.com/onederx/bitcoin-processing/bitcoin"
+	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 )
 
 func init() {
@@ -19,20 +20,36 @@ func init() {
 	makeWithdrawCommmandRunner := func(url string, toColdStorage bool) func(cmd *cobra.Command, args []string) {
 		return func(cmd *cobra.Command, args []string) {
 			var withdrawMetainfo interface{}
-			var address, amount, fee string
+			var address, amountStr, feeStr string
 
 			withdrawIDParsed, _ := uuid.FromString(withdrawID)
 
 			if len(args) == 3 {
-				address, amount, fee = args[0], args[1], args[2]
+				address, amountStr, feeStr = args[0], args[1], args[2]
 			} else {
 				if !toColdStorage {
 					panic("Regular withdraw requires 3 args")
 				}
-				amount, fee = args[0], args[1]
+				amountStr, feeStr = args[0], args[1]
 			}
 
-			var requestData = api.WithdrawRequest{
+			amount, err := bitcoin.BTCAmountFromStringedFloat(amountStr)
+
+			if err != nil {
+				log.Fatalf(
+					"Failed to convert given amount value %q to bitcoin amount",
+					amountStr)
+			}
+
+			fee, err := bitcoin.BTCAmountFromStringedFloat(feeStr)
+
+			if err != nil {
+				log.Fatalf(
+					"Failed to convert given fee value %q to bitcoin amount",
+					feeStr)
+			}
+
+			var requestData = wallet.WithdrawRequest{
 				ID:      withdrawIDParsed,
 				Address: address,
 				Amount:  amount,

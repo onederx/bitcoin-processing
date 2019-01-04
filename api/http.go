@@ -28,20 +28,6 @@ const (
 	GetEventsURL                  = "/get_events"
 )
 
-// WithdrawRequest describes data sent by client to create new withdrawal
-// Fields ID, FeeType and Metainfo are optional
-// Address can be optional for withdrawals to hot storage (because hot storage
-// address can be set in config)
-// Amount and Fee are strings because they are sent by client as stringed floats
-type WithdrawRequest struct {
-	ID       uuid.UUID   `json:"id,omitempty"`
-	Address  string      `json:"address,omitempty"`
-	Amount   string      `json:"amount"`
-	Fee      string      `json:"fee,omitempty"`
-	FeeType  string      `json:"fee_type,omitempty"`
-	Metainfo interface{} `json:"metainfo"`
-}
-
 // GetTransactionsFilter describes data sent by client to set up filters in
 // /get_transactions request. Currently, filtering by direction and status
 // is supported, empty value means do not filter
@@ -140,48 +126,25 @@ func (s *Server) notifyWalletTxStatusChanged(response http.ResponseWriter, reque
 }
 
 func (s *Server) withdraw(toColdStorage bool, response http.ResponseWriter, request *http.Request) {
-	var req WithdrawRequest
-	var withdrawReq wallet.WithdrawRequest
-	var body []byte
-	var err error
+	var req wallet.WithdrawRequest
 
-	if body, err = ioutil.ReadAll(request.Body); err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	if err = json.Unmarshal(body, &req); err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	withdrawReq.Address = req.Address
-	withdrawReq.Amount, err = bitcoin.BTCAmountFromStringedFloat(req.Amount)
-	if err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	withdrawReq.Fee, err = bitcoin.BTCAmountFromStringedFloat(req.Fee)
-	if err != nil {
+	if err := json.NewDecoder(request.Body).Decode(&req); err != nil {
 		s.respond(response, nil, err)
 		return
 	}
 	if req.ID == uuid.Nil {
-		withdrawReq.ID = uuid.Must(uuid.NewV4())
-		log.Printf("Generated new withdrawal id %s", withdrawReq.ID)
-	} else {
-		withdrawReq.ID = req.ID
+		req.ID = uuid.Must(uuid.NewV4())
+		log.Printf("Generated new withdrawal id %s", req.ID)
 	}
 	if req.FeeType == "" {
 		log.Printf("Fee type not specified: setting to 'fixed' by default")
-		withdrawReq.FeeType = "fixed"
-	} else {
-		withdrawReq.FeeType = req.FeeType
+		req.FeeType = "fixed"
 	}
-	withdrawReq.Metainfo = req.Metainfo
-	if err = s.wallet.Withdraw(&withdrawReq, toColdStorage); err != nil {
+	if err := s.wallet.Withdraw(&req, toColdStorage); err != nil {
 		s.respond(response, nil, err)
 		return
 	}
-	s.respond(response, withdrawReq, nil)
+	s.respond(response, req, nil)
 }
 
 func (s *Server) withdrawRegular(response http.ResponseWriter, request *http.Request) {

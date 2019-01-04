@@ -7,15 +7,15 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 )
 
-func (cli *Client) Withdraw(request *api.WithdrawRequest) (*wallet.WithdrawRequest, error) {
+func (cli *Client) Withdraw(request *wallet.WithdrawRequest) (*wallet.WithdrawRequest, error) {
 	return cli.withdraw(api.WithdrawURL, request)
 }
 
-func (cli *Client) WithdrawToColdStorage(request *api.WithdrawRequest) (*wallet.WithdrawRequest, error) {
+func (cli *Client) WithdrawToColdStorage(request *wallet.WithdrawRequest) (*wallet.WithdrawRequest, error) {
 	return cli.withdraw(api.WithdrawToColdStorageURL, request)
 }
 
-func (cli *Client) withdraw(relativeURL string, request *api.WithdrawRequest) (*wallet.WithdrawRequest, error) {
+func (cli *Client) withdraw(relativeURL string, request *wallet.WithdrawRequest) (*wallet.WithdrawRequest, error) {
 	var responseData wallet.WithdrawRequest
 
 	err := cli.sendHTTPAPIRequest(relativeURL, request, func(response []byte) error {

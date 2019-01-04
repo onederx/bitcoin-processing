@@ -13,12 +13,15 @@ import (
 // WithdrawRequest is a structure with parameters that can be set for new
 // withdrawal. In order to make a withdraw, caller must initialize this
 // structire and pass it to Withdraw method
+// Fields ID, FeeType and Metainfo are optional
+// Address can be optional for withdrawals to hot storage (because hot storage
+// address can be set in config)
 type WithdrawRequest struct {
-	ID       uuid.UUID         `json:"id"`
-	Address  string            `json:"address"`
+	ID       uuid.UUID         `json:"id,omitempty"`
+	Address  string            `json:"address,omitempty"`
 	Amount   bitcoin.BTCAmount `json:"amount"`
-	Fee      bitcoin.BTCAmount `json:"fee"`
-	FeeType  string            `json:"fee_type"`
+	Fee      bitcoin.BTCAmount `json:"fee,omitempty"`
+	FeeType  string            `json:"fee_type,omitempty"`
 	Metainfo interface{}       `json:"metainfo"`
 }
 
