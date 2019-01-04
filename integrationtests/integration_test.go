@@ -7,12 +7,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/satori/go.uuid"
-
 	"github.com/onederx/bitcoin-processing/bitcoin"
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
+
+var testDepositAmount = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.5"))
 
 type testMetainfo struct {
 	Testing string `json:"testing"`
@@ -87,6 +86,9 @@ func TestCommonUsage(t *testing.T) {
 	})
 	t.Run("Deposit", func(t *testing.T) {
 		testDeposit(t, env, clientAddress)
+	})
+	t.Run("GetBalanceAfterDeposit", func(t *testing.T) {
+		checkBalance(t, env, testDepositAmount, testDepositAmount)
 	})
 	t.Run("Withdraw", func(t *testing.T) {
 		testWithdraw(t, env)
@@ -179,64 +181,22 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 }
 
 func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
-	depositAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.5"))
 	depositFee := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.004"))
 
 	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
-		clientAddress, depositAmount, depositFee, false,
+		clientAddress, testDepositAmount, depositFee, false,
 	)
 
 	if err != nil {
 		t.Fatalf("Failed to send money from client node for deposit")
 	}
 
-	checkNotificationFieldsForDeposit := func(t *testing.T, n *wallet.TxNotification) {
-		if got, want := n.Address, clientAddress; got != want {
-			t.Errorf("Incorrect address for deposit: expected %s, got %s", want, got)
-		}
-		if got, want := n.Amount, depositAmount; got != want {
-			t.Errorf("Incorrect amount for deposit: expected %s, got %s", want, got)
-		}
-		if got, want := n.Direction, wallet.IncomingDirection; got != want {
-			t.Errorf("Incorrect direction for deposit: expected %s, got %s", want, got)
-		}
-		if got, want := n.Hash, txHash; got != want {
-			t.Errorf("Incorrect tx hash for deposit: expected %s, got %s", want, got)
-		}
-		if got, want := n.IpnType, "deposit"; got != want {
-			t.Errorf("Expected 'ipn_type' field to be '%s', instead got '%s'", want, got)
-		}
-		if got, want := n.Currency, "BTC"; got != want {
-			t.Errorf("Currency should always be '%s', instead got '%s'", want, got)
-		}
-		txIDStr := n.ID.String()
-		if txIDStr == "" || n.IpnID != txIDStr {
-			t.Errorf("Expected tx id and 'ipn_id' field to be equal and nonempty "+
-				"instead they were '%s' and '%s'", txIDStr, n.IpnID)
-		}
-		if n.ColdStorage != false {
-			t.Errorf("Cold storage flag should be empty for any incoming tx, instead it was true")
-		}
-		compareMetainfo(t, n.Metainfo, initialTestMetainfo)
+	tx := &txTestData{
+		address:  clientAddress,
+		amount:   testDepositAmount,
+		hash:     txHash,
+		metainfo: initialTestMetainfo,
 	}
-
-	checkNotificationFieldsForNewDeposit := func(t *testing.T, n *wallet.TxNotification) {
-		checkNotificationFieldsForDeposit(t, n)
-		if got, want := n.BlockHash, ""; got != want {
-			t.Errorf("Expected that block hash for new tx will be empty, instead got %s", got)
-		}
-		if got, want := n.Confirmations, int64(0); got != want {
-			t.Errorf("Expected 0 confirmations for new tx, instead got %d", got)
-		}
-		if got, want := n.StatusCode, 0; got != want {
-			t.Errorf("Expected status code 0 for new incoming tx, instead got %d", got)
-		}
-		if got, want := n.StatusStr, wallet.NewTransaction.String(); got != want {
-			t.Errorf("Expected status name %s for new incoming tx, instead got %s", want, got)
-		}
-	}
-
-	var txID uuid.UUID
 
 	t.Run("NewTransaction", func(t *testing.T) {
 		env.checkNextCallbackRequest(func(req *callbackRequest) {
@@ -254,8 +214,8 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 					t.Fatalf("Failed to deserialize notification data from http "+
 						"callback request body: %v", err)
 				}
-				txID = notification.ID
-				checkNotificationFieldsForNewDeposit(t, notification)
+				tx.id = notification.ID
+				checkNotificationFieldsForNewDeposit(t, notification, tx)
 			})
 		})
 
@@ -266,12 +226,12 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 			if err != nil {
 				t.Fatalf("Failed to deserialize websocket notification about new deposit: %v", err)
 			}
-			if event.Data.ID != txID {
+			if event.Data.ID != tx.id {
 				t.Errorf("Expected that tx id in websocket and http callback "+
 					"notification will be the same, but they are %s %s",
-					txID, event.Data.ID)
+					tx.id, event.Data.ID)
 			}
-			checkNotificationFieldsForNewDeposit(t, event.Data)
+			checkNotificationFieldsForNewDeposit(t, event.Data, tx)
 		})
 	})
 
@@ -281,21 +241,8 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 		t.Fatalf("Failed to mine tx into blockchain: %v", err)
 	}
 
-	checkNotificationFieldsForConfirmedDeposit := func(t *testing.T, n *wallet.TxNotification) {
-		checkNotificationFieldsForDeposit(t, n)
-		if got, want := n.BlockHash, blockHash; got != want {
-			t.Errorf("Expected that block hash will be %s, instead got %s", want, got)
-		}
-		if got, want := n.Confirmations, int64(1); got != want {
-			t.Errorf("Expected %d confirmations for confirmed tx, instead got %d", want, got)
-		}
-		if got, want := n.StatusCode, 100; got != want {
-			t.Errorf("Expected status code %d for confirmed tx, instead got %d", want, got)
-		}
-		if got, want := n.StatusStr, wallet.FullyConfirmedTransaction.String(); got != want {
-			t.Errorf("Expected status name %s for new incoming tx, instead got %s", want, got)
-		}
-	}
+	tx.confirmations = 1
+	tx.blockHash = blockHash
 
 	t.Run("ConfirmedTransaction", func(t *testing.T) {
 		env.checkNextCallbackRequest(func(req *callbackRequest) {
@@ -304,12 +251,12 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 				t.Fatalf("Failed to deserialize notification data from http "+
 					"callback request body: %v", err)
 			}
-			if notification.ID != txID {
+			if notification.ID != tx.id {
 				t.Errorf("Expected that tx id for confirmed tx in http callback "+
 					"data to match id of initial tx, but they are %s %s",
-					notification.ID, txID)
+					notification.ID, tx.id)
 			}
-			checkNotificationFieldsForConfirmedDeposit(t, notification)
+			checkNotificationFieldsForFullyConfirmedDeposit(t, notification, tx)
 		})
 
 		env.websocketListeners[0].checkNextMessage(func(message []byte) {
@@ -318,16 +265,21 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 			if err != nil {
 				t.Fatalf("Failed to deserialize websocket notification about new deposit: %v", err)
 			}
-			if event.Data.ID != txID {
+			if event.Data.ID != tx.id {
 				t.Errorf("Expected that tx id for confirmed tx in websocket "+
 					"notification will match one for initial tx, but they are %s %s",
-					txID, event.Data.ID)
+					tx.id, event.Data.ID)
 			}
-			checkNotificationFieldsForConfirmedDeposit(t, event.Data)
+			checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data, tx)
 		})
 	})
 }
 
 func testWithdraw(t *testing.T, env *testEnvironment) {
-	//http.Post(env.processingUrl("/withdraw"), "application/json")
+	//withdrawFee := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.0001"))
+
+	t.Run("WithoutManualConfirmation", func(t *testing.T) {
+		//withdrawAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.05"))
+		//resp, err := env.processingClient.Withdraw()
+	})
 }

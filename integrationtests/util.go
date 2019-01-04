@@ -1,13 +1,10 @@
 package integrationtests
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"path"
-	"reflect"
-	"testing"
 	"time"
 )
 
@@ -57,34 +54,4 @@ func waitForPort(host string, port uint16) {
 		conn.Close()
 		return nil
 	})
-}
-
-func compareMetainfo(t *testing.T, got, want interface{}) {
-	gotJSON, err := json.MarshalIndent(got, "", "    ")
-	if err != nil {
-		t.Fatalf("Failed to marshal metainfo %#v to JSON for comparison: %s", got, err)
-	}
-	wantJSON, err := json.MarshalIndent(want, "", "    ")
-	if err != nil {
-		t.Fatalf("Failed to marshal metainfo %#v to JSON for comparison: %s", want, err)
-	}
-	gotJSONStr, wantJSONStr := string(gotJSON), string(wantJSON)
-
-	var gotUnified, wantUnified interface{}
-
-	err = json.Unmarshal(gotJSON, &gotUnified)
-
-	if err != nil {
-		t.Fatalf("Failed to unmarshal metainfo %s back from JSON for comparison: %s", gotJSONStr, err)
-	}
-
-	err = json.Unmarshal(wantJSON, &wantUnified)
-
-	if err != nil {
-		t.Fatalf("Failed to unmarshal metainfo %s back from JSON for comparison: %s", wantJSONStr, err)
-	}
-
-	if !reflect.DeepEqual(gotUnified, wantUnified) {
-		t.Fatalf("Unexpected metainfo. Got %s, wanted %s", gotJSONStr, wantJSONStr)
-	}
 }
