@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onederx/bitcoin-processing/api/client"
+	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/util"
 )
 
 func init() {
@@ -18,8 +20,8 @@ func init() {
 		Short: "Subscribe to events via websocket",
 		Run: func(cmd *cobra.Command, args []string) {
 			cli := client.NewClient(apiURL)
-			wsClient, err := cli.NewWebsocketClient(startSeq, func(message []byte) {
-				log.Printf("recv: %s", message)
+			wsClient, err := cli.NewWebsocketClient(startSeq, func(message *events.NotificationWithSeq) {
+				util.MustPrettyPrint(message)
 			})
 
 			if err != nil {

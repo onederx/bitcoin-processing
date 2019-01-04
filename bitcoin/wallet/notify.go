@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"encoding/json"
+
 	"github.com/onederx/bitcoin-processing/events"
 )
 
@@ -11,6 +13,25 @@ type TxNotification struct {
 	IpnType    string `json:"ipn_type"`
 	Currency   string `json:"currency"`
 	IpnID      string `json:"ipn_id"`
+}
+
+func init() {
+	txEvents := []events.EventType{
+		events.NewIncomingTxEvent,
+		events.IncomingTxConfirmedEvent,
+		events.NewOutgoingTxEvent,
+		events.OutgoingTxConfirmedEvent,
+		events.PendingStatusUpdatedEvent,
+		events.PendingTxCancelledEvent,
+	}
+	for _, et := range txEvents {
+		events.RegisterNotificationUnmarshaler(et, func(b []byte) (interface{}, error) {
+			var notification TxNotification
+
+			err := json.Unmarshal(b, &notification)
+			return &notification, err
+		})
+	}
 }
 
 // NotifyTransaction is used to send a notification about a new or updated

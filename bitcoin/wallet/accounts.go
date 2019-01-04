@@ -1,10 +1,25 @@
 package wallet
 
+import (
+	"encoding/json"
+
+	"github.com/onederx/bitcoin-processing/events"
+)
+
 // Account describes user account. It consists of bitcoin address and metainfo
 // supplied when account was created
 type Account struct {
 	Address  string                 `json:"address"`
 	Metainfo map[string]interface{} `json:"metainfo"`
+}
+
+func init() {
+	events.RegisterNotificationUnmarshaler(events.NewAddressEvent, func(b []byte) (interface{}, error) {
+		var account Account
+
+		err := json.Unmarshal(b, &account)
+		return &account, err
+	})
 }
 
 func (w *Wallet) generateNewAddress() (string, error) {

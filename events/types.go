@@ -94,6 +94,8 @@ var eventTypeToStringMap = map[EventType]string{
 
 var stringToEventTypeMap = make(map[string]EventType)
 
+var notificationUnmarshalers = make(map[EventType]func([]byte) (interface{}, error))
+
 func init() {
 	for eventType, eventTypeStr := range eventTypeToStringMap {
 		stringToEventTypeMap[eventTypeStr] = eventType
@@ -135,4 +137,59 @@ func (et *EventType) UnmarshalJSON(b []byte) error {
 	}
 	*et, err = EventTypeFromString(j)
 	return err
+}
+
+func RegisterNotificationUnmarshaler(et EventType, unmarshaler func([]byte) (interface{}, error)) {
+	notificationUnmarshalers[et] = unmarshaler
+}
+
+type genericNodificationData struct {
+	eventType  EventType
+	resultData interface{}
+}
+
+func (n *genericNodificationData) UnmarshalJSON(b []byte) error {
+	unmarshaler, ok := notificationUnmarshalers[n.eventType]
+
+	if !ok {
+		var genericData interface{}
+		err := json.Unmarshal(b, &genericData)
+		if err != nil {
+			return err
+		}
+		n.resultData = genericData
+		return nil
+	}
+	data, err := unmarshaler(b)
+	if err != nil {
+		return err
+	}
+	n.resultData = data
+	return nil
+}
+
+func (n *NotificationWithSeq) UnmarshalJSON(b []byte) error {
+	var notificationWithoutData struct {
+		Type EventType `json:"type"`
+		Seq  int       `json:"seq"`
+	}
+	err := json.Unmarshal(b, &notificationWithoutData)
+
+	if err != nil {
+		return err
+	}
+
+	n.Type = notificationWithoutData.Type
+	n.Seq = notificationWithoutData.Seq
+
+	var notificationWithGenericData struct {
+		Data genericNodificationData `json:"data"`
+	}
+	notificationWithGenericData.Data.eventType = n.Type
+	err = json.Unmarshal(b, &notificationWithGenericData)
+	if err != nil {
+		return err
+	}
+	n.Data = notificationWithGenericData.Data.resultData
+	return nil
 }

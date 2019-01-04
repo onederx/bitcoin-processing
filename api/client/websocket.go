@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onederx/bitcoin-processing/api"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
 type WebsocketClient struct {
@@ -18,7 +19,7 @@ type WebsocketClient struct {
 	owner *Client
 }
 
-func (cli *Client) NewWebsocketClient(startSeq int, messageCb func([]byte)) (*WebsocketClient, error) {
+func (cli *Client) NewWebsocketClient(startSeq int, messageCb func(*events.NotificationWithSeq)) (*WebsocketClient, error) {
 	u, err := url.Parse(cli.apiBaseURL)
 
 	if err != nil {
@@ -42,12 +43,13 @@ func (cli *Client) NewWebsocketClient(startSeq int, messageCb func([]byte)) (*We
 	go func() {
 		defer close(done)
 		for {
-			_, message, err := c.ReadMessage()
+			var notification events.NotificationWithSeq
+			err := c.ReadJSON(&notification)
 			if err != nil {
 				log.Println("read:", err)
 				return
 			}
-			messageCb(message)
+			messageCb(&notification)
 		}
 	}()
 
