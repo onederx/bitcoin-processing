@@ -4,10 +4,10 @@ package integrationtests
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
+	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
 
@@ -119,12 +119,7 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 		if address == "" {
 			t.Fatalf("Generated address is empty")
 		}
-		env.websocketListeners[0].checkNextMessage(func(message []byte) {
-			var event newWalletEvent
-			err := json.Unmarshal(message, &event)
-			if err != nil {
-				t.Fatalf("Failed to JSON-decode WS notification: %v", err)
-			}
+		env.websocketListeners[0].checkNextMessage(func(event *events.NotificationWithSeq) {
 			if got, want := event.Seq, 1; got != want {
 				t.Errorf("Unxpected sequence number of first event: %d", got)
 			}
@@ -132,14 +127,15 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 				t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
 					want, got)
 			}
-			if got, want := event.Data.Address, address; got != want {
+			data := event.Data.(*wallet.Account)
+			if got, want := data.Address, address; got != want {
 				t.Errorf("Expected address from WS notification to be equal "+
 					"to address from API response (%s), but instead got %s",
 					want, got)
 			}
-			if event.Data.Metainfo != nil {
+			if data.Metainfo != nil {
 				t.Errorf("Account metainfo in WS notification unexpectedly non-nil: %v",
-					event.Data.Metainfo)
+					data.Metainfo)
 			}
 		})
 	})
@@ -156,12 +152,7 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 		if clientAddress == "" {
 			t.Fatalf("Generated address is empty")
 		}
-		env.websocketListeners[0].checkNextMessage(func(message []byte) {
-			var event newWalletEvent
-			err := json.Unmarshal(message, &event)
-			if err != nil {
-				t.Fatalf("Failed to JSON-decode WS notification: %v", err)
-			}
+		env.websocketListeners[0].checkNextMessage(func(event *events.NotificationWithSeq) {
 			if got, want := event.Seq, 2; got != want {
 				t.Errorf("Unxpected sequence number of second event: %d", got)
 			}
@@ -169,12 +160,13 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 				t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
 					want, got)
 			}
-			if got, want := event.Data.Address, clientAddress; got != want {
+			data := event.Data.(*wallet.Account)
+			if got, want := data.Address, clientAddress; got != want {
 				t.Errorf("Expected address from WS notification to be equal "+
 					"to address from API response (%s), but instead got %s",
 					want, got)
 			}
-			compareMetainfo(t, event.Data.Metainfo, initialTestMetainfo)
+			compareMetainfo(t, data.Metainfo, initialTestMetainfo)
 		})
 	})
 	return clientAddress
@@ -219,19 +211,14 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 			})
 		})
 
-		env.websocketListeners[0].checkNextMessage(func(message []byte) {
-			var event txEvent
-
-			err := json.Unmarshal(message, &event)
-			if err != nil {
-				t.Fatalf("Failed to deserialize websocket notification about new deposit: %v", err)
-			}
-			if event.Data.ID != tx.id {
+		env.websocketListeners[0].checkNextMessage(func(event *events.NotificationWithSeq) {
+			data := event.Data.(*wallet.TxNotification)
+			if data.ID != tx.id {
 				t.Errorf("Expected that tx id in websocket and http callback "+
 					"notification will be the same, but they are %s %s",
-					tx.id, event.Data.ID)
+					tx.id, data.ID)
 			}
-			checkNotificationFieldsForNewDeposit(t, event.Data, tx)
+			checkNotificationFieldsForNewDeposit(t, data, tx)
 		})
 	})
 
@@ -259,18 +246,14 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 			checkNotificationFieldsForFullyConfirmedDeposit(t, notification, tx)
 		})
 
-		env.websocketListeners[0].checkNextMessage(func(message []byte) {
-			var event txEvent
-			err := json.Unmarshal(message, &event)
-			if err != nil {
-				t.Fatalf("Failed to deserialize websocket notification about new deposit: %v", err)
-			}
-			if event.Data.ID != tx.id {
+		env.websocketListeners[0].checkNextMessage(func(event *events.NotificationWithSeq) {
+			data := event.Data.(*wallet.TxNotification)
+			if data.ID != tx.id {
 				t.Errorf("Expected that tx id for confirmed tx in websocket "+
 					"notification will match one for initial tx, but they are %s %s",
-					tx.id, event.Data.ID)
+					tx.id, data.ID)
 			}
-			checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data, tx)
+			checkNotificationFieldsForFullyConfirmedDeposit(t, data, tx)
 		})
 	})
 }

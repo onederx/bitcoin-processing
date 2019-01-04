@@ -5,18 +5,19 @@ import (
 	"time"
 
 	"github.com/onederx/bitcoin-processing/api/client"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
 type websocketListener struct {
 	wsClient *client.WebsocketClient
 	stopped  bool
 
-	messages chan []byte
+	messages chan *events.NotificationWithSeq
 }
 
 func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener, error) {
 	listener := &websocketListener{
-		messages: make(chan []byte, listenersMessageQueueSize),
+		messages: make(chan *events.NotificationWithSeq, listenersMessageQueueSize),
 	}
 	wsClient, err := e.processingClient.NewWebsocketClient(
 		startSeq, listener.processMessage,
@@ -29,7 +30,7 @@ func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener
 	return listener, nil
 }
 
-func (l *websocketListener) processMessage(message []byte) {
+func (l *websocketListener) processMessage(message *events.NotificationWithSeq) {
 	l.messages <- message
 }
 
@@ -44,7 +45,7 @@ func (l *websocketListener) stop() {
 	log.Printf("Websocket listener stopped")
 }
 
-func (l *websocketListener) checkNextMessage(checker func([]byte)) {
+func (l *websocketListener) checkNextMessage(checker func(*events.NotificationWithSeq)) {
 	select {
 	case msg := <-l.messages:
 		checker(msg)
