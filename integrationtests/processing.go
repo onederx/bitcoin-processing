@@ -36,17 +36,21 @@ bitcoin:
   node:
     address: bitcoin-processing-integration-test-node-our:18443
     user: bitcoinrpc
-    password: TEST_BITCOIN_NODE_PASSWORD`
+    password: TEST_BITCOIN_NODE_PASSWORD
+wallet:
+   min_withdraw_without_manual_confirmation: {{.MinWithdrawWithoutManualConfirmation}}`
 )
 
 type processingSettings struct {
-	MaxConfirmations int
-	CallbackURL      string
+	MaxConfirmations                     int
+	CallbackURL                          string
+	MinWithdrawWithoutManualConfirmation string
 }
 
 var defaultSettings = processingSettings{
-	MaxConfirmations: 1,
-	CallbackURL:      "http://127.0.0.1:9000" + defaultCallbackURLPath,
+	MaxConfirmations:                     1,
+	CallbackURL:                          "http://127.0.0.1:9000" + defaultCallbackURLPath,
+	MinWithdrawWithoutManualConfirmation: "0.1",
 }
 
 func (e *testEnvironment) startProcessingWithDefaultSettings(ctx context.Context) error {
@@ -92,10 +96,7 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 	if err != nil {
 		return err
 	}
-	e.processing = &containerInfo{
-		name: "main",
-		id:   resp.ID,
-	}
+	e.processing = &containerInfo{name: "main", id: resp.ID}
 
 	err = e.cli.ContainerStart(ctx, e.processing.id, types.ContainerStartOptions{})
 	if err != nil {
