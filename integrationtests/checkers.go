@@ -119,7 +119,7 @@ func checkNewTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *tx
 	}
 }
 
-func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
 	if got, want := n.ID, tx.id; got != want {
 		t.Errorf("Expected that tx id will be %s, instead got %s", want, got)
 	}
@@ -132,11 +132,26 @@ func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotificat
 	if got, want := n.Confirmations, tx.confirmations; got != want {
 		t.Errorf("Expected %d confirmations for confirmed tx, instead got %d", want, got)
 	}
+}
+
+func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkConfirmedTxNotificationFields(t, n, tx)
 	if got, want := n.StatusCode, 100; got != want {
 		t.Errorf("Expected status code %d for fully confirmed tx, instead got %d", want, got)
 	}
 	if got, want := n.StatusStr, wallet.FullyConfirmedTransaction.String(); got != want {
-		t.Errorf("Expected status name %s for new incoming tx, instead got %s", want, got)
+		t.Errorf("Expected status name %s for fully confirmed tx, instead got %s", want, got)
+	}
+}
+
+func checkPartiallyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkConfirmedTxNotificationFields(t, n, tx)
+	if !(n.StatusCode > 0 && n.StatusCode < 100) {
+		t.Errorf("Expected status code for partially confirmed tx to be more "+
+			"than 0, but less than 100. Instead got %d", n.StatusCode)
+	}
+	if got, want := n.StatusStr, wallet.ConfirmedTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for confirmed tx, instead got %s", want, got)
 	}
 }
 
@@ -170,6 +185,11 @@ func checkNotificationFieldsForNewDeposit(t *testing.T, n *wallet.TxNotification
 func checkNotificationFieldsForFullyConfirmedDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkFullyConfirmedTxNotificationFields(t, n, tx)
+}
+
+func checkNotificationFieldsForPartiallyConfirmedDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkNotificationFieldsForDeposit(t, n, tx)
+	checkPartiallyConfirmedTxNotificationFields(t, n, tx)
 }
 
 func checkWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, wantRequest *wallet.WithdrawRequest) {
@@ -252,8 +272,18 @@ func checkNotificationFieldsForFullyConfirmedWithdraw(t *testing.T, n *wallet.Tx
 	checkFullyConfirmedTxNotificationFields(t, n, tx)
 }
 
+func checkNotificationFieldsForPartiallyConfirmedWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkNotificationFieldsForWithdraw(t, n, tx)
+	checkPartiallyConfirmedTxNotificationFields(t, n, tx)
+}
+
 func checkNotificationFieldsForFullyConfirmedClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
 	checkNotificationFieldsForFullyConfirmedWithdraw(t, n, tx)
+	checkNotificationFieldsForClientWithdraw(t, n, tx)
+}
+
+func checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkNotificationFieldsForPartiallyConfirmedWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 }
 

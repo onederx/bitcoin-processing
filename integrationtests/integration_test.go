@@ -16,7 +16,12 @@ import (
 
 const zeroBTC = bitcoin.BTCAmount(0)
 
-var testDepositAmount = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.5"))
+var (
+	testDepositAmount   = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.5"))
+	depositFee          = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.004"))
+	withdrawFee         = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.0001"))
+	withdrawAmountSmall = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.05"))
+)
 
 type testMetainfo struct {
 	Testing string `json:"testing"`
@@ -103,6 +108,53 @@ func TestCommonUsage(t *testing.T) {
 	})
 }
 
+func TestMoreConfirmations(t *testing.T) {
+	const neededConfirmations = 4
+
+	ctx := context.Background()
+	env, err := newTestEnvironment(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = env.start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer env.stop(ctx)
+	env.waitForLoad()
+
+	processingSettings := defaultSettings
+
+	processingSettings.MaxConfirmations = neededConfirmations
+	processingSettings.CallbackURL = env.callbackURL
+
+	err = env.startProcessing(ctx, &processingSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer env.stopProcessing(ctx)
+	env.waitForProcessing()
+	_, err = env.newWebsocketListener(0)
+	if err != nil {
+		t.Fatalf("Failed to connect websocket event listener %v", err)
+	}
+
+	clientWallet, err := env.processingClient.NewWallet(nil)
+
+	// skip new wallet notification
+	env.websocketListeners[0].getNextMessageWithTimeout(t)
+
+	t.Run("Deposit", func(t *testing.T) {
+		testDepositSeveralConfirmations(t, env, clientWallet.Address, neededConfirmations)
+	})
+	t.Run("GetBalanceAfterDeposit", func(t *testing.T) {
+		checkBalance(t, env, testDepositAmount, testDepositAmount)
+	})
+	t.Run("Withdraw", func(t *testing.T) {
+		testWithdrawSeveralConfirmations(t, env, neededConfirmations)
+	})
+}
+
 func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
 	hotWalletAddress, err := env.processingClient.GetHotStorageAddress()
 	if err != nil {
@@ -179,8 +231,6 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
 }
 
 func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
-	depositFee := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.004"))
-
 	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
 		clientAddress, testDepositAmount, depositFee, false,
 	)
@@ -227,9 +277,9 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 				tx.id, data.ID)
 		}
 		checkNotificationFieldsForNewDeposit(t, data, tx)
-	})
 
-	checkBalance(t, env, zeroBTC, testDepositAmount)
+		checkBalance(t, env, zeroBTC, testDepositAmount)
+	})
 
 	blockHash, err := env.mineTx(txHash)
 
@@ -241,34 +291,12 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 	tx.blockHash = blockHash
 
 	t.Run("ConfirmedTransaction", func(t *testing.T) {
-		notification := env.getNextCallbackNotificationWithTimeout(t)
-
-		if notification.ID != tx.id {
-			t.Errorf("Expected that tx id for confirmed tx in http callback "+
-				"data to match id of initial tx, but they are %s %s",
-				notification.ID, tx.id)
-		}
-		checkNotificationFieldsForFullyConfirmedDeposit(t, notification, tx)
-
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
-		if got, want := event.Type, events.IncomingTxConfirmedEvent; got != want {
-			t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
-				want, got)
-		}
-		data := event.Data.(*wallet.TxNotification)
-		if data.ID != tx.id {
-			t.Errorf("Expected that tx id for confirmed tx in websocket "+
-				"notification will match one for initial tx, but they are %s %s",
-				tx.id, data.ID)
-		}
-		checkNotificationFieldsForFullyConfirmedDeposit(t, data, tx)
+		testDepositFullyConfirmed(t, env, tx)
 	})
 }
 
 func testWithdraw(t *testing.T, env *testEnvironment) {
-	withdrawFee := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.0001"))
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
-	withdrawAmountSmall := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.05"))
 
 	defaultWithdrawRequest := wallet.WithdrawRequest{
 		Address: withdrawAddress,
@@ -319,7 +347,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		tx.confirmations = 1
 
 		t.Run("ConfirmedTransaction", func(t *testing.T) {
-			testWithdrawConfirmedTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
+			testWithdrawFullyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 		})
 	})
 
@@ -380,7 +408,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		tx.confirmations = 1
 
 		t.Run("ConfirmedTransaction", func(t *testing.T) {
-			testWithdrawConfirmedTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
+			testWithdrawFullyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 		})
 
 		t.Run("CancelInsteadOfConfirming", func(t *testing.T) {
@@ -485,7 +513,23 @@ func testWithdrawNewTransaction(t *testing.T, env *testEnvironment, tx *txTestDa
 		expectedClientBalanceAfterWithdraw)
 }
 
-func testWithdrawConfirmedTransaction(t *testing.T, env *testEnvironment, tx *txTestData, clientBalance *api.BalanceInfo, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+func testWithdrawPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData, clientBalance *api.BalanceInfo, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+	notification := env.getNextCallbackNotificationWithTimeout(t)
+	checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t, notification, tx)
+	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+
+	if got, want := event.Type, events.OutgoingTxConfirmedEvent; got != want {
+		t.Errorf("Expected type of event for confirmed successful withdraw "+
+			"to be %s, instead got %s", want, got)
+	}
+	data := event.Data.(*wallet.TxNotification)
+	checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t, data, tx)
+	checkClientBalanceBecame(t, env,
+		expectedClientBalanceAfterWithdraw,
+		expectedClientBalanceAfterWithdraw)
+}
+
+func testWithdrawFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData, clientBalance *api.BalanceInfo, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
 	notification := env.getNextCallbackNotificationWithTimeout(t)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, tx)
 	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
@@ -518,4 +562,190 @@ func testWithdrawTransactionPendingManualConfirmation(t *testing.T, env *testEnv
 
 	// same balance as before, because this tx is not confirmed yet
 	checkBalance(t, env, ourOldBalance, ourOldBalance)
+}
+
+func testDepositPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData) {
+	notification := env.getNextCallbackNotificationWithTimeout(t)
+
+	if notification.ID != tx.id {
+		t.Errorf("Expected that tx id for confirmed tx in http callback "+
+			"data to match id of initial tx, but they are %s %s",
+			notification.ID, tx.id)
+	}
+	checkNotificationFieldsForPartiallyConfirmedDeposit(t, notification, tx)
+
+	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	if got, want := event.Type, events.IncomingTxConfirmedEvent; got != want {
+		t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
+			want, got)
+	}
+	data := event.Data.(*wallet.TxNotification)
+	if data.ID != tx.id {
+		t.Errorf("Expected that tx id for confirmed tx in websocket "+
+			"notification will match one for initial tx, but they are %s %s",
+			tx.id, data.ID)
+	}
+	checkNotificationFieldsForPartiallyConfirmedDeposit(t, data, tx)
+
+}
+
+func testDepositFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData) {
+	notification := env.getNextCallbackNotificationWithTimeout(t)
+
+	if notification.ID != tx.id {
+		t.Errorf("Expected that tx id for confirmed tx in http callback "+
+			"data to match id of initial tx, but they are %s %s",
+			notification.ID, tx.id)
+	}
+	checkNotificationFieldsForFullyConfirmedDeposit(t, notification, tx)
+
+	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	if got, want := event.Type, events.IncomingTxConfirmedEvent; got != want {
+		t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
+			want, got)
+	}
+	data := event.Data.(*wallet.TxNotification)
+	if data.ID != tx.id {
+		t.Errorf("Expected that tx id for confirmed tx in websocket "+
+			"notification will match one for initial tx, but they are %s %s",
+			tx.id, data.ID)
+	}
+	checkNotificationFieldsForFullyConfirmedDeposit(t, data, tx)
+}
+
+func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientAddress string, neededConfirmations int) {
+	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+		clientAddress, testDepositAmount, depositFee, false,
+	)
+
+	if err != nil {
+		t.Fatalf("Failed to send money from client node for deposit")
+	}
+
+	tx := &txTestData{
+		address:  clientAddress,
+		amount:   testDepositAmount,
+		hash:     txHash,
+		metainfo: nil,
+	}
+
+	t.Run("NewTransaction", func(t *testing.T) {
+		notification := env.getNextCallbackNotificationWithTimeout(t)
+		tx.id = notification.ID
+		checkNotificationFieldsForNewDeposit(t, notification, tx)
+
+		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+		data := event.Data.(*wallet.TxNotification)
+		if got, want := event.Type, events.NewIncomingTxEvent; got != want {
+			t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
+				want, got)
+		}
+		if data.ID != tx.id {
+			t.Errorf("Expected that tx id in websocket and http callback "+
+				"notification will be the same, but they are %s %s",
+				tx.id, data.ID)
+		}
+		checkNotificationFieldsForNewDeposit(t, data, tx)
+
+		checkBalance(t, env, zeroBTC, testDepositAmount)
+	})
+
+	blockHash, err := env.mineTx(txHash)
+
+	if err != nil {
+		t.Fatalf("Failed to mine tx into blockchain: %v", err)
+	}
+
+	tx.confirmations = 1
+	tx.blockHash = blockHash
+
+	t.Run("Confirmation", func(t *testing.T) {
+		testDepositPartiallyConfirmed(t, env, tx)
+
+		for i := 2; i < neededConfirmations; i++ {
+			_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx.confirmations = int64(i)
+			testDepositPartiallyConfirmed(t, env, tx)
+		}
+		_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx.confirmations++
+		testDepositFullyConfirmed(t, env, tx)
+	})
+}
+
+func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, neededConfirmations int) {
+	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
+
+	defaultWithdrawRequest := wallet.WithdrawRequest{
+		Address: withdrawAddress,
+		Amount:  withdrawAmountSmall,
+		Fee:     withdrawFee,
+	}
+
+	clientBalance, err := env.getClientBalance()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if clientBalance.Balance != clientBalance.BalanceWithUnconf {
+		t.Fatalf("Expected client balance to have no uncofirmed part. "+
+			"Instead, confirmed and full balances are %s %s",
+			clientBalance.Balance, clientBalance.BalanceWithUnconf)
+	}
+
+	expectedClientBalanceAfterWithdraw := clientBalance.Balance + withdrawAmountSmall - withdrawFee
+	resp, err := env.processingClient.Withdraw(&defaultWithdrawRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkClientWithdrawRequest(t, resp, &defaultWithdrawRequest)
+
+	tx := &txTestData{
+		id:      resp.ID,
+		address: withdrawAddress,
+		amount:  withdrawAmountSmall,
+		fee:     withdrawFee,
+	}
+
+	t.Run("NewTransaction", func(t *testing.T) {
+		testWithdrawNewTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
+	})
+
+	wantBalance := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.45")) // deposit - withdraw: 0.5 - 0.05
+	checkBalance(t, env, wantBalance, wantBalance)
+
+	tx.blockHash, err = env.mineTx(tx.hash)
+
+	if err != nil {
+		t.Fatalf("Failed to mine tx into blockchain: %v", err)
+	}
+
+	tx.confirmations = 1
+
+	t.Run("Confirmation", func(t *testing.T) {
+		testWithdrawPartiallyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
+
+		for i := 2; i < neededConfirmations; i++ {
+			_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx.confirmations = int64(i)
+			testWithdrawPartiallyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
+		}
+		_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx.confirmations++
+
+		testWithdrawFullyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
+	})
 }
