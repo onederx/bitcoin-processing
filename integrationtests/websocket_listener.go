@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"log"
+	"testing"
 	"time"
 
 	"github.com/onederx/bitcoin-processing/api/client"
@@ -45,11 +46,12 @@ func (l *websocketListener) stop() {
 	log.Printf("Websocket listener stopped")
 }
 
-func (l *websocketListener) checkNextMessage(checker func(*events.NotificationWithSeq)) {
+func (l *websocketListener) getNextMessageWithTimeout(t *testing.T) *events.NotificationWithSeq {
 	select {
 	case msg := <-l.messages:
-		checker(msg)
+		return msg
 	case <-time.After(listenersMessageWaitTimeout):
-		panic("No message arrived before timeout")
+		t.Fatal("No message arrived before timeout")
 	}
+	return nil
 }

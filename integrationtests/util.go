@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"time"
+
+	"testing"
 )
 
 const waitForEventRetries = 120
@@ -22,6 +24,13 @@ func waitForEventOrPanic(callback func() error) {
 	err := waitForEvent(callback)
 	if err != nil {
 		panic(err)
+	}
+}
+
+func waitForEventOrFailTest(t *testing.T, callback func() error) {
+	err := waitForEvent(callback)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -54,4 +63,13 @@ func waitForPort(host string, port uint16) {
 		conn.Close()
 		return nil
 	})
+}
+
+func getNewAddressForWithdrawOrFail(t *testing.T, env *testEnvironment) string {
+	addressDecoded, err := env.regtest["node-client"].nodeAPI.CreateNewAddress()
+
+	if err != nil {
+		t.Fatalf("Failed to request new address from client node: %v", err)
+	}
+	return addressDecoded.EncodeAddress()
 }

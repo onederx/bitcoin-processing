@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"testing"
 	"time"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
@@ -24,6 +25,15 @@ func (c *callbackRequest) unmarshal() (*wallet.TxNotification, error) {
 	var notification wallet.TxNotification
 	err := json.Unmarshal(c.body, &notification)
 	return &notification, err
+}
+
+func (c *callbackRequest) unmarshalOrFail(t *testing.T) *wallet.TxNotification {
+	notification, err := c.unmarshal()
+	if err != nil {
+		t.Fatalf("Failed to deserialize notification data from http "+
+			"callback request body: %v", err)
+	}
+	return notification
 }
 
 func newTestRandomFreePortListener(host string) net.Listener {
@@ -63,11 +73,17 @@ func (e *testEnvironment) stopCallbackListener() {
 	log.Println("Callback listener stopped")
 }
 
-func (e *testEnvironment) checkNextCallbackRequest(checker func(*callbackRequest)) {
+func (e *testEnvironment) getNextCallbackRequestWithTimeout(t *testing.T) *callbackRequest {
 	select {
 	case req := <-e.callbackMessageQueue:
-		checker(req)
+		return req
 	case <-time.After(listenersMessageWaitTimeout):
-		panic("No message arrived before timeout")
+		t.Fatal("No message arrived before timeout")
 	}
+	return nil
+}
+
+func (e *testEnvironment) getNextCallbackNotificationWithTimeout(t *testing.T) *wallet.TxNotification {
+	req := e.getNextCallbackRequestWithTimeout(t)
+	return req.unmarshalOrFail(t)
 }

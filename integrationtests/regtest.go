@@ -9,6 +9,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 
+	"github.com/onederx/bitcoin-processing/api"
+	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/settings"
 )
@@ -264,4 +266,20 @@ func (e *testEnvironment) mineTx(txHash string) (string, error) {
 		return "", err
 	}
 	return generatedBlocks[0], nil
+}
+
+func (e *testEnvironment) getClientBalance() (*api.BalanceInfo, error) {
+	clientNode := e.regtest["node-client"].nodeAPI
+
+	clientBalanceConfU64, clientBalanceUnconfU64, err := clientNode.GetConfirmedAndUnconfirmedBalance()
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := &api.BalanceInfo{
+		Balance:           bitcoin.BTCAmount(clientBalanceConfU64),
+		BalanceWithUnconf: bitcoin.BTCAmount(clientBalanceConfU64 + clientBalanceUnconfU64),
+	}
+	return result, nil
 }
