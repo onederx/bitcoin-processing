@@ -87,24 +87,37 @@ func TestCommonUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect websocket event listener %v", err)
 	}
-	t.Run("HotWalletGenerated", func(t *testing.T) {
+	runSubtest(t, "HotWalletGenerated", func(t *testing.T) {
 		testHotWalletGenerated(t, env)
 	})
-	t.Run("InitialCheckBalanceGivesZero", func(t *testing.T) {
+	runSubtest(t, "InitialCheckBalanceGivesZero", func(t *testing.T) {
 		checkBalance(t, env, zeroBTC, zeroBTC)
 	})
-	var clientAddress string
-	t.Run("GenerateClientWallet", func(t *testing.T) {
-		clientAddress = testGenerateClientWallet(t, env)
+	var clientAccount *wallet.Account
+	runSubtest(t, "GenerateClientWallet", func(t *testing.T) {
+		clientAccount = testGenerateClientWallet(t, env)
 	})
-	t.Run("Deposit", func(t *testing.T) {
-		testDeposit(t, env, clientAddress)
+	runSubtest(t, "Deposit", func(t *testing.T) {
+		testDeposit(t, env, clientAccount.Address)
 	})
-	t.Run("GetBalanceAfterDeposit", func(t *testing.T) {
+	runSubtest(t, "GetBalanceAfterDeposit", func(t *testing.T) {
 		checkBalance(t, env, testDepositAmount, testDepositAmount)
 	})
-	t.Run("Withdraw", func(t *testing.T) {
+	runSubtest(t, "Withdraw", func(t *testing.T) {
 		testWithdraw(t, env)
+	})
+	var accounts []*wallet.Account
+	runSubtest(t, "MultipleAccounts", func(t *testing.T) {
+		accounts = testGenerateMultipleClientWallets(t, env)
+	})
+	runSubtest(t, "MultipleDeposits", func(t *testing.T) {
+		testDepositMultiple(t, env, accounts)
+	})
+	runSubtest(t, "MultipleWithdrawals", func(t *testing.T) {
+		testWithdrawMultiple(t, env)
+	})
+	runSubtest(t, "MultipleDepositsAndWithdrawalsMixed", func(t *testing.T) {
+		testDepositAndWithdrawMultipleMixed(t, env, accounts)
 	})
 }
 
@@ -144,13 +157,13 @@ func TestMoreConfirmations(t *testing.T) {
 	// skip new wallet notification
 	env.websocketListeners[0].getNextMessageWithTimeout(t)
 
-	t.Run("Deposit", func(t *testing.T) {
+	runSubtest(t, "Deposit", func(t *testing.T) {
 		testDepositSeveralConfirmations(t, env, clientWallet.Address, neededConfirmations)
 	})
-	t.Run("GetBalanceAfterDeposit", func(t *testing.T) {
+	runSubtest(t, "GetBalanceAfterDeposit", func(t *testing.T) {
 		checkBalance(t, env, testDepositAmount, testDepositAmount)
 	})
-	t.Run("Withdraw", func(t *testing.T) {
+	runSubtest(t, "Withdraw", func(t *testing.T) {
 		testWithdrawSeveralConfirmations(t, env, neededConfirmations)
 	})
 }
@@ -165,69 +178,80 @@ func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
 	}
 }
 
-func testGenerateClientWallet(t *testing.T, env *testEnvironment) string {
-	var clientAddress string
-	t.Run("EmptyMetainfo", func(t *testing.T) {
-		result, err := env.processingClient.NewWallet(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if result.Metainfo != nil {
-			t.Fatalf("Metainfo unexpectedly non-nil: %v", result.Metainfo)
-		}
-		address := result.Address
-		if address == "" {
-			t.Fatalf("Generated address is empty")
-		}
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
-		if got, want := event.Seq, 1; got != want {
-			t.Errorf("Unxpected sequence number of first event: %d", got)
-		}
-		if got, want := event.Type, events.NewAddressEvent; got != want {
-			t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
-				want, got)
-		}
-		data := event.Data.(*wallet.Account)
-		if got, want := data.Address, address; got != want {
-			t.Errorf("Expected address from WS notification to be equal "+
-				"to address from API response (%s), but instead got %s",
-				want, got)
-		}
-		if data.Metainfo != nil {
-			t.Errorf("Account metainfo in WS notification unexpectedly non-nil: %v",
-				data.Metainfo)
-		}
+func testGenerateClientWallet(t *testing.T, env *testEnvironment) *wallet.Account {
+	var clientAccount *wallet.Account
+	runSubtest(t, "EmptyMetainfo", func(t *testing.T) {
+		testGenerateClientWalletWithMetainfo(t, env, nil, 1)
 	})
-	t.Run("NonEmptyMetainfo", func(t *testing.T) {
-		result, err := env.processingClient.NewWallet(initialTestMetainfo)
-		if err != nil {
-			t.Fatal(err)
-		}
+	runSubtest(t, "NonEmptyMetainfo", func(t *testing.T) {
+		clientAccount = testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, 2)
+	})
+	return clientAccount
+}
+
+func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, metainfo interface{}, seq int) *wallet.Account {
+	result, err := env.processingClient.NewWallet(metainfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metainfo != nil {
 		if result.Metainfo == nil {
 			t.Fatalf("Metainfo unexpectedly nil")
+		} else {
+			compareMetainfo(t, result.Metainfo, metainfo)
 		}
-		compareMetainfo(t, result.Metainfo, initialTestMetainfo)
-		clientAddress = result.Address
-		if clientAddress == "" {
-			t.Fatalf("Generated address is empty")
+	} else if metainfo == nil && result.Metainfo != nil {
+		t.Errorf("Metainfo unexpectedly non-nil: %v", result.Metainfo)
+	}
+	address := result.Address
+	if address == "" {
+		t.Errorf("Generated address is empty")
+	}
+	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	if seq >= 0 {
+		if got, want := event.Seq, seq; got != want {
+			t.Errorf("Unxpected sequence number of second event: %d, wanted %d", got, want)
 		}
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
-		if got, want := event.Seq, 2; got != want {
-			t.Errorf("Unxpected sequence number of second event: %d", got)
-		}
-		if got, want := event.Type, events.NewAddressEvent; got != want {
-			t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
-				want, got)
-		}
-		data := event.Data.(*wallet.Account)
-		if got, want := data.Address, clientAddress; got != want {
-			t.Errorf("Expected address from WS notification to be equal "+
-				"to address from API response (%s), but instead got %s",
-				want, got)
-		}
-		compareMetainfo(t, data.Metainfo, initialTestMetainfo)
-	})
-	return clientAddress
+	}
+	if got, want := event.Type, events.NewAddressEvent; got != want {
+		t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
+			want, got)
+	}
+	data := event.Data.(*wallet.Account)
+	if got, want := data.Address, address; got != want {
+		t.Errorf("Expected address from WS notification to be equal "+
+			"to address from API response (%s), but instead got %s",
+			want, got)
+	}
+	if metainfo != nil {
+		compareMetainfo(t, data.Metainfo, metainfo)
+	}
+	return result
+}
+
+func testGenerateMultipleClientWallets(t *testing.T, env *testEnvironment) []*wallet.Account {
+	type testData struct {
+		ID int `json:"id"`
+	}
+	var result []*wallet.Account
+	testMetainfos := []interface{}{
+		struct {
+			TestTest int        `json:"testtest"`
+			Name     string     `json:"name"`
+			Active   bool       `json:"active"`
+			Info     []testData `json:"info"`
+		}{
+			TestTest: 321,
+			Name:     "Foo Bar",
+			Info:     []testData{testData{ID: 777}, testData{ID: 99}},
+		},
+		nil,
+		initialTestMetainfo,
+	}
+	for _, m := range testMetainfos {
+		result = append(result, testGenerateClientWalletWithMetainfo(t, env, m, -1))
+	}
+	return result
 }
 
 func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
@@ -246,10 +270,10 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 		metainfo: initialTestMetainfo,
 	}
 
-	t.Run("NewTransaction", func(t *testing.T) {
+	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		req := env.getNextCallbackRequestWithTimeout(t)
 
-		t.Run("CallbackMethodAndUrl", func(t *testing.T) {
+		runSubtest(t, "CallbackMethodAndUrl", func(t *testing.T) {
 			if got, want := req.method, "POST"; got != want {
 				t.Errorf("Expected callback request to use method %s, instead was %s", want, got)
 			}
@@ -258,7 +282,7 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 			}
 		})
 
-		t.Run("CallbackNewDepositData", func(t *testing.T) {
+		runSubtest(t, "CallbackNewDepositData", func(t *testing.T) {
 			notification := req.unmarshalOrFail(t)
 
 			tx.id = notification.ID
@@ -290,7 +314,7 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 	tx.confirmations = 1
 	tx.blockHash = blockHash
 
-	t.Run("ConfirmedTransaction", func(t *testing.T) {
+	runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
 		testDepositFullyConfirmed(t, env, tx)
 	})
 }
@@ -316,7 +340,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			clientBalance.Balance, clientBalance.BalanceWithUnconf)
 	}
 
-	t.Run("WithoutManualConfirmation", func(t *testing.T) {
+	runSubtest(t, "WithoutManualConfirmation", func(t *testing.T) {
 		expectedClientBalanceAfterWithdraw := clientBalance.Balance + withdrawAmountSmall - withdrawFee
 		resp, err := env.processingClient.Withdraw(&defaultWithdrawRequest)
 		if err != nil {
@@ -331,7 +355,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			fee:     withdrawFee,
 		}
 
-		t.Run("NewTransaction", func(t *testing.T) {
+		runSubtest(t, "NewTransaction", func(t *testing.T) {
 			testWithdrawNewTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 		})
 
@@ -346,7 +370,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 
 		tx.confirmations = 1
 
-		t.Run("ConfirmedTransaction", func(t *testing.T) {
+		runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
 			testWithdrawFullyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 		})
 	})
@@ -363,7 +387,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			clientBalance.Balance, clientBalance.BalanceWithUnconf)
 	}
 
-	t.Run("WithManualConfirmation", func(t *testing.T) {
+	runSubtest(t, "WithManualConfirmation", func(t *testing.T) {
 		withdrawAmountBig := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.15"))
 		withdrawRequest := defaultWithdrawRequest
 		withdrawRequest.Amount = withdrawAmountBig
@@ -381,12 +405,12 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			fee:     withdrawFee,
 		}
 
-		t.Run("NewTransactionNotConfirmedYet", func(t *testing.T) {
+		runSubtest(t, "NewTransactionNotConfirmedYet", func(t *testing.T) {
 			testWithdrawTransactionPendingManualConfirmation(t, env, tx,
 				bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.45")))
 		})
 		expectedClientBalanceAfterWithdraw := clientBalance.Balance + withdrawAmountBig - withdrawFee
-		t.Run("ManuallyConfirmTransaction", func(t *testing.T) {
+		runSubtest(t, "ManuallyConfirmTransaction", func(t *testing.T) {
 			err := env.processingClient.Confirm(tx.id)
 
 			if err != nil {
@@ -407,11 +431,11 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 
 		tx.confirmations = 1
 
-		t.Run("ConfirmedTransaction", func(t *testing.T) {
+		runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
 			testWithdrawFullyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 		})
 
-		t.Run("CancelInsteadOfConfirming", func(t *testing.T) {
+		runSubtest(t, "CancelInsteadOfConfirming", func(t *testing.T) {
 			resp, err := env.processingClient.Withdraw(&withdrawRequest)
 			if err != nil {
 				t.Fatal(err)
@@ -451,7 +475,11 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		})
 	})
 
-	t.Run("FixedID", func(t *testing.T) {
+	runSubtest(t, "InsufficientFunds", func(t *testing.T) {
+		// TODO
+	})
+
+	runSubtest(t, "FixedID", func(t *testing.T) {
 		req := defaultWithdrawRequest
 		withdrawID := uuid.Must(uuid.FromString("e06ed38b-ff2c-4e3d-885f-135fe6c72625"))
 		req.ID = withdrawID
@@ -475,6 +503,10 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			t.Errorf("Expected withdraw id in http notification to be equal "+
 				"to requested one %s, but got %s", withdrawID, data.ID)
 		}
+		env.mineTx(notification.Hash)
+		// skip corresponding notifications
+		env.getNextCallbackNotificationWithTimeout(t)
+		env.websocketListeners[0].getNextMessageWithTimeout(t)
 	})
 }
 
@@ -629,7 +661,7 @@ func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientA
 		metainfo: nil,
 	}
 
-	t.Run("NewTransaction", func(t *testing.T) {
+	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		notification := env.getNextCallbackNotificationWithTimeout(t)
 		tx.id = notification.ID
 		checkNotificationFieldsForNewDeposit(t, notification, tx)
@@ -659,7 +691,7 @@ func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientA
 	tx.confirmations = 1
 	tx.blockHash = blockHash
 
-	t.Run("Confirmation", func(t *testing.T) {
+	runSubtest(t, "Confirmation", func(t *testing.T) {
 		testDepositPartiallyConfirmed(t, env, tx)
 
 		for i := 2; i < neededConfirmations; i++ {
@@ -714,7 +746,7 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 		fee:     withdrawFee,
 	}
 
-	t.Run("NewTransaction", func(t *testing.T) {
+	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		testWithdrawNewTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 	})
 
@@ -729,7 +761,7 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 
 	tx.confirmations = 1
 
-	t.Run("Confirmation", func(t *testing.T) {
+	runSubtest(t, "Confirmation", func(t *testing.T) {
 		testWithdrawPartiallyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 
 		for i := 2; i < neededConfirmations; i++ {
@@ -748,4 +780,214 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 
 		testWithdrawFullyConfirmed(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 	})
+}
+
+func testDepositMultiple(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
+	const nDeposits = 3
+
+	amounts := []bitcoin.BTCAmount{
+		bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.1")),
+		bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.2")),
+		bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.3")),
+	}
+
+	tests := map[string]bool{"DifferentAddresses": true, "SameAddress": false}
+
+	for testName, useDifferentAddresses := range tests {
+		runSubtest(t, testName, func(t *testing.T) {
+			testDepositMultipleSimultaneous(t, env, accounts, amounts, useDifferentAddresses, nDeposits)
+			testDepositMultipleInterleaved(t, env, accounts, amounts, useDifferentAddresses, nDeposits)
+		})
+	}
+}
+
+func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
+	balanceInfo, err := env.processingClient.GetBalance()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if balanceInfo.Balance != balanceInfo.BalanceWithUnconf {
+		t.Fatalf("Expected that confirmed and uncofirmed balance to be equal "+
+			"by this moment, but they are %s %s", balanceInfo.Balance,
+			balanceInfo.BalanceWithUnconf)
+	}
+
+	balanceByNow := balanceInfo.Balance
+
+	// 0.1 + 0.2 + 0.3 = 0.6
+	balanceAfterDeposit := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
+
+	var address string
+
+	runSubtest(t, "Simultaneous", func(t *testing.T) {
+		var deposits []*txTestData
+		for i := 0; i < nDeposits; i++ {
+			var metainfo interface{}
+			if useDifferentAddresses {
+				address = accounts[i].Address
+				metainfo = accounts[i].Metainfo
+			} else {
+				address = accounts[0].Address
+				metainfo = accounts[0].Metainfo
+			}
+			txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+				address, amounts[i], depositFee, false,
+			)
+			if err != nil {
+				t.Fatalf("Failed to send money from client node for deposit")
+			}
+
+			deposits = append(deposits, &txTestData{
+				address:  address,
+				amount:   amounts[i],
+				hash:     txHash,
+				metainfo: metainfo,
+			})
+		}
+
+		runSubtest(t, "NewTransactions", func(t *testing.T) {
+			httpNotifications, wsNotifications := collectNotifications(t, env, events.NewIncomingTxEvent, nDeposits)
+
+			for _, tx := range deposits {
+				n := findNotificationForTxOrFail(t, httpNotifications, tx)
+				checkNotificationFieldsForNewDeposit(t, n, tx)
+				tx.id = n.ID
+				wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
+				checkNotificationFieldsForNewDeposit(t, wsN, tx)
+			}
+			checkBalance(t, env, balanceByNow, balanceAfterDeposit)
+		})
+		var txHashes []string
+		for _, tx := range deposits {
+			txHashes = append(txHashes, tx.hash)
+		}
+		blockHash, err := env.mineMultipleTxns(txHashes)
+
+		if err != nil {
+			t.Fatalf("Failed to mine tx into blockchain: %v", err)
+		}
+
+		for _, tx := range deposits {
+			tx.confirmations = 1
+			tx.blockHash = blockHash
+		}
+		runSubtest(t, "ConfirmedTxns", func(t *testing.T) {
+			httpNotifications, wsNotifications := collectNotifications(t, env, events.IncomingTxConfirmedEvent, nDeposits)
+
+			for _, tx := range deposits {
+				n := findNotificationForTxOrFail(t, httpNotifications, tx)
+				checkNotificationFieldsForFullyConfirmedDeposit(t, n, tx)
+				wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
+				if n.ID != tx.id {
+					t.Errorf("Expected that tx id for confirmed tx in http callback "+
+						"data to match id of initial tx, but they are %s %s",
+						n.ID, tx.id)
+				}
+
+				if wsN.ID != tx.id {
+					t.Errorf("Expected that tx id for confirmed tx in websocket "+
+						"notification will match one for initial tx, but they are %s %s",
+						tx.id, wsN.ID)
+				}
+				checkNotificationFieldsForFullyConfirmedDeposit(t, wsN, tx)
+			}
+			checkBalance(t, env, balanceAfterDeposit, balanceAfterDeposit)
+		})
+	})
+}
+
+func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
+	balanceInfo, err := env.processingClient.GetBalance()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if balanceInfo.Balance != balanceInfo.BalanceWithUnconf {
+		t.Fatalf("Expected that confirmed and uncofirmed balance to be equal "+
+			"by this moment, but they are %s %s", balanceInfo.Balance,
+			balanceInfo.BalanceWithUnconf)
+	}
+
+	balanceByNow := balanceInfo.Balance
+
+	var txYounger, txOlder *txTestData
+
+	runSubtest(t, "Interleaved", func(t *testing.T) {
+		for i := 0; i < nDeposits; i++ {
+			if txOlder != nil {
+				blockHash, err := env.mineTx(txOlder.hash)
+				if err != nil {
+					t.Fatal(err)
+				}
+				txOlder.blockHash = blockHash
+				txOlder.confirmations = 1
+			}
+			var accountIdx int
+			if useDifferentAddresses {
+				accountIdx = i
+			} else {
+				accountIdx = 0
+			}
+			txYounger = &txTestData{
+				address:  accounts[accountIdx].Address,
+				amount:   amounts[i],
+				metainfo: accounts[accountIdx].Metainfo,
+			}
+			txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+				txYounger.address, txYounger.amount, depositFee, false,
+			)
+			txYounger.hash = txHash
+			if err != nil {
+				t.Fatalf("Failed to send money from client node for deposit")
+			}
+			nEvents := 1
+			if txOlder != nil {
+				nEvents = 2
+			}
+			cbNotifications, wsEvents := collectNotificationsAndEvents(t, env, nEvents)
+			if txOlder != nil {
+				notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
+				checkNotificationFieldsForFullyConfirmedDeposit(t, notification, txOlder)
+				event := findEventWithTypeOrFail(t, wsEvents, events.IncomingTxConfirmedEvent)
+				checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data.(*wallet.TxNotification), txOlder)
+			}
+
+			notification := findNotificationForTxOrFail(t, cbNotifications, txYounger)
+			txYounger.id = notification.ID
+			checkNotificationFieldsForNewDeposit(t, notification, txYounger)
+			event := findEventWithTypeOrFail(t, wsEvents, events.NewIncomingTxEvent)
+			eventData := event.Data.(*wallet.TxNotification)
+			if eventData.ID != txYounger.id {
+				t.Errorf("Expected tx id from cb and ws notification to be "+
+					"equal, but they are %s %s", txYounger.id, eventData.ID)
+			}
+			checkNotificationFieldsForNewDeposit(t, eventData, txYounger)
+			txOlder = txYounger
+		}
+		blockHash, err := env.mineTx(txOlder.hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txOlder.blockHash = blockHash
+		txOlder.confirmations = 1
+		cbNotifications, wsEvents := collectNotificationsAndEvents(t, env, 1)
+		notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
+		checkNotificationFieldsForFullyConfirmedDeposit(t, notification, txOlder)
+		event := findEventWithTypeOrFail(t, wsEvents, events.IncomingTxConfirmedEvent)
+		checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data.(*wallet.TxNotification), txOlder)
+
+		wantBalance := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
+		checkBalance(t, env, wantBalance, wantBalance)
+	})
+}
+
+func testWithdrawMultiple(t *testing.T, env *testEnvironment) {
+	// TODO
+}
+
+func testDepositAndWithdrawMultipleMixed(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
+	// TODO
 }
