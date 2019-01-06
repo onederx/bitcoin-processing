@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/satori/go.uuid"
 
@@ -21,9 +22,9 @@ import (
 // making SQL queries to DB and returning their results.
 type PostgresWalletStorage struct {
 	db                           *sql.DB
-	lastSeenBlockHash            string
-	hotWalletAddress             string
-	moneyRequiredFromColdStorage uint64
+	lastSeenBlockHash            atomic.Value
+	hotWalletAddress             atomic.Value
+	moneyRequiredFromColdStorage *uint64
 }
 
 type queryResult interface {
@@ -58,15 +59,17 @@ func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
 		db: db,
 	}
 
-	storage.lastSeenBlockHash, err = storage.getMeta("last_seen_block_hash", "")
+	lastSeenBlockHash, err := storage.getMeta("last_seen_block_hash", "")
 	if err != nil {
 		panic(err)
 	}
+	storage.lastSeenBlockHash.Store(lastSeenBlockHash)
 
-	storage.hotWalletAddress, err = storage.getMeta("hot_wallet_address", "")
+	hotWalletAddress, err := storage.getMeta("hot_wallet_address", "")
 	if err != nil {
 		panic(err)
 	}
+	storage.hotWalletAddress.Store(hotWalletAddress)
 
 	moneyRequiredFromColdStorageString, err := storage.getMeta(
 		"money_required_from_cold_storage",
@@ -76,11 +79,12 @@ func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
 		panic(err)
 	}
 
-	storage.moneyRequiredFromColdStorage, err = strconv.ParseUint(
+	moneyRequiredFromColdStorageU64, err := strconv.ParseUint(
 		moneyRequiredFromColdStorageString,
 		10,
 		64,
 	)
+	storage.moneyRequiredFromColdStorage = &moneyRequiredFromColdStorageU64
 	if err != nil {
 		panic(err)
 	}
@@ -109,18 +113,18 @@ func (s *PostgresWalletStorage) setMeta(name string, value string) error {
 // by SetLastSeenBlockHash. In case someone connects to DB and manually changes
 // it there, processing won't notice it, so restart will be required to update
 func (s *PostgresWalletStorage) GetLastSeenBlockHash() string {
-	return s.lastSeenBlockHash
+	return s.lastSeenBlockHash.Load().(string)
 }
 
 // SetLastSeenBlockHash sets last seen block hash - a string returned by
 // GetLastSeenBlockHash. The value is written to DB and also stored in memory,
 // so that it's reads do not have to access postgres each time
 func (s *PostgresWalletStorage) SetLastSeenBlockHash(hash string) error {
+	s.lastSeenBlockHash.Store(hash)
 	if err := s.setMeta("last_seen_block_hash", hash); err != nil {
 		return err
 	}
 
-	s.lastSeenBlockHash = hash
 	return nil
 }
 
@@ -420,19 +424,19 @@ func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transac
 // SetHotWalletAddress. This operation always succeeds because hot wallet
 // address is stored in memory in the same way as last seen block hash
 func (s *PostgresWalletStorage) GetHotWalletAddress() string {
-	return s.hotWalletAddress
+	return s.hotWalletAddress.Load().(string)
 }
 
 // SetHotWalletAddress sets hot wallet address - string value returned by
 // GetHotWalletAddress. This operation makes an update in DB and also updates
 // value cached in memory
 func (s *PostgresWalletStorage) SetHotWalletAddress(address string) error {
+	s.hotWalletAddress.Store(address)
 	err := s.setMeta("hot_wallet_address", address)
 	if err != nil {
 		return err
 	}
 
-	s.hotWalletAddress = address
 	return nil
 }
 
@@ -474,13 +478,14 @@ func (s *PostgresWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 // This operation always succeeds because the value is stored in memory in the
 // same way as last seen block hash
 func (s *PostgresWalletStorage) GetMoneyRequiredFromColdStorage() uint64 {
-	return s.moneyRequiredFromColdStorage
+	return atomic.LoadUint64(s.moneyRequiredFromColdStorage)
 }
 
 // SetMoneyRequiredFromColdStorage stores money required to transfer from
 // cold storage - uint64 value returned by GetMoneyRequiredFromColdStorage. The
 // value is updated in DB and in memory
 func (s *PostgresWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) error {
+	atomic.StoreUint64(s.moneyRequiredFromColdStorage, amount)
 	err := s.setMeta(
 		"money_required_from_cold_storage",
 		strconv.FormatUint(amount, 10),
@@ -488,7 +493,6 @@ func (s *PostgresWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) e
 	if err != nil {
 		return err
 	}
-	s.moneyRequiredFromColdStorage = amount
 	return nil
 }
 
