@@ -89,6 +89,9 @@ func TestCommonUsage(t *testing.T) {
 	runSubtest(t, "InitialCheckBalanceGivesZero", func(t *testing.T) {
 		checkBalance(t, env, zeroBTC, zeroBTC)
 	})
+	runSubtest(t, "InitialRequiredFromColdStorageGivsZero", func(t *testing.T) {
+		checkRequiredFromColdStorage(t, env, zeroBTC)
+	})
 	var clientAccount *wallet.Account
 	runSubtest(t, "GenerateClientWallet", func(t *testing.T) {
 		clientAccount = testGenerateClientWallet(t, env)

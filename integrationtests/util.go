@@ -10,6 +10,8 @@ import (
 
 	"github.com/satori/go.uuid"
 
+	"github.com/onederx/bitcoin-processing/api"
+	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
@@ -134,4 +136,33 @@ func collectNotifications(t *testing.T, env *testEnvironment, eventType events.E
 		wsNotifications = append(wsNotifications, event.Data.(*wallet.TxNotification))
 	}
 	return
+}
+
+func stableBalanceOrFail(t *testing.T, name string, bal *api.BalanceInfo) bitcoin.BTCAmount {
+	if bal.Balance != bal.BalanceWithUnconf {
+		t.Fatalf("Expected that confirmed and uncofirmed %s to be equal "+
+			"by this moment, but they are %s %s", name, bal.Balance,
+			bal.BalanceWithUnconf)
+	}
+	return bal.Balance
+}
+
+func getStableBalanceOrFail(t *testing.T, env *testEnvironment) bitcoin.BTCAmount {
+	balanceInfo, err := env.processingClient.GetBalance()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return stableBalanceOrFail(t, "balance", balanceInfo)
+}
+
+func getStableClientBalanceOrFail(t *testing.T, env *testEnvironment) bitcoin.BTCAmount {
+	clientBalance, err := env.getClientBalance()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return stableBalanceOrFail(t, "client balance", clientBalance)
 }

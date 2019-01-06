@@ -208,19 +208,7 @@ func testDepositMultiple(t *testing.T, env *testEnvironment, accounts []*wallet.
 }
 
 func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
-	balanceInfo, err := env.processingClient.GetBalance()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if balanceInfo.Balance != balanceInfo.BalanceWithUnconf {
-		t.Fatalf("Expected that confirmed and uncofirmed balance to be equal "+
-			"by this moment, but they are %s %s", balanceInfo.Balance,
-			balanceInfo.BalanceWithUnconf)
-	}
-
-	balanceByNow := balanceInfo.Balance
+	balanceByNow := getStableBalanceOrFail(t, env)
 
 	// 0.1 + 0.2 + 0.3 = 0.6
 	balanceAfterDeposit := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
@@ -305,19 +293,7 @@ func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, account
 }
 
 func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
-	balanceInfo, err := env.processingClient.GetBalance()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if balanceInfo.Balance != balanceInfo.BalanceWithUnconf {
-		t.Fatalf("Expected that confirmed and uncofirmed balance to be equal "+
-			"by this moment, but they are %s %s", balanceInfo.Balance,
-			balanceInfo.BalanceWithUnconf)
-	}
-
-	balanceByNow := balanceInfo.Balance
+	balanceByNow := getStableBalanceOrFail(t, env)
 
 	var txYounger, txOlder *txTestData
 

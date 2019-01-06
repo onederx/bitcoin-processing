@@ -10,6 +10,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/events"
 )
 
 type txTestData struct {
@@ -67,6 +68,19 @@ func checkBalance(t *testing.T, e *testEnvironment, balance, balanceWithUnconf b
 
 	if got, want := balanceInfo.BalanceWithUnconf, balanceWithUnconf; got != want {
 		t.Errorf("Wrong wallet balance including unconfirmed: expected %s, got %s", want, got)
+	}
+}
+
+func checkRequiredFromColdStorage(t *testing.T, e *testEnvironment, balance bitcoin.BTCAmount) {
+	required, err := e.processingClient.GetRequiredFromColdStorage()
+
+	if err != nil {
+		t.Fatalf("Failed request amount required from cold storage from processing: %v", err)
+	}
+
+	if got, want := required, balance; got != want {
+		t.Errorf("Expected that amount required from cold storage will be %s "+
+			"but got %s", want, got)
 	}
 }
 
@@ -287,7 +301,7 @@ func checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t *testing.T, n 
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 }
 
-func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForAnyPendingWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkUnconfirmedTxNotificationFields(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
@@ -297,18 +311,38 @@ func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n
 			"but got %s", n.ID, tx.id)
 	}
 
-	if got, want := n.StatusStr, wallet.PendingManualConfirmationTransaction.String(); got != want {
-		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
-	}
-
 	if n.Hash != "" {
-		t.Errorf("Expected tx pending manual confirmation to have no "+
-			"bitcoin tx hash, but tx hash is %s", n.Hash)
+		t.Errorf("Expected pending tx to have no bitcoin tx hash, but tx "+
+			"hash is %s", n.Hash)
 	}
 
 	if n.StatusCode >= 100 {
 		t.Errorf("Status code for pending tx should be less than 100, but it "+
 			"is %d", n.StatusCode)
+	}
+}
+
+func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
+
+	if got, want := n.StatusStr, wallet.PendingManualConfirmationTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
+	}
+}
+
+func checkNotificationFieldsForWithdrawPending(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
+
+	if got, want := n.StatusStr, wallet.PendingTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
+	}
+}
+
+func checkNotificationFieldsForWithdrawPendingColdStorage(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
+
+	if got, want := n.StatusStr, wallet.PendingColdStorageTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
 	}
 }
 
@@ -335,4 +369,37 @@ func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNot
 		t.Errorf("Status code for cancelled tx should be less than 100, but it "+
 			"is %d", n.StatusCode)
 	}
+}
+
+func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testEnvironment,
+	notification *wallet.TxNotification, event *events.NotificationWithSeq,
+	tx *txTestData, clientBalance, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+	checkNotificationFieldsForNewClientWithdraw(t, notification, tx)
+
+	if got, want := notification.StatusStr, wallet.NewTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for new outgoing tx, instead got %s", want, got)
+	}
+
+	tx.hash = notification.Hash
+
+	if got, want := event.Type, events.NewOutgoingTxEvent; got != want {
+		t.Errorf("Expected type of event for fresh successful withdraw "+
+			"to be %s, instead got %s", want, got)
+	}
+
+	data := event.Data.(*wallet.TxNotification)
+
+	checkNotificationFieldsForNewClientWithdraw(t, data, tx)
+
+	if got, want := data.StatusStr, wallet.NewTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for new outgoing tx, instead got %s", want, got)
+	}
+
+	if got, want := data.Hash, tx.hash; got != want {
+		t.Errorf("Expected bitcoin tx hash to be equal in http and "+
+			"websocket notification, instead they are %s %s",
+			tx.hash, data.Hash)
+	}
+	checkClientBalanceBecame(t, env, clientBalance,
+		expectedClientBalanceAfterWithdraw)
 }
