@@ -16,13 +16,13 @@ func (cli *Client) GetHotStorageAddress() (string, error) {
 	return result, err
 }
 
-func (cli *Client) GetBalance() (api.BalanceInfo, error) {
+func (cli *Client) GetBalance() (*api.BalanceInfo, error) {
 	var responseData api.BalanceInfo
 
 	err := cli.sendHTTPAPIRequest(api.GetBalanceURL, nil, func(response []byte) error {
 		return json.Unmarshal(response, &responseData)
 	})
-	return responseData, err
+	return &responseData, err
 }
 
 func (cli *Client) GetRequiredFromColdStorage() (bitcoin.BTCAmount, error) {
