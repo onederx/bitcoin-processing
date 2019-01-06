@@ -104,6 +104,8 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 	}
 	e.processing.ip = e.getContainerIP(ctx, resp.ID)
 
+	e.setProcessingAddressForNotifications(e.processing.ip)
+
 	e.processingClient = client.NewClient(e.processingURL("/"))
 
 	log.Printf("processing container started: id=%v", e.processing.id)

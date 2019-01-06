@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -42,8 +43,9 @@ type testEnvironment struct {
 
 	db *containerInfo
 
-	regtest         map[string]*bitcoinNodeContainerInfo
-	regtestIsLoaded chan error
+	regtest          map[string]*bitcoinNodeContainerInfo
+	regtestIsLoaded  chan error
+	notifyScriptFile *os.File
 
 	processing           *containerInfo
 	processingConfigPath string

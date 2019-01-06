@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
+	"strings"
+	"text/template"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -22,7 +26,28 @@ const (
 
 	regtestNodeUser     = "bitcoinrpc"
 	regtestNodePassword = "TEST_BITCOIN_NODE_PASSWORD"
+
+	nodeConfigTemplate = `printtoconsole=1
+rpcuser=bitcoinrpc
+rpcpassword=TEST_BITCOIN_NODE_PASSWORD
+regtest=1
+rpcallowip=0.0.0.0/0
+{{.Additional}}
+
+[regtest]
+{{.Peers}}
+`
+
+	processingNotifyScriptTemplate = `#!/bin/bash -e
+echo "notify about tx $1"
+echo -e "GET /notify_wallet HTTP/1.1\r\nhost: {{.ProcessingAddress}}\r\nConnection: close\r\n\r\n" > /dev/tcp/{{.ProcessingAddress}}/8000
+`
 )
+
+type nodeConfig struct {
+	Peers      string
+	Additional string
+}
 
 var bitcoinNodes = []string{
 	"node-our",
@@ -37,13 +62,50 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 	e.regtest = make(map[string]*bitcoinNodeContainerInfo)
 
 	for _, node := range bitcoinNodes {
+		peers := make([]string, 0)
+		for _, otherNode := range bitcoinNodes {
+			if otherNode != node {
+				peers = append(peers, "addnode="+nodeNamePrefix+otherNode)
+			}
+		}
+		nodeConfigParams := nodeConfig{Peers: strings.Join(peers, "\n")}
+		if node == "node-our" {
+			nodeConfigParams.Additional = "walletnotify=/bin/bash /usr/share/notify-processing.sh %s"
+		}
+		configTempFile, err := ioutil.TempFile("", "")
+		if err != nil {
+			e.stopRegtest(ctx)
+			return err
+		}
+		configTempFilePath := configTempFile.Name()
+
+		defer os.Remove(configTempFilePath)
+		defer configTempFile.Close()
+
+		tmpl := template.Must(template.New("config").Parse(nodeConfigTemplate))
+		tmpl.Execute(configTempFile, nodeConfigParams)
+
+		bindMounts := []string{
+			configTempFilePath + ":/bitcoin/.bitcoin/bitcoin.conf",
+		}
+
+		if node == "node-our" {
+			notifyScriptTempFile, err := ioutil.TempFile("", "")
+			if err != nil {
+				e.stopRegtest(ctx)
+				return err
+			}
+			notifyScriptTempFilePath := notifyScriptTempFile.Name()
+			defer os.Remove(notifyScriptTempFilePath)
+			e.notifyScriptFile = notifyScriptTempFile
+			bindMounts = append(bindMounts, notifyScriptTempFilePath+":/usr/share/notify-processing.sh")
+			bindMounts = append(bindMounts, getFullSourcePath("tools/curl")+":/usr/local/bin/notifyprocessing")
+		}
+
 		hostConfig := &container.HostConfig{
 			NetworkMode: container.NetworkMode(e.network),
 			AutoRemove:  true,
-			Binds: []string{
-				getFullSourcePath("integrationtests/testdata/regtest/"+node+"/bitcoin.conf") +
-					":/bitcoin/.bitcoin/bitcoin.conf",
-			},
+			Binds:       bindMounts,
 		}
 		containerName := nodeNamePrefix + node
 		resp, err := e.cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, containerName)
@@ -69,6 +131,17 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 	e.regtestIsLoaded = make(chan error)
 	go e.initRegtest()
 	return nil
+}
+
+func (e *testEnvironment) setProcessingAddressForNotifications(address string) {
+	templateArgs := struct{ ProcessingAddress string }{ProcessingAddress: address}
+
+	tmpl := template.Must(template.New("notifyscript").Parse(processingNotifyScriptTemplate))
+	_, err := e.notifyScriptFile.Seek(0, 0)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to seek on notify script file %v", err))
+	}
+	tmpl.Execute(e.notifyScriptFile, templateArgs)
 }
 
 type regtestNodeSettings struct {
@@ -198,6 +271,10 @@ func (e *testEnvironment) stopRegtest(ctx context.Context) error {
 		log.Printf("regtest container stopped: id=%v", container.id)
 	}
 	e.regtest = nil
+	if e.notifyScriptFile != nil {
+		e.notifyScriptFile.Close()
+		e.notifyScriptFile = nil
+	}
 	return nil
 }
 
