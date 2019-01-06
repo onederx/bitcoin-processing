@@ -128,19 +128,8 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 				t.Fatalf("Failed to cancel tx pending manual confirmation: %v",
 					err)
 			}
-			notification := env.getNextCallbackNotificationWithTimeout(t)
 
-			checkNotificationFieldsForCancelledWithdrawal(t, notification, tx)
-
-			event := env.websocketListeners[0].getNextMessageWithTimeout(t)
-
-			if got, want := event.Type, events.PendingTxCancelledEvent; got != want {
-				t.Errorf("Expected event type to be %s, but got %s", want, got)
-			}
-
-			data := event.Data.(*wallet.TxNotification)
-
-			checkNotificationFieldsForCancelledWithdrawal(t, data, tx)
+			testWithdrawTransactionCancelled(t, env, tx)
 
 			// same balance as before, because this tx is cancelled
 			checkBalance(t, env, wantBalance, wantBalance)
@@ -183,15 +172,21 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 }
 
 func testWithdrawInsufficientFunds(t *testing.T, env *testEnvironment) {
-	runSubtest(t, "PendingIncomingTxConfirmation", func(t *testing.T) {
-		testWithdrawInsufficientFundsPending(t, env)
-	})
-	runSubtest(t, "PendingColdStorage", func(t *testing.T) {
-		testWithdrawInsufficientFundsPendingColdStorage(t, env)
-	})
+	testNames := map[bool]string{false: "PayMissing", true: "Cancel"}
+	for _, doCancel := range []bool{false, true} {
+		name := testNames[doCancel]
+		runSubtest(t, name, func(t *testing.T) {
+			runSubtest(t, "PendingIncomingTxConfirmation", func(t *testing.T) {
+				testWithdrawInsufficientFundsPending(t, env, doCancel)
+			})
+			runSubtest(t, "PendingColdStorage", func(t *testing.T) {
+				testWithdrawInsufficientFundsPendingColdStorage(t, env, doCancel)
+			})
+		})
+	}
 }
 
-func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment) {
+func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, cancel bool) {
 	ourBalance := getStableBalanceOrFail(t, env)
 	withdrawAmountTooBig := ourBalance + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
 	unconfirmedIncome := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("2"))
@@ -218,24 +213,31 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment) {
 	clientBalance := getStableClientBalanceOrFail(t, env)
 
 	runSubtest(t, "GetTransactionsPending", func(t *testing.T) {
-		txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
-			Status: wallet.PendingTransaction.String(),
-		})
+		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallet.PendingTransaction)
+	})
+
+	if cancel {
+		err := env.processingClient.Cancel(tx.id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, filteredTx := range txns {
-			if filteredTx.ID == tx.id {
-				return
-			}
-		}
-		t.Error("GetTransactions API did not return test pending transaction")
-	})
+		testWithdrawTransactionCancelled(t, env, tx)
+		checkBalance(t, env, ourBalance, ourBalance+unconfirmedIncome)
+	}
 
 	_, err = env.mineTx(unconfirmedIncomeTxHash)
 
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if cancel {
+		// skip notifications from incoming tx confirmation
+		env.getNextCallbackNotificationWithTimeout(t)
+		env.websocketListeners[0].getNextMessageWithTimeout(t)
+		ourBalanceAfterIncome := ourBalance + unconfirmedIncome
+		checkBalance(t, env, ourBalanceAfterIncome, ourBalanceAfterIncome)
+		return
 	}
 
 	notifications, wsEvents := collectNotificationsAndEvents(t, env, 2)
@@ -260,7 +262,7 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment) {
 	testWithdrawFullyConfirmed(t, env, tx, clientBalanceAfterWithdraw)
 }
 
-func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvironment) {
+func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvironment, cancel bool) {
 	ourBalance := getStableBalanceOrFail(t, env)
 	overflowAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
 	withdrawAmountTooBig := ourBalance + overflowAmount
@@ -274,19 +276,19 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 	checkRequiredFromColdStorage(t, env, overflowAmount)
 
 	runSubtest(t, "GetTransactionsPendingColdStorage", func(t *testing.T) {
-		txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
-			Status: wallet.PendingColdStorageTransaction.String(),
-		})
+		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallet.PendingColdStorageTransaction)
+	})
+
+	if cancel {
+		err := env.processingClient.Cancel(tx.id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, filteredTx := range txns {
-			if filteredTx.ID == tx.id {
-				return
-			}
-		}
-		t.Error("GetTransactions API did not return test pending cold storage transaction")
-	})
+		testWithdrawTransactionCancelled(t, env, tx)
+		checkRequiredFromColdStorage(t, env, zeroBTC)
+		checkBalance(t, env, ourBalance, ourBalance)
+		return
+	}
 
 	hsAddress, err := env.processingClient.GetHotStorageAddress()
 
@@ -309,32 +311,10 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 	testWithdrawTransactionPending(t, env, tx, zeroBTC, false)
 
 	runSubtest(t, "GetTransactionsNotPendingColdStorage", func(t *testing.T) {
-		txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
-			Status: wallet.PendingColdStorageTransaction.String(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, filteredTx := range txns {
-			if filteredTx.ID == tx.id {
-				t.Error("GetTransactions API returns test pending cold " +
-					"storage transaction when it should not")
-			}
-		}
+		testGetTransactionsTxNotFoundByStatus(t, env, tx.id, wallet.PendingColdStorageTransaction)
 	})
 	runSubtest(t, "GetTransactionsPending", func(t *testing.T) {
-		txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
-			Status: wallet.PendingTransaction.String(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, filteredTx := range txns {
-			if filteredTx.ID == tx.id {
-				return
-			}
-		}
-		t.Error("GetTransactions API did not return test pending transaction")
+		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallet.PendingTransaction)
 	})
 	checkRequiredFromColdStorage(t, env, zeroBTC)
 
@@ -497,6 +477,22 @@ func testWithdrawTransactionPending(t *testing.T, env *testEnvironment, tx *txTe
 	}
 }
 
+func testWithdrawTransactionCancelled(t *testing.T, env *testEnvironment, tx *txTestData) {
+	notification := env.getNextCallbackNotificationWithTimeout(t)
+
+	checkNotificationFieldsForCancelledWithdrawal(t, notification, tx)
+
+	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+
+	if got, want := event.Type, events.PendingTxCancelledEvent; got != want {
+		t.Errorf("Expected event type to be %s, but got %s", want, got)
+	}
+
+	data := event.Data.(*wallet.TxNotification)
+
+	checkNotificationFieldsForCancelledWithdrawal(t, data, tx)
+}
+
 func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, neededConfirmations int) {
 	clientBalance := getStableClientBalanceOrFail(t, env)
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
@@ -555,6 +551,39 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 
 		testWithdrawFullyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
 	})
+}
+
+func testGetTransactionsTxFoundByStatus(t *testing.T, env *testEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
+	statusStr := status.String()
+	txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
+		Status: statusStr,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, filteredTx := range txns {
+		if filteredTx.ID == txID {
+			return
+		}
+	}
+	t.Error("GetTransactions API did not return test transaction with "+
+		"status %s", statusStr)
+}
+
+func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
+	statusStr := status.String()
+	txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
+		Status: statusStr,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, filteredTx := range txns {
+		if filteredTx.ID == txID {
+			t.Error("GetTransactions API returns tx with status %s "+
+				"when it should not", statusStr)
+		}
+	}
 }
 
 func testWithdrawMultiple(t *testing.T, env *testEnvironment) {
