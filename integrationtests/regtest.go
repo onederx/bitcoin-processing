@@ -268,6 +268,49 @@ func (e *testEnvironment) mineTx(txHash string) (string, error) {
 	return generatedBlocks[0], nil
 }
 
+func (e *testEnvironment) mineMultipleTxns(txHashes []string) (string, error) {
+	miner := e.regtest["node-miner"].nodeAPI
+	log.Printf("Mine tx: waiting for txns %v to get into miner mempool", txHashes)
+	err := waitForEvent(func() error {
+		var response struct {
+			Result []string
+			Error  *nodeapi.JSONRPCError
+		}
+		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(responseJSON, &response)
+		if err != nil {
+			return err
+		}
+		if response.Error != nil {
+			return response.Error
+		}
+		for _, hash := range txHashes {
+			found := false
+			for _, mempoolTxHash := range response.Result {
+				if mempoolTxHash == hash {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("Tx %s not in miner mempool", hash)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	generatedBlocks, err := generateBlocks(miner, 1)
+	if err != nil {
+		return "", err
+	}
+	return generatedBlocks[0], nil
+}
+
 func (e *testEnvironment) getClientBalance() (*api.BalanceInfo, error) {
 	clientNode := e.regtest["node-client"].nodeAPI
 
