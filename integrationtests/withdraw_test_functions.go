@@ -589,5 +589,213 @@ func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testEnvironment, t
 }
 
 func testWithdrawMultiple(t *testing.T, env *testEnvironment) {
-	// TODO
+	const nWithdrawals = 3
+
+	var (
+		amounts   []bitcoin.BTCAmount
+		addresses []string
+	)
+
+	for i := 1; i <= nWithdrawals; i++ {
+		amounts = append(amounts, bitcoin.BTCAmount(i)*bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.01")))
+		addresses = append(addresses, getNewAddressForWithdrawOrFail(t, env))
+	}
+
+	tests := map[string]bool{"DifferentAddresses": true, "SameAddress": false}
+
+	for testName, useDifferentAddresses := range tests {
+		runSubtest(t, testName, func(t *testing.T) {
+			runSubtest(t, "Simultaneous", func(t *testing.T) {
+				testWithdrawMultipleSimultaneous(t, env, addresses, amounts, useDifferentAddresses)
+			})
+			runSubtest(t, "Interleaved", func(t *testing.T) {
+				testWithdrawMultipleInterleaved(t, env, addresses, amounts, useDifferentAddresses)
+			})
+		})
+	}
+}
+
+func testWithdrawMultipleSimultaneous(t *testing.T, env *testEnvironment, addresses []string, amounts []bitcoin.BTCAmount, useDifferentAddresses bool) {
+	balanceByNow := getStableBalanceOrFail(t, env)
+	nWithdrawals := len(amounts)
+
+	totalWithdrawAmount := zeroBTC
+
+	for _, amount := range amounts {
+		totalWithdrawAmount += amount
+	}
+
+	if totalWithdrawAmount > balanceByNow {
+		t.Fatalf("Test assumes wallet has enough money for withdrawals, but "+
+			"current balance is %s, and total withdraw is %s", balanceByNow,
+			totalWithdrawAmount)
+	}
+
+	balanceAfterWithdraw := balanceByNow - totalWithdrawAmount
+
+	var withdrawals []*txTestData
+	var address string
+	for i := 0; i < nWithdrawals; i++ {
+		if useDifferentAddresses {
+			address = addresses[i]
+		} else {
+			address = addresses[0]
+		}
+		withdrawReq := &wallet.WithdrawRequest{
+			Address:  address,
+			Amount:   amounts[i],
+			Fee:      withdrawFee,
+			Metainfo: initialTestMetainfo,
+		}
+		resp, err := env.processingClient.Withdraw(withdrawReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checkClientWithdrawRequest(t, resp, withdrawReq)
+
+		withdrawals = append(withdrawals, &txTestData{
+			id:       resp.ID,
+			address:  address,
+			amount:   amounts[i],
+			metainfo: initialTestMetainfo,
+			fee:      withdrawFee,
+		})
+	}
+	var txHashes []string
+	runSubtest(t, "NewTransactions", func(t *testing.T) {
+		httpNotifications, wsNotifications := collectNotifications(t, env, events.NewOutgoingTxEvent, nWithdrawals)
+
+		for _, tx := range withdrawals {
+			n := findNotificationForTxOrFail(t, httpNotifications, tx)
+			checkNotificationFieldsForNewClientWithdraw(t, n, tx)
+			tx.hash = n.Hash
+			txHashes = append(txHashes, n.Hash)
+			wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
+			checkNotificationFieldsForNewClientWithdraw(t, wsN, tx)
+		}
+		checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
+	})
+	blockHash, err := env.mineMultipleTxns(txHashes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tx := range withdrawals {
+		tx.confirmations = 1
+		tx.blockHash = blockHash
+	}
+	runSubtest(t, "ConfirmedTxns", func(t *testing.T) {
+		httpNotifications, wsNotifications := collectNotifications(t, env, events.OutgoingTxConfirmedEvent, nWithdrawals)
+
+		for _, tx := range withdrawals {
+			n := findNotificationForTxOrFail(t, httpNotifications, tx)
+			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, n, tx)
+			wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
+			if n.ID != tx.id {
+				t.Errorf("Expected that tx id for confirmed tx in http callback "+
+					"data to match id of initial tx, but they are %s %s",
+					n.ID, tx.id)
+			}
+
+			if wsN.ID != tx.id {
+				t.Errorf("Expected that tx id for confirmed tx in websocket "+
+					"notification will match one for initial tx, but they are %s %s",
+					tx.id, wsN.ID)
+			}
+			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, wsN, tx)
+		}
+		checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
+	})
+}
+
+func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, addresses []string, amounts []bitcoin.BTCAmount, useDifferentAddresses bool) {
+	balanceByNow := getStableBalanceOrFail(t, env)
+	nWithdrawals := len(amounts)
+
+	totalWithdrawAmount := zeroBTC
+
+	for _, amount := range amounts {
+		totalWithdrawAmount += amount
+	}
+
+	if totalWithdrawAmount > balanceByNow {
+		t.Fatalf("Test assumes wallet has enough money for withdrawals, but "+
+			"current balance is %s, and total withdraw is %s", balanceByNow,
+			totalWithdrawAmount)
+	}
+
+	balanceAfterWithdraw := balanceByNow - totalWithdrawAmount
+
+	var txYounger, txOlder *txTestData
+
+	for i := 0; i < nWithdrawals; i++ {
+		if txOlder != nil {
+			blockHash, err := env.mineTx(txOlder.hash)
+			if err != nil {
+				t.Fatal(err)
+			}
+			txOlder.blockHash = blockHash
+			txOlder.confirmations = 1
+		}
+		var accountIdx int
+		if useDifferentAddresses {
+			accountIdx = i
+		} else {
+			accountIdx = 0
+		}
+		txYounger = &txTestData{
+			address:  addresses[accountIdx],
+			amount:   amounts[i],
+			metainfo: initialTestMetainfo,
+			fee:      withdrawFee,
+		}
+		withdrawReq := &wallet.WithdrawRequest{
+			Address:  txYounger.address,
+			Amount:   amounts[i],
+			Fee:      withdrawFee,
+			Metainfo: initialTestMetainfo,
+		}
+		resp, err := env.processingClient.Withdraw(withdrawReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkClientWithdrawRequest(t, resp, withdrawReq)
+		txYounger.id = resp.ID
+		nEvents := 1
+		if txOlder != nil {
+			nEvents = 2
+		}
+		cbNotifications, wsEvents := collectNotificationsAndEvents(t, env, nEvents)
+		if txOlder != nil {
+			notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
+			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, txOlder)
+			event := findEventWithTypeOrFail(t, wsEvents, events.OutgoingTxConfirmedEvent)
+			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallet.TxNotification), txOlder)
+		}
+
+		notification := findNotificationForTxOrFail(t, cbNotifications, txYounger)
+		txYounger.hash = notification.Hash
+		checkNotificationFieldsForNewClientWithdraw(t, notification, txYounger)
+		event := findEventWithTypeOrFail(t, wsEvents, events.NewOutgoingTxEvent)
+		eventData := event.Data.(*wallet.TxNotification)
+		if eventData.ID != txYounger.id {
+			t.Errorf("Expected tx id from cb and ws notification to be "+
+				"equal, but they are %s %s", txYounger.id, eventData.ID)
+		}
+		checkNotificationFieldsForNewClientWithdraw(t, eventData, txYounger)
+		txOlder = txYounger
+	}
+	blockHash, err := env.mineTx(txOlder.hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txOlder.blockHash = blockHash
+	txOlder.confirmations = 1
+	cbNotifications, wsEvents := collectNotificationsAndEvents(t, env, 1)
+	notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
+	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, txOlder)
+	event := findEventWithTypeOrFail(t, wsEvents, events.OutgoingTxConfirmedEvent)
+	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallet.TxNotification), txOlder)
+
+	checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
 }
