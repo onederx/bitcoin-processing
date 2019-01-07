@@ -11,21 +11,8 @@ import (
 )
 
 func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
-	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
-		clientAddress, testDepositAmount, depositFee, false,
-	)
-
-	if err != nil {
-		t.Fatalf("Failed to send money from client node for deposit")
-	}
-
-	tx := &txTestData{
-		address:  clientAddress,
-		amount:   testDepositAmount,
-		hash:     txHash,
-		metainfo: initialTestMetainfo,
-	}
-
+	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount)
+	tx.metainfo = initialTestMetainfo
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		req := env.getNextCallbackRequestWithTimeout(t)
 
@@ -61,18 +48,27 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 		checkBalance(t, env, zeroBTC, testDepositAmount)
 	})
 
-	blockHash, err := env.mineTx(txHash)
-
-	if err != nil {
-		t.Fatalf("Failed to mine tx into blockchain: %v", err)
-	}
-
-	tx.confirmations = 1
-	tx.blockHash = blockHash
+	tx.mineOrFail(t, env)
 
 	runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
 		testDepositFullyConfirmed(t, env, tx)
 	})
+}
+
+func testMakeDeposit(t *testing.T, env *testEnvironment, address string, amount bitcoin.BTCAmount) *txTestData {
+	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+		address, amount, depositFee, false,
+	)
+
+	if err != nil {
+		t.Fatalf("Failed to send money from client node for deposit")
+	}
+
+	return &txTestData{
+		address: address,
+		amount:  amount,
+		hash:    txHash,
+	}
 }
 
 func testDepositPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData) {
@@ -125,20 +121,7 @@ func testDepositFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestDat
 }
 
 func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientAddress string, neededConfirmations int) {
-	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
-		clientAddress, testDepositAmount, depositFee, false,
-	)
-
-	if err != nil {
-		t.Fatalf("Failed to send money from client node for deposit")
-	}
-
-	tx := &txTestData{
-		address:  clientAddress,
-		amount:   testDepositAmount,
-		hash:     txHash,
-		metainfo: nil,
-	}
+	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount)
 
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		notification := env.getNextCallbackNotificationWithTimeout(t)
@@ -161,14 +144,7 @@ func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientA
 		checkBalance(t, env, zeroBTC, testDepositAmount)
 	})
 
-	blockHash, err := env.mineTx(txHash)
-
-	if err != nil {
-		t.Fatalf("Failed to mine tx into blockchain: %v", err)
-	}
-
-	tx.confirmations = 1
-	tx.blockHash = blockHash
+	tx.mineOrFail(t, env)
 
 	runSubtest(t, "Confirmation", func(t *testing.T) {
 		testDepositPartiallyConfirmed(t, env, tx)
@@ -215,32 +191,18 @@ func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, account
 	// 0.1 + 0.2 + 0.3 = 0.6
 	balanceAfterDeposit := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
 
-	var address string
-
 	runSubtest(t, "Simultaneous", func(t *testing.T) {
-		var deposits []*txTestData
+		deposits := make(testTxCollection, nDeposits)
 		for i := 0; i < nDeposits; i++ {
-			var metainfo interface{}
+			var account *wallet.Account
 			if useDifferentAddresses {
-				address = accounts[i].Address
-				metainfo = accounts[i].Metainfo
+				account = accounts[i]
 			} else {
-				address = accounts[0].Address
-				metainfo = accounts[0].Metainfo
-			}
-			txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
-				address, amounts[i], depositFee, false,
-			)
-			if err != nil {
-				t.Fatalf("Failed to send money from client node for deposit")
+				account = accounts[0]
 			}
 
-			deposits = append(deposits, &txTestData{
-				address:  address,
-				amount:   amounts[i],
-				hash:     txHash,
-				metainfo: metainfo,
-			})
+			deposits[i] = testMakeDeposit(t, env, account.Address, amounts[i])
+			deposits[i].metainfo = account.Metainfo
 		}
 
 		runSubtest(t, "NewTransactions", func(t *testing.T) {
@@ -255,20 +217,9 @@ func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, account
 			}
 			checkBalance(t, env, balanceByNow, balanceAfterDeposit)
 		})
-		var txHashes []string
-		for _, tx := range deposits {
-			txHashes = append(txHashes, tx.hash)
-		}
-		blockHash, err := env.mineMultipleTxns(txHashes)
 
-		if err != nil {
-			t.Fatalf("Failed to mine tx into blockchain: %v", err)
-		}
+		deposits.mineOrFail(t, env)
 
-		for _, tx := range deposits {
-			tx.confirmations = 1
-			tx.blockHash = blockHash
-		}
 		runSubtest(t, "ConfirmedTxns", func(t *testing.T) {
 			httpNotifications, wsNotifications := collectNotifications(t, env, events.IncomingTxConfirmedEvent, nDeposits)
 
@@ -302,12 +253,7 @@ func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts
 	runSubtest(t, "Interleaved", func(t *testing.T) {
 		for i := 0; i < nDeposits; i++ {
 			if txOlder != nil {
-				blockHash, err := env.mineTx(txOlder.hash)
-				if err != nil {
-					t.Fatal(err)
-				}
-				txOlder.blockHash = blockHash
-				txOlder.confirmations = 1
+				txOlder.mineOrFail(t, env)
 			}
 			var accountIdx int
 			if useDifferentAddresses {
@@ -315,18 +261,10 @@ func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts
 			} else {
 				accountIdx = 0
 			}
-			txYounger = &txTestData{
-				address:  accounts[accountIdx].Address,
-				amount:   amounts[i],
-				metainfo: accounts[accountIdx].Metainfo,
-			}
-			txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
-				txYounger.address, txYounger.amount, depositFee, false,
-			)
-			txYounger.hash = txHash
-			if err != nil {
-				t.Fatalf("Failed to send money from client node for deposit")
-			}
+
+			txYounger = testMakeDeposit(t, env, accounts[accountIdx].Address, amounts[i])
+			txYounger.metainfo = accounts[accountIdx].Metainfo
+
 			nEvents := 1
 			if txOlder != nil {
 				nEvents = 2
@@ -351,12 +289,7 @@ func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts
 			checkNotificationFieldsForNewDeposit(t, eventData, txYounger)
 			txOlder = txYounger
 		}
-		blockHash, err := env.mineTx(txOlder.hash)
-		if err != nil {
-			t.Fatal(err)
-		}
-		txOlder.blockHash = blockHash
-		txOlder.confirmations = 1
+		txOlder.mineOrFail(t, env)
 		cbNotifications, wsEvents := collectNotificationsAndEvents(t, env, 1)
 		notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
 		checkNotificationFieldsForFullyConfirmedDeposit(t, notification, txOlder)

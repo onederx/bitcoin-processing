@@ -25,6 +25,32 @@ type txTestData struct {
 	confirmations int64
 }
 
+func (tx *txTestData) mineOrFail(t *testing.T, e *testEnvironment) {
+	blockHash, err := e.mineTx(tx.hash)
+	if err != nil {
+		t.Fatalf("Failed to mine tx %s into blockchain: %v", tx.hash, err)
+	}
+	tx.blockHash = blockHash
+	tx.confirmations++
+}
+
+type testTxCollection []*txTestData
+
+func (tc testTxCollection) mineOrFail(t *testing.T, e *testEnvironment) {
+	var hashes []string
+	for _, tx := range tc {
+		hashes = append(hashes, tx.hash)
+	}
+	blockHash, err := e.mineMultipleTxns(hashes)
+	if err != nil {
+		t.Fatalf("Failed to mine txns %v into blockchain: %v", hashes, err)
+	}
+	for _, tx := range tc {
+		tx.blockHash = blockHash
+		tx.confirmations++
+	}
+}
+
 func compareMetainfo(t *testing.T, got, want interface{}) {
 	gotJSON, err := json.MarshalIndent(got, "", "    ")
 	if err != nil {

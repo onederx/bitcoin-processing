@@ -166,7 +166,3 @@ func TestMoreConfirmations(t *testing.T) {
 		testWithdrawSeveralConfirmations(t, env, neededConfirmations)
 	})
 }
-
-func testDepositAndWithdrawMultipleMixed(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
-	// TODO
-}

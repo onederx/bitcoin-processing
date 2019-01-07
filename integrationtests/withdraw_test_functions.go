@@ -15,29 +15,12 @@ import (
 
 func testWithdraw(t *testing.T, env *testEnvironment) {
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
-
-	defaultWithdrawRequest := wallet.WithdrawRequest{
-		Address: withdrawAddress,
-		Amount:  withdrawAmountSmall,
-		Fee:     withdrawFee,
-	}
-
 	clientBalance := getStableClientBalanceOrFail(t, env)
 
 	runSubtest(t, "WithoutManualConfirmation", func(t *testing.T) {
 		expectedClientBalanceAfterWithdraw := clientBalance + withdrawAmountSmall - withdrawFee
-		resp, err := env.processingClient.Withdraw(&defaultWithdrawRequest)
-		if err != nil {
-			t.Fatal(err)
-		}
-		checkClientWithdrawRequest(t, resp, &defaultWithdrawRequest)
 
-		tx := &txTestData{
-			id:      resp.ID,
-			address: withdrawAddress,
-			amount:  withdrawAmountSmall,
-			fee:     withdrawFee,
-		}
+		tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountSmall, nil)
 
 		runSubtest(t, "NewTransaction", func(t *testing.T) {
 			testWithdrawNewTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
@@ -46,13 +29,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		wantBalance := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.45")) // deposit - withdraw: 0.5 - 0.05
 		checkBalance(t, env, wantBalance, wantBalance)
 
-		tx.blockHash, err = env.mineTx(tx.hash)
-
-		if err != nil {
-			t.Fatalf("Failed to mine tx into blockchain: %v", err)
-		}
-
-		tx.confirmations = 1
+		tx.mineOrFail(t, env)
 
 		runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
 			testWithdrawFullyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
@@ -63,21 +40,8 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 
 	runSubtest(t, "WithManualConfirmation", func(t *testing.T) {
 		withdrawAmountBig := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.15"))
-		withdrawRequest := defaultWithdrawRequest
-		withdrawRequest.Amount = withdrawAmountBig
 
-		resp, err := env.processingClient.Withdraw(&withdrawRequest)
-		if err != nil {
-			t.Fatal(err)
-		}
-		checkClientWithdrawRequest(t, resp, &withdrawRequest)
-
-		tx := &txTestData{
-			id:      resp.ID,
-			address: withdrawAddress,
-			amount:  withdrawAmountBig,
-			fee:     withdrawFee,
-		}
+		tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountBig, nil)
 
 		runSubtest(t, "NewTransactionNotConfirmedYet", func(t *testing.T) {
 			testWithdrawTransactionPendingManualConfirmation(t, env, tx,
@@ -97,34 +61,17 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		wantBalance := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.3"))
 		checkBalance(t, env, wantBalance, wantBalance)
 
-		tx.blockHash, err = env.mineTx(tx.hash)
-
-		if err != nil {
-			t.Fatalf("Failed to mine tx into blockchain: %v", err)
-		}
-
-		tx.confirmations = 1
+		tx.mineOrFail(t, env)
 
 		runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
 			testWithdrawFullyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
 		})
 
 		runSubtest(t, "CancelInsteadOfConfirming", func(t *testing.T) {
-			resp, err := env.processingClient.Withdraw(&withdrawRequest)
-			if err != nil {
-				t.Fatal(err)
-			}
-			checkClientWithdrawRequest(t, resp, &withdrawRequest)
-
-			tx := &txTestData{
-				id:      resp.ID,
-				address: withdrawAddress,
-				amount:  withdrawAmountBig,
-				fee:     withdrawFee,
-			}
+			tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountBig, nil)
 			testWithdrawTransactionPendingManualConfirmation(t, env, tx,
 				wantBalance, true)
-			err = env.processingClient.Cancel(tx.id)
+			err := env.processingClient.Cancel(tx.id)
 
 			if err != nil {
 				t.Fatalf("Failed to cancel tx pending manual confirmation: %v",
@@ -143,14 +90,18 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 	})
 
 	runSubtest(t, "FixedID", func(t *testing.T) {
-		req := defaultWithdrawRequest
 		withdrawID := uuid.Must(uuid.FromString("e06ed38b-ff2c-4e3d-885f-135fe6c72625"))
-		req.ID = withdrawID
-		resp, err := env.processingClient.Withdraw(&req)
+		req := &wallet.WithdrawRequest{
+			ID:      withdrawID,
+			Amount:  withdrawAmountSmall,
+			Address: withdrawAddress,
+			Fee:     withdrawFee,
+		}
+		resp, err := env.processingClient.Withdraw(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		checkClientWithdrawRequest(t, resp, &req)
+		checkClientWithdrawRequest(t, resp, req)
 		if resp.ID != withdrawID {
 			t.Errorf("Expected resulting withdraw id to be equal to "+
 				"requested one %s, but got %s", withdrawID, resp.ID)
@@ -171,6 +122,25 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		env.getNextCallbackNotificationWithTimeout(t)
 		env.websocketListeners[0].getNextMessageWithTimeout(t)
 	})
+}
+
+func testMakeWithdraw(t *testing.T, env *testEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {
+	req := &wallet.WithdrawRequest{
+		Address: address, Amount: amount, Fee: withdrawFee, Metainfo: metainfo,
+	}
+	resp, err := env.processingClient.Withdraw(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkClientWithdrawRequest(t, resp, req)
+
+	return &txTestData{
+		id:       resp.ID,
+		address:  address,
+		amount:   amount,
+		fee:      withdrawFee,
+		metainfo: metainfo,
+	}
 }
 
 func testWithdrawInsufficientFunds(t *testing.T, env *testEnvironment) {
@@ -252,14 +222,7 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, ca
 	checkNewWithdrawTransactionNotificationAndEvent(t, env, withdrawNotification,
 		withdrawEvent, tx, clientBalance, clientBalanceAfterWithdraw)
 
-	blockHash, err := env.mineTx(tx.hash)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx.blockHash = blockHash
-	tx.confirmations = 1
+	tx.mineOrFail(t, env)
 
 	testWithdrawFullyConfirmed(t, env, tx, clientBalanceAfterWithdraw)
 }
@@ -331,14 +294,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 
 	testWithdrawNewTransaction(t, env, tx, clientBalance, clientBalanceAfterWithdraw)
 
-	blockHash, err := env.mineTx(tx.hash)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx.blockHash = blockHash
-	tx.confirmations = 1
+	tx.mineOrFail(t, env)
 
 	testWithdrawFullyConfirmed(t, env, tx, clientBalanceAfterWithdraw)
 }
@@ -346,26 +302,12 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 func testMakePendingWithdraw(t *testing.T, env *testEnvironment, amount bitcoin.BTCAmount) *txTestData {
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
 
-	resp, err := env.processingClient.Withdraw(&wallet.WithdrawRequest{
-		Address: withdrawAddress,
-		Amount:  amount,
-		Fee:     withdrawFee,
-	})
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := testMakeWithdraw(t, env, withdrawAddress, amount, nil)
 
 	// first, this withdraw will wait for manual confirmation
-	tx := &txTestData{
-		id:      resp.ID,
-		address: withdrawAddress,
-		amount:  amount,
-		fee:     withdrawFee,
-	}
 	testWithdrawTransactionPendingManualConfirmation(t, env, tx, zeroBTC, false)
 
-	err = env.processingClient.Confirm(tx.id)
+	err := env.processingClient.Confirm(tx.id)
 
 	if err != nil {
 		t.Fatal(err)
@@ -498,26 +440,9 @@ func testWithdrawTransactionCancelled(t *testing.T, env *testEnvironment, tx *tx
 func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, neededConfirmations int) {
 	clientBalance := getStableClientBalanceOrFail(t, env)
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
-
-	defaultWithdrawRequest := wallet.WithdrawRequest{
-		Address: withdrawAddress,
-		Amount:  withdrawAmountSmall,
-		Fee:     withdrawFee,
-	}
-
 	expectedClientBalanceAfterWithdraw := clientBalance + withdrawAmountSmall - withdrawFee
-	resp, err := env.processingClient.Withdraw(&defaultWithdrawRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	checkClientWithdrawRequest(t, resp, &defaultWithdrawRequest)
 
-	tx := &txTestData{
-		id:      resp.ID,
-		address: withdrawAddress,
-		amount:  withdrawAmountSmall,
-		fee:     withdrawFee,
-	}
+	tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountSmall, nil)
 
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		testWithdrawNewTransaction(t, env, tx, clientBalance, expectedClientBalanceAfterWithdraw)
@@ -526,13 +451,7 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 	wantBalance := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.45")) // deposit - withdraw: 0.5 - 0.05
 	checkBalance(t, env, wantBalance, wantBalance)
 
-	tx.blockHash, err = env.mineTx(tx.hash)
-
-	if err != nil {
-		t.Fatalf("Failed to mine tx into blockchain: %v", err)
-	}
-
-	tx.confirmations = 1
+	tx.mineOrFail(t, env)
 
 	runSubtest(t, "Confirmation", func(t *testing.T) {
 		testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
@@ -633,7 +552,7 @@ func testWithdrawMultipleSimultaneous(t *testing.T, env *testEnvironment, addres
 
 	balanceAfterWithdraw := balanceByNow - totalWithdrawAmount
 
-	var withdrawals []*txTestData
+	withdrawals := make(testTxCollection, nWithdrawals)
 	var address string
 	for i := 0; i < nWithdrawals; i++ {
 		if useDifferentAddresses {
@@ -641,28 +560,9 @@ func testWithdrawMultipleSimultaneous(t *testing.T, env *testEnvironment, addres
 		} else {
 			address = addresses[0]
 		}
-		withdrawReq := &wallet.WithdrawRequest{
-			Address:  address,
-			Amount:   amounts[i],
-			Fee:      withdrawFee,
-			Metainfo: initialTestMetainfo,
-		}
-		resp, err := env.processingClient.Withdraw(withdrawReq)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		checkClientWithdrawRequest(t, resp, withdrawReq)
-
-		withdrawals = append(withdrawals, &txTestData{
-			id:       resp.ID,
-			address:  address,
-			amount:   amounts[i],
-			metainfo: initialTestMetainfo,
-			fee:      withdrawFee,
-		})
+		withdrawals[i] = testMakeWithdraw(t, env, address, amounts[i],
+			initialTestMetainfo)
 	}
-	var txHashes []string
 	runSubtest(t, "NewTransactions", func(t *testing.T) {
 		httpNotifications, wsNotifications := collectNotifications(t, env, events.NewOutgoingTxEvent, nWithdrawals)
 
@@ -670,20 +570,14 @@ func testWithdrawMultipleSimultaneous(t *testing.T, env *testEnvironment, addres
 			n := findNotificationForTxOrFail(t, httpNotifications, tx)
 			checkNotificationFieldsForNewClientWithdraw(t, n, tx)
 			tx.hash = n.Hash
-			txHashes = append(txHashes, n.Hash)
 			wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
 			checkNotificationFieldsForNewClientWithdraw(t, wsN, tx)
 		}
 		checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
 	})
-	blockHash, err := env.mineMultipleTxns(txHashes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, tx := range withdrawals {
-		tx.confirmations = 1
-		tx.blockHash = blockHash
-	}
+
+	withdrawals.mineOrFail(t, env)
+
 	runSubtest(t, "ConfirmedTxns", func(t *testing.T) {
 		httpNotifications, wsNotifications := collectNotifications(t, env, events.OutgoingTxConfirmedEvent, nWithdrawals)
 
@@ -730,12 +624,7 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, address
 
 	for i := 0; i < nWithdrawals; i++ {
 		if txOlder != nil {
-			blockHash, err := env.mineTx(txOlder.hash)
-			if err != nil {
-				t.Fatal(err)
-			}
-			txOlder.blockHash = blockHash
-			txOlder.confirmations = 1
+			txOlder.mineOrFail(t, env)
 		}
 		var accountIdx int
 		if useDifferentAddresses {
@@ -743,24 +632,8 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, address
 		} else {
 			accountIdx = 0
 		}
-		txYounger = &txTestData{
-			address:  addresses[accountIdx],
-			amount:   amounts[i],
-			metainfo: initialTestMetainfo,
-			fee:      withdrawFee,
-		}
-		withdrawReq := &wallet.WithdrawRequest{
-			Address:  txYounger.address,
-			Amount:   amounts[i],
-			Fee:      withdrawFee,
-			Metainfo: initialTestMetainfo,
-		}
-		resp, err := env.processingClient.Withdraw(withdrawReq)
-		if err != nil {
-			t.Fatal(err)
-		}
-		checkClientWithdrawRequest(t, resp, withdrawReq)
-		txYounger.id = resp.ID
+		txYounger = testMakeWithdraw(t, env, addresses[accountIdx], amounts[i], initialTestMetainfo)
+
 		nEvents := 1
 		if txOlder != nil {
 			nEvents = 2
@@ -785,12 +658,7 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, address
 		checkNotificationFieldsForNewClientWithdraw(t, eventData, txYounger)
 		txOlder = txYounger
 	}
-	blockHash, err := env.mineTx(txOlder.hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	txOlder.blockHash = blockHash
-	txOlder.confirmations = 1
+	txOlder.mineOrFail(t, env)
 	cbNotifications, wsEvents := collectNotificationsAndEvents(t, env, 1)
 	notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, txOlder)
