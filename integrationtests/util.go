@@ -36,6 +36,7 @@ func waitForEventOrPanic(callback func() error) {
 func waitForEventOrFailTest(t *testing.T, callback func() error) {
 	err := waitForEvent(callback)
 	if err != nil {
+		t.Helper()
 		t.Fatal(err)
 	}
 }
@@ -75,6 +76,7 @@ func getNewAddressForWithdrawOrFail(t *testing.T, env *testEnvironment) string {
 	addressDecoded, err := env.regtest["node-client"].nodeAPI.CreateNewAddress()
 
 	if err != nil {
+		t.Helper()
 		t.Fatalf("Failed to request new address from client node: %v", err)
 	}
 	return addressDecoded.EncodeAddress()
@@ -102,7 +104,9 @@ func findNotificationForTxOrFail(t *testing.T, notifications []*wallet.TxNotific
 			return n
 		}
 	}
-	t.Fatal("Failed to relevant notification")
+	t.Helper()
+	t.Fatalf("Failed to find relevant notification for tx id %s hash %s "+
+		"address %s amount %s", tx.id, tx.hash, tx.address, tx.amount)
 	return nil
 }
 
@@ -112,11 +116,13 @@ func findEventWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, e
 			return e
 		}
 	}
+	t.Helper()
 	t.Fatalf("Failed to find event with requested type %s", et)
 	return nil
 }
 
 func collectNotificationsAndEvents(t *testing.T, env *testEnvironment, n int) (httpNotifications []*wallet.TxNotification, wsEvents []*events.NotificationWithSeq) {
+	t.Helper()
 	for i := 0; i < n; i++ {
 		httpNotifications = append(httpNotifications, env.getNextCallbackNotificationWithTimeout(t))
 		wsEvents = append(wsEvents, env.websocketListeners[0].getNextMessageWithTimeout(t))
@@ -125,6 +131,7 @@ func collectNotificationsAndEvents(t *testing.T, env *testEnvironment, n int) (h
 }
 
 func collectNotifications(t *testing.T, env *testEnvironment, eventType events.EventType, n int) (httpNotifications []*wallet.TxNotification, wsNotifications []*wallet.TxNotification) {
+	t.Helper()
 	for i := 0; i < n; i++ {
 		httpNotifications = append(httpNotifications, env.getNextCallbackNotificationWithTimeout(t))
 		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
@@ -140,6 +147,7 @@ func collectNotifications(t *testing.T, env *testEnvironment, eventType events.E
 
 func stableBalanceOrFail(t *testing.T, name string, bal *api.BalanceInfo) bitcoin.BTCAmount {
 	if bal.Balance != bal.BalanceWithUnconf {
+		t.Helper()
 		t.Fatalf("Expected that confirmed and uncofirmed %s to be equal "+
 			"by this moment, but they are %s %s", name, bal.Balance,
 			bal.BalanceWithUnconf)
@@ -151,6 +159,7 @@ func getStableBalanceOrFail(t *testing.T, env *testEnvironment) bitcoin.BTCAmoun
 	balanceInfo, err := env.processingClient.GetBalance()
 
 	if err != nil {
+		t.Helper()
 		t.Fatal(err)
 	}
 
@@ -161,6 +170,7 @@ func getStableClientBalanceOrFail(t *testing.T, env *testEnvironment) bitcoin.BT
 	clientBalance, err := env.getClientBalance()
 
 	if err != nil {
+		t.Helper()
 		t.Fatal(err)
 	}
 
