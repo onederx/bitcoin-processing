@@ -13,6 +13,7 @@ type TxNotification struct {
 	IpnType    string `json:"ipn_type"`
 	Currency   string `json:"currency"`
 	IpnID      string `json:"ipn_id"`
+	Seq        int    `json:"seq,omitempty"`
 }
 
 func init() {
