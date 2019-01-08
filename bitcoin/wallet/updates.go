@@ -50,6 +50,13 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 		// other goroutines process notification
 		notification := *tx
 		notification.Confirmations = i // Send confirmations sequentially
+
+		if i == 0 {
+			// in case this tx is already confirmed (fresh tx event was missed)
+			// block hash will be set - make it empty so that tx in notification
+			// looks like unconfirmed one
+			notification.BlockHash = ""
+		}
 		w.setTxStatusByConfirmations(&notification)
 
 		w.NotifyTransaction(eventType, notification)
