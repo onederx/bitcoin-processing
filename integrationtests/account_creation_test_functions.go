@@ -9,7 +9,7 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
-func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
+func testHotWalletGenerated(t *testing.T, env *testEnvironment) string {
 	hotWalletAddress, err := env.processingClient.GetHotStorageAddress()
 	if err != nil {
 		t.Fatalf("Failed to request hot wallet address %v", err)
@@ -17,6 +17,7 @@ func testHotWalletGenerated(t *testing.T, env *testEnvironment) {
 	if hotWalletAddress == "" {
 		t.Fatalf("Hot wallet address from get_hot_storage_address API is empty")
 	}
+	return hotWalletAddress
 }
 
 func testGenerateClientWallet(t *testing.T, env *testEnvironment) *wallet.Account {
@@ -30,7 +31,7 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) *wallet.Accoun
 	return clientAccount
 }
 
-func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, metainfo interface{}, seq int) *wallet.Account {
+func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, metainfo interface{}, checkSeq int) *wallet.Account {
 	result, err := env.processingClient.NewWallet(metainfo)
 	if err != nil {
 		t.Fatal(err)
@@ -49,8 +50,8 @@ func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, me
 		t.Errorf("Generated address is empty")
 	}
 	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
-	if seq >= 0 {
-		if got, want := event.Seq, seq; got != want {
+	if checkSeq >= 0 {
+		if got, want := event.Seq, checkSeq; got != want {
 			t.Errorf("Unxpected sequence number of second event: %d, wanted %d", got, want)
 		}
 	}

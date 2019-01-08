@@ -3,6 +3,7 @@
 package integrationtests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
@@ -11,8 +12,7 @@ import (
 )
 
 func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
-	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount)
-	tx.metainfo = initialTestMetainfo
+	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount, initialTestMetainfo)
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		req := env.getNextCallbackRequestWithTimeout(t)
 
@@ -55,7 +55,7 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 	})
 }
 
-func testMakeDeposit(t *testing.T, env *testEnvironment, address string, amount bitcoin.BTCAmount) *txTestData {
+func testMakeDeposit(t *testing.T, env *testEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {
 	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
 		address, amount, depositFee, false,
 	)
@@ -65,9 +65,10 @@ func testMakeDeposit(t *testing.T, env *testEnvironment, address string, amount 
 	}
 
 	return &txTestData{
-		address: address,
-		amount:  amount,
-		hash:    txHash,
+		address:  address,
+		amount:   amount,
+		hash:     txHash,
+		metainfo: metainfo,
 	}
 }
 
@@ -121,7 +122,7 @@ func testDepositFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestDat
 }
 
 func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientAddress string, neededConfirmations int) {
-	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount)
+	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount, nil)
 
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
 		notification := env.getNextCallbackNotificationWithTimeout(t)
@@ -201,8 +202,7 @@ func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, account
 				account = accounts[0]
 			}
 
-			deposits[i] = testMakeDeposit(t, env, account.Address, amounts[i])
-			deposits[i].metainfo = account.Metainfo
+			deposits[i] = testMakeDeposit(t, env, account.Address, amounts[i], account.Metainfo)
 		}
 
 		runSubtest(t, "NewTransactions", func(t *testing.T) {
@@ -262,8 +262,7 @@ func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts
 				accountIdx = 0
 			}
 
-			txYounger = testMakeDeposit(t, env, accounts[accountIdx].Address, amounts[i])
-			txYounger.metainfo = accounts[accountIdx].Metainfo
+			txYounger = testMakeDeposit(t, env, accounts[accountIdx].Address, amounts[i], accounts[accountIdx].Metainfo)
 
 			nEvents := 1
 			if txOlder != nil {
@@ -298,5 +297,47 @@ func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts
 
 		wantBalance := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
 		checkBalance(t, env, wantBalance, wantBalance)
+	})
+}
+
+func testSendFundsToHotWallet(t *testing.T, env *testEnvironment, hotWalletAddress string) {
+	balance := getStableBalanceOrFail(t, env)
+	hotWalletIncome := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.3"))
+	expectedBalanceAfterIncome := balance + hotWalletIncome
+
+	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+		hotWalletAddress, hotWalletIncome, depositFee, false,
+	)
+	waitForEventOrFailTest(t, func() error {
+		balanceInfo, err := env.processingClient.GetBalance()
+
+		if err != nil {
+			return err
+		}
+
+		if balanceInfo.BalanceWithUnconf == expectedBalanceAfterIncome {
+			return nil
+		}
+		return fmt.Errorf("Expected unconfirmed wallet balance to become %s "+
+			"after tx sending money to hot wallet address was created, but "+
+			"it is %s", expectedBalanceAfterIncome, balanceInfo.BalanceWithUnconf)
+	})
+	_, err = env.mineTx(txHash)
+	if err != nil {
+		t.Fatalf("Failed to mine tx %s into blockchain: %v", txHash, err)
+	}
+	waitForEventOrFailTest(t, func() error {
+		balanceInfo, err := env.processingClient.GetBalance()
+
+		if err != nil {
+			return err
+		}
+
+		if balanceInfo.Balance == expectedBalanceAfterIncome {
+			return nil
+		}
+		return fmt.Errorf("Expected confirmed wallet balance to become %s "+
+			"after tx sending money to hot wallet address was mined, but "+
+			"it is %s", expectedBalanceAfterIncome, balanceInfo.Balance)
 	})
 }

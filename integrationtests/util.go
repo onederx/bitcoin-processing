@@ -106,7 +106,8 @@ func findNotificationForTxOrFail(t *testing.T, notifications []*wallet.TxNotific
 	}
 	t.Helper()
 	t.Fatalf("Failed to find relevant notification for tx id %s hash %s "+
-		"address %s amount %s", tx.id, tx.hash, tx.address, tx.amount)
+		"address %s amount %s.", tx.id, tx.hash,
+		tx.address, tx.amount)
 	return nil
 }
 
@@ -121,11 +122,33 @@ func findEventWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, e
 	return nil
 }
 
+func findAllEventsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType, n int) (result []*events.NotificationWithSeq) {
+	for _, e := range evts {
+		if e.Type == et {
+			result = append(result, e)
+		}
+		if len(result) >= n {
+			return
+		}
+	}
+	t.Helper()
+	t.Fatalf("Failed to find %d events with requested type %s", n, et)
+	return nil
+}
+
 func collectNotificationsAndEvents(t *testing.T, env *testEnvironment, n int) (httpNotifications []*wallet.TxNotification, wsEvents []*events.NotificationWithSeq) {
 	t.Helper()
 	for i := 0; i < n; i++ {
 		httpNotifications = append(httpNotifications, env.getNextCallbackNotificationWithTimeout(t))
 		wsEvents = append(wsEvents, env.websocketListeners[0].getNextMessageWithTimeout(t))
+	}
+	return
+}
+
+func findAllWsNotificationsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType, n int) (wsNotifications []*wallet.TxNotification) {
+	t.Helper()
+	for _, event := range findAllEventsWithTypeOrFail(t, evts, et, n) {
+		wsNotifications = append(wsNotifications, event.Data.(*wallet.TxNotification))
 	}
 	return
 }

@@ -83,8 +83,9 @@ func TestCommonUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect websocket event listener %v", err)
 	}
+	var hotWalletAddress string
 	runSubtest(t, "HotWalletGenerated", func(t *testing.T) {
-		testHotWalletGenerated(t, env)
+		hotWalletAddress = testHotWalletGenerated(t, env)
 	})
 	runSubtest(t, "InitialCheckBalanceGivesZero", func(t *testing.T) {
 		checkBalance(t, env, zeroBTC, zeroBTC)
@@ -105,6 +106,9 @@ func TestCommonUsage(t *testing.T) {
 	runSubtest(t, "Withdraw", func(t *testing.T) {
 		testWithdraw(t, env)
 	})
+	runSubtest(t, "SendFundsToHotWallet", func(t *testing.T) {
+		testSendFundsToHotWallet(t, env, hotWalletAddress)
+	})
 	var accounts []*wallet.Account
 	runSubtest(t, "MultipleAccounts", func(t *testing.T) {
 		accounts = testGenerateMultipleClientWallets(t, env)
@@ -117,6 +121,15 @@ func TestCommonUsage(t *testing.T) {
 	})
 	runSubtest(t, "MultipleDepositsAndWithdrawalsMixed", func(t *testing.T) {
 		testDepositAndWithdrawMultipleMixed(t, env, accounts)
+	})
+	runSubtest(t, "MissedEvents", func(t *testing.T) {
+		testProcessingCatchesMissedEvents(t, env, ctx, accounts)
+	})
+	runSubtest(t, "WebsocketListeners", func(t *testing.T) {
+		// TODO
+	})
+	runSubtest(t, "WithdrawToColdStorage", func(t *testing.T) {
+		// TODO
 	})
 }
 
