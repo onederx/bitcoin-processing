@@ -26,6 +26,7 @@ type txTestData struct {
 }
 
 func (tx *txTestData) mineOrFail(t *testing.T, e *testEnvironment) {
+	t.Helper()
 	blockHash, err := e.mineTx(tx.hash)
 	if err != nil {
 		t.Fatalf("Failed to mine tx %s into blockchain: %v", tx.hash, err)
@@ -37,6 +38,7 @@ func (tx *txTestData) mineOrFail(t *testing.T, e *testEnvironment) {
 type testTxCollection []*txTestData
 
 func (tc testTxCollection) mineOrFail(t *testing.T, e *testEnvironment) {
+	t.Helper()
 	var hashes []string
 	for _, tx := range tc {
 		hashes = append(hashes, tx.hash)
@@ -52,6 +54,7 @@ func (tc testTxCollection) mineOrFail(t *testing.T, e *testEnvironment) {
 }
 
 func compareMetainfo(t *testing.T, got, want interface{}) {
+	t.Helper()
 	gotJSON, err := json.MarshalIndent(got, "", "    ")
 	if err != nil {
 		t.Fatalf("Failed to marshal metainfo %#v to JSON for comparison: %s", got, err)
@@ -82,6 +85,7 @@ func compareMetainfo(t *testing.T, got, want interface{}) {
 }
 
 func checkBalance(t *testing.T, e *testEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
+	t.Helper()
 	balanceInfo, err := e.processingClient.GetBalance()
 
 	if err != nil {
@@ -98,6 +102,7 @@ func checkBalance(t *testing.T, e *testEnvironment, balance, balanceWithUnconf b
 }
 
 func checkRequiredFromColdStorage(t *testing.T, e *testEnvironment, balance bitcoin.BTCAmount) {
+	t.Helper()
 	required, err := e.processingClient.GetRequiredFromColdStorage()
 
 	if err != nil {
@@ -111,6 +116,7 @@ func checkRequiredFromColdStorage(t *testing.T, e *testEnvironment, balance bitc
 }
 
 func checkClientBalanceBecame(t *testing.T, e *testEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
+	t.Helper()
 	waitForEventOrFailTest(t, func() error {
 		clientBalance, err := e.getClientBalance()
 		if err != nil {
@@ -129,6 +135,7 @@ func checkClientBalanceBecame(t *testing.T, e *testEnvironment, balance, balance
 }
 
 func checkTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	if got, want := n.Amount, tx.amount; got != want {
 		t.Errorf("Incorrect amount for tx: expected %s, got %s", want, got)
 	}
@@ -144,6 +151,7 @@ func checkTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTes
 }
 
 func checkUnconfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	if got, want := n.BlockHash, ""; got != want {
 		t.Errorf("Expected that block hash for new tx will be empty, instead got %s", got)
 	}
@@ -153,6 +161,7 @@ func checkUnconfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification
 }
 
 func checkNewTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkUnconfirmedTxNotificationFields(t, n, tx)
 	if got, want := n.StatusCode, 0; got != want {
 		t.Errorf("Expected status code 0 for new tx, instead got %d", got)
@@ -160,6 +169,7 @@ func checkNewTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *tx
 }
 
 func checkConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	if got, want := n.ID, tx.id; got != want {
 		t.Errorf("Expected that tx id will be %s, instead got %s", want, got)
 	}
@@ -175,6 +185,7 @@ func checkConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, 
 }
 
 func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkConfirmedTxNotificationFields(t, n, tx)
 	if got, want := n.StatusCode, 100; got != want {
 		t.Errorf("Expected status code %d for fully confirmed tx, instead got %d", want, got)
@@ -185,6 +196,7 @@ func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotificat
 }
 
 func checkPartiallyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkConfirmedTxNotificationFields(t, n, tx)
 	if !(n.StatusCode > 0 && n.StatusCode < 100) {
 		t.Errorf("Expected status code for partially confirmed tx to be more "+
@@ -196,6 +208,7 @@ func checkPartiallyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotif
 }
 
 func checkNotificationFieldsForDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkTxNotificationFields(t, n, tx)
 	if got, want := n.Address, tx.address; got != want {
 		t.Errorf("Incorrect address for deposit: expected %s, got %s", want, got)
@@ -215,6 +228,7 @@ func checkNotificationFieldsForDeposit(t *testing.T, n *wallet.TxNotification, t
 }
 
 func checkNotificationFieldsForNewDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkNewTxNotificationFields(t, n, tx)
 	if got, want := n.StatusStr, wallet.NewTransaction.String(); got != want {
@@ -223,16 +237,19 @@ func checkNotificationFieldsForNewDeposit(t *testing.T, n *wallet.TxNotification
 }
 
 func checkNotificationFieldsForFullyConfirmedDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkFullyConfirmedTxNotificationFields(t, n, tx)
 }
 
 func checkNotificationFieldsForPartiallyConfirmedDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkPartiallyConfirmedTxNotificationFields(t, n, tx)
 }
 
 func checkWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, wantRequest *wallet.WithdrawRequest) {
+	t.Helper()
 	if got, want := gotRequest.Amount, wantRequest.Amount; got != want {
 		t.Errorf("Expected resulting amount to equal requested one %s, but got %s",
 			want, got)
@@ -247,6 +264,7 @@ func checkWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, want
 }
 
 func checkClientWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, wantRequest *wallet.WithdrawRequest) {
+	t.Helper()
 	checkWithdrawRequest(t, gotRequest, wantRequest)
 	if got, want := gotRequest.Address, wantRequest.Address; got != want {
 		t.Errorf("Expected resulting address to equal requested one %s, but got %s",
@@ -255,6 +273,7 @@ func checkClientWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest
 }
 
 func checkCSWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, wantRequest *wallet.WithdrawRequest, defaultCSAddress string) {
+	t.Helper()
 	checkWithdrawRequest(t, gotRequest, wantRequest)
 	if wantRequest.Address == "" {
 		if got, want := gotRequest.Address, defaultCSAddress; got != want {
@@ -271,6 +290,7 @@ func checkCSWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, wa
 }
 
 func checkNotificationFieldsForWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkTxNotificationFields(t, n, tx)
 	if got, want := n.Direction, wallet.OutgoingDirection; got != want {
 		t.Errorf("Incorrect direction for withdraw: expected %s, got %s", want, got)
@@ -284,11 +304,13 @@ func checkNotificationFieldsForWithdraw(t *testing.T, n *wallet.TxNotification, 
 }
 
 func checkNotificationFieldsForNewWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkNewTxNotificationFields(t, n, tx)
 }
 
 func checkNotificationFieldsForClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	if got, want := n.Address, tx.address; got != want {
 		t.Errorf("Incorrect address for regular withdraw: expected %s, got %s", want, got)
 	}
@@ -298,6 +320,7 @@ func checkNotificationFieldsForClientWithdraw(t *testing.T, n *wallet.TxNotifica
 }
 
 func checkNotificationFieldsForNewClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForNewWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 
@@ -308,26 +331,31 @@ func checkNotificationFieldsForNewClientWithdraw(t *testing.T, n *wallet.TxNotif
 }
 
 func checkNotificationFieldsForFullyConfirmedWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkFullyConfirmedTxNotificationFields(t, n, tx)
 }
 
 func checkNotificationFieldsForPartiallyConfirmedWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkPartiallyConfirmedTxNotificationFields(t, n, tx)
 }
 
 func checkNotificationFieldsForFullyConfirmedClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForFullyConfirmedWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 }
 
 func checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForPartiallyConfirmedWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 }
 
 func checkNotificationFieldsForAnyPendingWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkUnconfirmedTxNotificationFields(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
@@ -349,6 +377,7 @@ func checkNotificationFieldsForAnyPendingWithdraw(t *testing.T, n *wallet.TxNoti
 }
 
 func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
 
 	if got, want := n.StatusStr, wallet.PendingManualConfirmationTransaction.String(); got != want {
@@ -357,6 +386,7 @@ func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n
 }
 
 func checkNotificationFieldsForWithdrawPending(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
 
 	if got, want := n.StatusStr, wallet.PendingTransaction.String(); got != want {
@@ -365,6 +395,7 @@ func checkNotificationFieldsForWithdrawPending(t *testing.T, n *wallet.TxNotific
 }
 
 func checkNotificationFieldsForWithdrawPendingColdStorage(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
 
 	if got, want := n.StatusStr, wallet.PendingColdStorageTransaction.String(); got != want {
@@ -373,6 +404,7 @@ func checkNotificationFieldsForWithdrawPendingColdStorage(t *testing.T, n *walle
 }
 
 func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkUnconfirmedTxNotificationFields(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
@@ -400,6 +432,7 @@ func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNot
 func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testEnvironment,
 	notification *wallet.TxNotification, event *events.NotificationWithSeq,
 	tx *txTestData, clientBalance, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+	t.Helper()
 	checkNotificationFieldsForNewClientWithdraw(t, notification, tx)
 
 	if got, want := notification.StatusStr, wallet.NewTransaction.String(); got != want {
