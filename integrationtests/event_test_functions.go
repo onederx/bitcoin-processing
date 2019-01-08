@@ -28,7 +28,10 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 	// stop processing
 	env.websocketListeners[0].stop()
 	env.websocketListeners = nil
+
+	processingContainerID := env.processing.id
 	env.stopProcessing(ctx)
+	env.waitForContainerRemoval(ctx, processingContainerID)
 
 	deposits := testTxCollection{
 		testMakeDeposit(t, env, accounts[0].Address,

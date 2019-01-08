@@ -3,6 +3,7 @@
 package integrationtests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/satori/go.uuid"
@@ -666,4 +667,137 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, address
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallet.TxNotification), txOlder)
 
 	checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
+}
+
+func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.Context) {
+	err := env.startColdStorage(ctx)
+
+	if err != nil {
+		t.Fatalf("Failed to start cold storage: %v", err)
+	}
+
+	defer env.stopColdStorage(ctx)
+
+	csAddress := env.coldStorageLoadAndGenerateAddress()
+
+	runSubtest(t, "Successful", func(t *testing.T) {
+		balance := getStableBalanceOrFail(t, env)
+		withdrawAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
+
+		if balance < withdrawAmount {
+			t.Fatal("Expected that wallet balance will be >= 1 BTC by now")
+		}
+		withdrawRequest := &wallet.WithdrawRequest{
+			Address: csAddress, Amount: withdrawAmount, Fee: withdrawFee,
+		}
+		resp, err := env.processingClient.WithdrawToColdStorage(withdrawRequest)
+		if err != nil {
+			t.Fatalf("Failed to perform withdraw to cold storage: %v", err)
+		}
+		checkCSWithdrawRequest(t, resp, withdrawRequest, "")
+		checkBalance(t, env, balance-withdrawAmount, balance-withdrawAmount)
+		// now, withdraw tx should get to miner and cold storage
+
+		// wait for miner to get this tx. We don't know the hash, but there
+		// should be no other txns in our test bitcoin network at this moment so
+		// just wait for miner to get any tx
+		_, err = env.mineAnyTx()
+
+		if err != nil {
+			t.Fatalf("Mining cold storage withdraw tx failed: %v", err)
+		}
+
+		// now our cold storage should have received money. It can happen after
+		// some delay (when its node receives new block), so wait a bit
+		coldStorageIncome := withdrawAmount - withdrawFee
+		checkBalanceBecame(t, func() (*api.BalanceInfo, error) {
+			return env.getNodeBalance(env.regtest["node-cold-storage"].nodeAPI)
+		}, coldStorageIncome, coldStorageIncome)
+	})
+
+	runSubtest(t, "InsufficientFunds", func(t *testing.T) {
+		balance := getStableBalanceOrFail(t, env)
+		withdrawAmountTooBig := balance + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
+		_, err := env.processingClient.WithdrawToColdStorage(&wallet.WithdrawRequest{
+			Address: csAddress, Amount: withdrawAmountTooBig, Fee: withdrawFee,
+		})
+		if err == nil {
+			t.Fatal("Expected that withdrawing more money than we have in " +
+				"wallet to cold storage will raise an error but it did not")
+		}
+	})
+
+	lastSeq := env.websocketListeners[0].lastSeq
+	runSubtest(t, "AddressFromConfig", func(t *testing.T) {
+		// we need to change processing config for this test, so we'll have to
+		// restart it
+		env.websocketListeners[0].stop()
+		env.websocketListeners = nil
+
+		processingContainerID := env.processing.id
+		err := env.stopProcessing(ctx)
+		env.waitForContainerRemoval(ctx, processingContainerID)
+
+		if err != nil {
+			t.Fatalf("Failed to stop processing for restart: %v", err)
+		}
+
+		settings := env.processingSettings
+		settings.AdditionalWalletSettings = "cold_wallet_address: " + csAddress
+
+		err = env.startProcessing(ctx, settings)
+
+		if err != nil {
+			t.Fatalf("Failed to start processing: %v", err)
+		}
+
+		env.waitForProcessing()
+
+		balance := getStableBalanceOrFail(t, env)
+		withdrawAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
+
+		if balance < withdrawAmount {
+			t.Fatal("Expected that wallet balance will be >= 1 BTC by now")
+		}
+
+		csBalance, err := env.getNodeBalance(env.regtest["node-cold-storage"].nodeAPI)
+
+		if err != nil {
+			t.Fatalf("Failed to request balance from cold storage %v", err)
+		}
+
+		if csBalance.Balance != csBalance.BalanceWithUnconf {
+			t.Fatal("Expected cold storage balance to be stable by this momen")
+		}
+
+		withdrawRequest := &wallet.WithdrawRequest{
+			Amount: withdrawAmount, Fee: withdrawFee,
+		}
+		resp, err := env.processingClient.WithdrawToColdStorage(withdrawRequest)
+		if err != nil {
+			t.Fatalf("Failed to perform withdraw to cold storage: %v", err)
+		}
+		checkCSWithdrawRequest(t, resp, withdrawRequest, csAddress)
+		checkBalance(t, env, balance-withdrawAmount, balance-withdrawAmount)
+		// now, withdraw tx should get to miner and cold storage
+
+		// wait for miner to get this tx. We don't know the hash, but there
+		// should be no other txns in our test bitcoin network at this moment so
+		// just wait for miner to get any tx
+		_, err = env.mineAnyTx()
+
+		if err != nil {
+			t.Fatalf("Mining cold storage withdraw tx failed: %v", err)
+		}
+
+		// now our cold storage should have received money. It can happen after
+		// some delay (when its node receives new block), so wait a bit
+		coldStorageIncome := withdrawAmount - withdrawFee
+		checkBalanceBecame(t, func() (*api.BalanceInfo, error) {
+			return env.getNodeBalance(env.regtest["node-cold-storage"].nodeAPI)
+		}, csBalance.Balance+coldStorageIncome, csBalance.Balance+coldStorageIncome)
+	})
+
+	// recreate stopped WS listener
+	_, err = env.newWebsocketListener(lastSeq + 1)
 }

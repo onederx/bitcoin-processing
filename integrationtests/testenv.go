@@ -48,6 +48,7 @@ type testEnvironment struct {
 	notifyScriptFile *os.File
 
 	processing           *containerInfo
+	processingSettings   *processingSettings
 	processingConfigPath string
 	processingClient     *processingapiclient.Client
 

@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -47,6 +48,11 @@ echo -e "GET /notify_wallet HTTP/1.1\r\nhost: {{.ProcessingAddress}}\r\nConnecti
 type nodeConfig struct {
 	Peers      string
 	Additional string
+}
+
+type rawMempoolResponse struct {
+	Result []string
+	Error  *nodeapi.JSONRPCError
 }
 
 var bitcoinNodes = []string{
@@ -257,6 +263,17 @@ func (e *testEnvironment) initRegtest() {
 	e.regtestIsLoaded <- nil
 }
 
+func (e *testEnvironment) waitForContainerRemoval(ctx context.Context, containerID string) error {
+	return waitForEvent(func() error {
+		_, err := e.cli.ContainerInspect(ctx, containerID)
+
+		if err != nil {
+			return nil
+		}
+		return fmt.Errorf("Container %s is still running", containerID)
+	})
+}
+
 func (e *testEnvironment) stopRegtest(ctx context.Context) error {
 	log.Printf("trying to stop regtest containers")
 	if e.regtest == nil {
@@ -312,10 +329,7 @@ func (e *testEnvironment) mineTx(txHash string) (string, error) {
 	miner := e.regtest["node-miner"].nodeAPI
 	log.Printf("Mine tx: waiting for tx %s to get into miner mempool", txHash)
 	err := waitForEvent(func() error {
-		var response struct {
-			Result []string
-			Error  *nodeapi.JSONRPCError
-		}
+		var response rawMempoolResponse
 		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
 		if err != nil {
 			return err
@@ -345,14 +359,42 @@ func (e *testEnvironment) mineTx(txHash string) (string, error) {
 	return generatedBlocks[0], nil
 }
 
+func (e *testEnvironment) mineAnyTx() (string, error) {
+	miner := e.regtest["node-miner"].nodeAPI
+	log.Print("Mine tx: waiting for any tx to get into miner mempool")
+	err := waitForEvent(func() error {
+		var response rawMempoolResponse
+		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(responseJSON, &response)
+		if err != nil {
+			return err
+		}
+		if response.Error != nil {
+			return response.Error
+		}
+		if len(response.Result) > 0 {
+			return nil
+		}
+		return errors.New("Miner mempool is empty")
+	})
+	if err != nil {
+		return "", err
+	}
+	generatedBlocks, err := generateBlocks(miner, 1)
+	if err != nil {
+		return "", err
+	}
+	return generatedBlocks[0], nil
+}
+
 func (e *testEnvironment) mineMultipleTxns(txHashes []string) (string, error) {
 	miner := e.regtest["node-miner"].nodeAPI
 	log.Printf("Mine tx: waiting for txns %v to get into miner mempool", txHashes)
 	err := waitForEvent(func() error {
-		var response struct {
-			Result []string
-			Error  *nodeapi.JSONRPCError
-		}
+		var response rawMempoolResponse
 		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
 		if err != nil {
 			return err
@@ -388,18 +430,20 @@ func (e *testEnvironment) mineMultipleTxns(txHashes []string) (string, error) {
 	return generatedBlocks[0], nil
 }
 
-func (e *testEnvironment) getClientBalance() (*api.BalanceInfo, error) {
-	clientNode := e.regtest["node-client"].nodeAPI
-
-	clientBalanceConfU64, clientBalanceUnconfU64, err := clientNode.GetConfirmedAndUnconfirmedBalance()
+func (e *testEnvironment) getNodeBalance(node nodeapi.NodeAPI) (*api.BalanceInfo, error) {
+	balanceConfU64, balanceUnconfU64, err := node.GetConfirmedAndUnconfirmedBalance()
 
 	if err != nil {
 		return nil, err
 	}
 
 	result := &api.BalanceInfo{
-		Balance:           bitcoin.BTCAmount(clientBalanceConfU64),
-		BalanceWithUnconf: bitcoin.BTCAmount(clientBalanceConfU64 + clientBalanceUnconfU64),
+		Balance:           bitcoin.BTCAmount(balanceConfU64),
+		BalanceWithUnconf: bitcoin.BTCAmount(balanceConfU64 + balanceUnconfU64),
 	}
 	return result, nil
+}
+
+func (e *testEnvironment) getClientBalance() (*api.BalanceInfo, error) {
+	return e.getNodeBalance(e.regtest["node-client"].nodeAPI)
 }

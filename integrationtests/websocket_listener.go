@@ -14,6 +14,8 @@ type websocketListener struct {
 	stopped  bool
 
 	messages chan *events.NotificationWithSeq
+
+	lastSeq int
 }
 
 func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener, error) {
@@ -32,6 +34,7 @@ func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener
 }
 
 func (l *websocketListener) processMessage(message *events.NotificationWithSeq) {
+	l.lastSeq = message.Seq
 	l.messages <- message
 }
 

@@ -38,13 +38,15 @@ bitcoin:
     user: bitcoinrpc
     password: TEST_BITCOIN_NODE_PASSWORD
 wallet:
-   min_withdraw_without_manual_confirmation: {{.MinWithdrawWithoutManualConfirmation}}`
+   min_withdraw_without_manual_confirmation: {{.MinWithdrawWithoutManualConfirmation}}
+   {{.AdditionalWalletSettings}}`
 )
 
 type processingSettings struct {
 	MaxConfirmations                     int
 	CallbackURL                          string
 	MinWithdrawWithoutManualConfirmation string
+	AdditionalWalletSettings             string
 }
 
 var defaultSettings = processingSettings{
@@ -107,6 +109,8 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 	e.setProcessingAddressForNotifications(e.processing.ip)
 
 	e.processingClient = client.NewClient(e.processingURL("/"))
+
+	e.processingSettings = s
 
 	log.Printf("processing container started: id=%v", e.processing.id)
 	return nil

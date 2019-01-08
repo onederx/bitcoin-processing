@@ -126,10 +126,13 @@ func TestCommonUsage(t *testing.T) {
 		testProcessingCatchesMissedEvents(t, env, ctx, accounts)
 	})
 	runSubtest(t, "WebsocketListeners", func(t *testing.T) {
+		//testWebsocketListeners(t, env)
+	})
+	runSubtest(t, "GetEvents", func(t *testing.T) {
 		// TODO
 	})
 	runSubtest(t, "WithdrawToColdStorage", func(t *testing.T) {
-		// TODO
+		testWithdrawToColdStorage(t, env, ctx)
 	})
 }
 

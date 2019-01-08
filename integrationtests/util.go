@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -87,7 +88,8 @@ func runSubtest(t *testing.T, name string, f func(t *testing.T)) {
 	t.Run(name, func(t *testing.T) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Fatalf("Test %s failed with panic: %v", name, r)
+				t.Fatalf("Test %s failed with panic: %v. Stack %s", name, r,
+					debug.Stack())
 			}
 		}()
 		f(t)

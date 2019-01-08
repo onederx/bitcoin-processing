@@ -8,6 +8,7 @@ import (
 
 	"github.com/satori/go.uuid"
 
+	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
@@ -115,23 +116,28 @@ func checkRequiredFromColdStorage(t *testing.T, e *testEnvironment, balance bitc
 	}
 }
 
-func checkClientBalanceBecame(t *testing.T, e *testEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
+func checkBalanceBecame(t *testing.T, balanceFunc func() (*api.BalanceInfo, error), balance, balanceWithUnconf bitcoin.BTCAmount) {
 	t.Helper()
 	waitForEventOrFailTest(t, func() error {
-		clientBalance, err := e.getClientBalance()
+		currentBalance, err := balanceFunc()
 		if err != nil {
 			return err
 		}
-		if clientBalance.Balance != balance {
-			return fmt.Errorf("Expected confirmed client balance to be %s, "+
-				"but it it %s", balance, clientBalance.Balance)
+		if currentBalance.Balance != balance {
+			return fmt.Errorf("Expected confirmed balance to be %s, "+
+				"but it it %s", balance, currentBalance.Balance)
 		}
-		if clientBalance.BalanceWithUnconf != balanceWithUnconf {
-			return fmt.Errorf("Expected client balance including unconfirmed to be %s, "+
-				"but it it %s", balanceWithUnconf, clientBalance.BalanceWithUnconf)
+		if currentBalance.BalanceWithUnconf != balanceWithUnconf {
+			return fmt.Errorf("Expected balance including unconfirmed to be %s, "+
+				"but it it %s", balanceWithUnconf, currentBalance.BalanceWithUnconf)
 		}
 		return nil
 	})
+}
+
+func checkClientBalanceBecame(t *testing.T, e *testEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
+	t.Helper()
+	checkBalanceBecame(t, e.getClientBalance, balance, balanceWithUnconf)
 }
 
 func checkTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
