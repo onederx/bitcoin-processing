@@ -3,21 +3,58 @@
 package integrationtests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
 
-func testHotWalletGenerated(t *testing.T, env *testEnvironment) string {
-	hotWalletAddress, err := env.processingClient.GetHotStorageAddress()
-	if err != nil {
-		t.Fatalf("Failed to request hot wallet address %v", err)
-	}
-	if hotWalletAddress == "" {
-		t.Fatalf("Hot wallet address from get_hot_storage_address API is empty")
-	}
-	return hotWalletAddress
+func testHotWallet(t *testing.T, env *testEnvironment, ctx context.Context) {
+	var hotWalletAddress string
+
+	runSubtest(t, "WasGenerated", func(t *testing.T) {
+		var err error
+		hotWalletAddress, err = env.processingClient.GetHotStorageAddress()
+		if err != nil {
+			t.Fatalf("Failed to request hot wallet address %v", err)
+		}
+		if hotWalletAddress == "" {
+			t.Fatalf("Hot wallet address from get_hot_storage_address API is empty")
+		}
+	})
+	runSubtest(t, "SendFundsToHotWallet", func(t *testing.T) {
+		testSendFundsToHotWallet(t, env, hotWalletAddress)
+	})
+	runSubtest(t, "PersistsRestart", func(t *testing.T) {
+		// restart processing
+
+		// stop
+		processingContainerID := env.processing.id
+		lastSeq := env.websocketListeners[0].lastSeq
+		env.websocketListeners[0].stop()
+		env.websocketListeners = nil
+		env.stopProcessing(ctx)
+		env.waitForContainerRemoval(ctx, processingContainerID)
+
+		// start
+		env.startProcessingWithDefaultSettings(ctx)
+
+		hotWalletAddressNow, err := env.processingClient.GetHotStorageAddress()
+		if err != nil {
+			t.Fatalf("Failed to request hot wallet address %v", err)
+		}
+		if hotWalletAddressNow != hotWalletAddress {
+			t.Fatalf("Expected that hot wallet address after restart will be "+
+				"same as before restart (%s), but it was %s", hotWalletAddress,
+				hotWalletAddressNow)
+		}
+		// restore stopped websocket listener
+		_, err = env.newWebsocketListener(lastSeq + 1)
+		if err != nil {
+			t.Fatalf("Failed to connect websocket event listener %v", err)
+		}
+	})
 }
 
 func testGenerateClientWallet(t *testing.T, env *testEnvironment) *wallet.Account {
