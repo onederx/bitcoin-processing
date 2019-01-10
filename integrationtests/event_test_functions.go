@@ -4,6 +4,7 @@ package integrationtests
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
@@ -114,6 +115,9 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 	runSubtest(t, "WebsocketNotifications", func(t *testing.T) {
 		runSubtest(t, "GetAllNotifications", func(t *testing.T) {
 			listener, err := env.newWebsocketListener(0)
+			if err != nil {
+				t.Fatalf("Failed to connect websocket event listener %v", err)
+			}
 			allMessages := make([]*events.NotificationWithSeq, 0, maxSeq)
 			if err != nil {
 				t.Fatal(err)
@@ -129,6 +133,9 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 		})
 		runSubtest(t, "GetOnlyNeededNotifications", func(t *testing.T) {
 			listener, err := env.newWebsocketListener(maxSeq - 4)
+			if err != nil {
+				t.Fatalf("Failed to connect websocket event listener %v", err)
+			}
 			neededMessages := make([]*events.NotificationWithSeq, 0, 5)
 			if err != nil {
 				t.Fatal(err)
@@ -145,5 +152,218 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 			listener.stop()
 			env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
 		})
+	})
+}
+
+func testWebsocketListeners(t *testing.T, env *testEnvironment) {
+	runSubtest(t, "ExistingEvents", func(t *testing.T) {
+		listener, err := env.newWebsocketListener(0)
+		if err != nil {
+			t.Fatalf("Failed to connect websocket event listener %v", err)
+		}
+
+		event := listener.getNextMessageWithTimeout(t)
+
+		if event == nil {
+			t.Fatal("Expected existing event to be non-nil")
+		}
+		listener.stop()
+		env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+	})
+	runSubtest(t, "GetEventsFromSeq", func(t *testing.T) {
+		runSubtest(t, "Sanity", func(t *testing.T) {
+			seq := env.websocketListeners[0].lastSeq - 10
+			listener, err := env.newWebsocketListener(seq)
+			if err != nil {
+				t.Fatalf("Failed to connect websocket event listener %v", err)
+			}
+			event := listener.getNextMessageWithTimeout(t)
+
+			if event == nil {
+				t.Fatal("Expected existing event to be non-nil")
+			}
+			if event.Seq < seq {
+				t.Errorf("Expected event requested from seq to have seq >= %d, "+
+					"but received %d", seq, event.Seq)
+			}
+			listener.stop()
+			env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+		})
+		runSubtest(t, "GetLostEvents", func(t *testing.T) {
+			// create a couple of events that listener will catch in time
+			account1 := testGenerateClientWalletWithMetainfo(t, env,
+				initialTestMetainfo, env.websocketListeners[0].lastSeq+1)
+			deposit1 := testMakeDeposit(t, env, account1.Address, testDepositAmount,
+				account1.Metainfo)
+
+			deposit1.id = env.getNextCallbackNotificationWithTimeout(t).ID
+			event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+			lastSeq := event.Seq
+			if got, want := event.Type, events.NewIncomingTxEvent; got != want {
+				t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
+					want, got)
+			}
+			checkNotificationFieldsForNewDeposit(t, event.Data.(*wallet.TxNotification), deposit1)
+
+			// stop this listener to simulate situation that client has gone away
+			// while some events are happening
+			env.websocketListeners[0].stop()
+			env.websocketListeners = nil
+
+			// (this withdraw will be put on hold until manual confirmation
+			// because it's amount is 0.4)
+			withdraw := testMakeWithdraw(t, env,
+				getNewAddressForWithdrawOrFail(t, env),
+				bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.4")), nil)
+
+			// skip http callback notification about this withdraw
+			env.getNextCallbackNotificationWithTimeout(t)
+
+			account2, err := env.processingClient.NewWallet(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			deposit1.mineOrFail(t, env)
+
+			// skip http callback notification about deposit confirmation
+			env.getNextCallbackNotificationWithTimeout(t)
+
+			// ok, now client is going back online
+			listener, err := env.newWebsocketListener(lastSeq + 1)
+
+			withdrawEvent := listener.getNextMessageWithTimeout(t)
+
+			if withdrawEvent.Type != events.PendingStatusUpdatedEvent {
+				t.Errorf("Unexpected event type: wanted %s, got %s",
+					events.PendingStatusUpdatedEvent, withdrawEvent.Type)
+			}
+			checkNotificationFieldsForWithdrawPendingManualConfirmation(t,
+				withdrawEvent.Data.(*wallet.TxNotification), withdraw)
+
+			newAccountEvent := listener.getNextMessageWithTimeout(t)
+
+			if got, want := newAccountEvent.Type, events.NewAddressEvent; got != want {
+				t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
+					want, got)
+			}
+			newAccountEventData := newAccountEvent.Data.(*wallet.Account)
+			if got, want := newAccountEventData.Address, account2.Address; got != want {
+				t.Errorf("Expected address to be %s, but instead got %s",
+					want, got)
+			}
+			if newAccountEventData.Metainfo != nil {
+				t.Errorf("Expected metainfo to be nil, but instead got %v",
+					newAccountEventData.Metainfo)
+			}
+
+			deposit1ConfirmedEvent := listener.getNextMessageWithTimeout(t)
+
+			if got, want := deposit1ConfirmedEvent.Type, events.IncomingTxConfirmedEvent; got != want {
+				t.Errorf("Unexpected event type: wanted %s, got %s", want, got)
+			}
+			checkNotificationFieldsForFullyConfirmedDeposit(t,
+				deposit1ConfirmedEvent.Data.(*wallet.TxNotification), deposit1)
+		})
+	})
+	runSubtest(t, "ParallelListeners", func(t *testing.T) {
+		seq := env.websocketListeners[0].lastSeq + 1
+		listener1, err := env.newWebsocketListener(seq)
+		if err != nil {
+			t.Fatalf("Failed to connect websocket event listener %v", err)
+		}
+		listener2, err := env.newWebsocketListener(seq)
+		if err != nil {
+			t.Fatalf("Failed to connect websocket event listener %v", err)
+		}
+
+		account := testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, seq)
+
+		event1 := listener1.getNextMessageWithTimeout(t)
+		event2 := listener2.getNextMessageWithTimeout(t)
+
+		if event1.Seq != seq {
+			t.Errorf("Expected next notification seqnum be %d, but it is %d",
+				seq, event1.Seq)
+		}
+		if got, want := event1.Type, events.NewAddressEvent; got != want {
+			t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
+				want, got)
+		}
+		data := event1.Data.(*wallet.Account)
+		if got, want := data.Address, account.Address; got != want {
+			t.Errorf("Expected address from WS notification to be equal "+
+				"to address from API response (%s), but instead got %s",
+				want, got)
+		}
+		compareMetainfo(t, data.Metainfo, initialTestMetainfo)
+
+		if !reflect.DeepEqual(event1, event2) {
+			t.Errorf("Expected notifications from 2 websocket listeners to be"+
+				"identical, but they are %v %v", event1, event2)
+		}
+		listener1.stop()
+		listener2.stop()
+		env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+	})
+}
+
+func testGetEvents(t *testing.T, env *testEnvironment) {
+	var lastSeq int
+	runSubtest(t, "ExistingEvents", func(t *testing.T) {
+		evts, err := env.processingClient.GetEvents(0)
+		if err != nil {
+			t.Fatalf("API call /get_events with seq 0 failed: %v", err)
+		}
+		if len(evts) == 0 {
+			t.Fatal("Expected /get_events call to return some existing " +
+				"events, instead got nothing")
+		}
+		lastSeq = evts[len(evts)-1].Seq
+	})
+	runSubtest(t, "GetEventsFromSeq", func(t *testing.T) {
+		seq := lastSeq - 10
+
+		evts, err := env.processingClient.GetEvents(seq)
+		if err != nil {
+			t.Fatalf("API call /get_events with seq %d failed: %v", seq, err)
+		}
+		if len(evts) == 0 {
+			t.Fatal("Expected /get_events call to return some events, " +
+				"instead got nothing")
+		}
+
+		if evts[0].Seq < seq {
+			t.Errorf("Expected event requested from seq to have seq >= %d, "+
+				"but received %d", seq, evts[0].Seq)
+		}
+	})
+	runSubtest(t, "NewEvent", func(t *testing.T) {
+		seq := lastSeq + 1
+		account := testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, seq)
+		evts, err := env.processingClient.GetEvents(seq)
+		if err != nil {
+			t.Fatalf("API call /get_events with seq %d failed: %v",
+				seq, err)
+		}
+		if len(evts) == 0 {
+			t.Fatal("Expected /get_events call to return new event, instead " +
+				"got nothing")
+		}
+		event := evts[0]
+		if event.Seq != seq {
+			t.Errorf("Expected next notification seqnum be %d, but it is %d",
+				seq, event.Seq)
+		}
+		if got, want := event.Type, events.NewAddressEvent; got != want {
+			t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
+				want, got)
+		}
+		data := event.Data.(*wallet.Account)
+		if got, want := data.Address, account.Address; got != want {
+			t.Errorf("Expected address from WS notification to be equal "+
+				"to address from API response (%s), but instead got %s",
+				want, got)
+		}
+		compareMetainfo(t, data.Metainfo, initialTestMetainfo)
 	})
 }
