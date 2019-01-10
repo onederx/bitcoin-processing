@@ -4,6 +4,7 @@ package integrationtests
 
 import (
 	"context"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -366,4 +367,33 @@ func testGetEvents(t *testing.T, env *testEnvironment) {
 		}
 		compareMetainfo(t, data.Metainfo, initialTestMetainfo)
 	})
+}
+
+func testHTTPCallbackBackoff(t *testing.T, env *testEnvironment, clientAccount *wallet.Account) {
+	errorCount := 3
+
+	env.callbackHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		if errorCount > 1 {
+			errorCount--
+		} else {
+			env.callbackHandler = nil
+		}
+	}
+
+	deposit := testMakeDeposit(t, env, clientAccount.Address,
+		bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.076")),
+		clientAccount.Metainfo)
+
+	n := env.getNextCallbackNotificationWithTimeout(t)
+	deposit.id = n.ID
+	checkNotificationFieldsForNewDeposit(t, n, deposit)
+	deposit.mineOrFail(t, env)
+	n = env.getNextCallbackNotificationWithTimeout(t)
+	checkNotificationFieldsForFullyConfirmedDeposit(t, n, deposit)
+
+	// skip websocket notifications about deposit
+	for i := 0; i < 2; i++ {
+		env.websocketListeners[0].getNextMessageWithTimeout(t)
+	}
 }

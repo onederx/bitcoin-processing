@@ -87,11 +87,7 @@ func testGetTransactions(t *testing.T, env *testEnvironment, clientAccount *wall
 			checkThereIsDepositTx(t, txns)
 		})
 	})
-	_, err := env.mineTx(deposit.hash)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	deposit.mineOrFail(t, env)
 	env.getNextCallbackRequestWithTimeout(t)
 	env.websocketListeners[0].getNextMessageWithTimeout(t)
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -55,6 +56,7 @@ type testEnvironment struct {
 	callbackListener     *httptest.Server
 	callbackURL          string
 	callbackMessageQueue chan *callbackRequest
+	callbackHandler      func(http.ResponseWriter, *http.Request)
 
 	websocketListeners []*websocketListener
 }

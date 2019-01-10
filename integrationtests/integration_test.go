@@ -131,6 +131,9 @@ func TestCommonUsage(t *testing.T) {
 	runSubtest(t, "GetEvents", func(t *testing.T) {
 		testGetEvents(t, env)
 	})
+	runSubtest(t, "HTTPCallbackBackoff", func(t *testing.T) {
+		testHTTPCallbackBackoff(t, env, clientAccount)
+	})
 	runSubtest(t, "GetTransactions", func(t *testing.T) {
 		testGetTransactions(t, env, clientAccount)
 	})

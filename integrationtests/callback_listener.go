@@ -47,6 +47,10 @@ func newTestRandomFreePortListener(host string) net.Listener {
 func (e *testEnvironment) startCallbackListener() {
 	log.Println("Starting callback listener server")
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if e.callbackHandler != nil {
+			e.callbackHandler(w, r)
+			return
+		}
 		var err error
 		cbRequest := callbackRequest{
 			method: r.Method,
