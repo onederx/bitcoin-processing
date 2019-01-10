@@ -131,6 +131,9 @@ func TestCommonUsage(t *testing.T) {
 	runSubtest(t, "GetEvents", func(t *testing.T) {
 		testGetEvents(t, env)
 	})
+	runSubtest(t, "GetTransactions", func(t *testing.T) {
+		testGetTransactions(t, env, clientAccount)
+	})
 	runSubtest(t, "WithdrawToColdStorage", func(t *testing.T) {
 		testWithdrawToColdStorage(t, env, ctx)
 	})
