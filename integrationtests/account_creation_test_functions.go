@@ -39,6 +39,7 @@ func testHotWallet(t *testing.T, env *testEnvironment, ctx context.Context) {
 
 		// start
 		env.startProcessingWithDefaultSettings(ctx)
+		env.waitForProcessing()
 
 		hotWalletAddressNow, err := env.processingClient.GetHotStorageAddress()
 		if err != nil {
