@@ -45,6 +45,13 @@ func (e *testEnvironment) startDatabase(ctx context.Context) error {
 	e.db.ip = e.getContainerIP(ctx, resp.ID)
 
 	log.Printf("db container started: id=%v", e.db.id)
+
+	err = e.writeContainerLogs(ctx, e.db, "postgres.log")
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

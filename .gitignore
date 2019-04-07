@@ -5,3 +5,4 @@ tools/regtest/auto-paying-proxy
 inventory
 .bitcoin
 .env
+integrationtests/*.log

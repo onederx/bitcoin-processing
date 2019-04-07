@@ -61,3 +61,7 @@ integration_test:
   script:
     - docker pull kylemanna/bitcoind && docker pull debian:stretch && docker pull postgres:10.5
     - (cd integrationtests && ./integration.test -test.v)
+  artifacts:
+    paths:
+      - integrationtests/*.log
+    when: on_failure

@@ -113,6 +113,13 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 	e.processingSettings = s
 
 	log.Printf("processing container started: id=%v", e.processing.id)
+
+	err = e.writeContainerLogs(ctx, e.processing, "processing.log")
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

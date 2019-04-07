@@ -132,6 +132,14 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 		}
 		e.regtest[node] = nodeContainerInfo
 		nodeContainerInfo.ip = e.getContainerIP(ctx, resp.ID)
+
+		err = e.writeContainerLogs(ctx, &nodeContainerInfo.containerInfo, node+".log")
+
+		if err != nil {
+			e.stopRegtest(ctx) // in case other nodes were started
+			return err
+		}
+
 		log.Printf("regtest node %s started: id=%v", node, resp.ID)
 	}
 	e.regtestIsLoaded = make(chan error)
