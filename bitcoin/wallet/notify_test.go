@@ -8,6 +8,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/events"
+	settingstestutil "github.com/onederx/bitcoin-processing/settings/testutil"
 )
 
 type eventBrokerNotifyCheckMock struct {
@@ -72,7 +73,7 @@ func TestNotify(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		s := &settingsMock{}
+		s := &settingstestutil.SettingsMock{}
 		txid, err := uuid.FromString(test.idStr)
 
 		if err != nil {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
+	settingstestutil "github.com/onederx/bitcoin-processing/settings/testutil"
 )
 
 const testAddress2 = "3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyC"
@@ -21,7 +22,7 @@ func (n *nodeAPICreateNewAddressAndGetAddressInfoMineMock) GetAddressInfo(addres
 }
 
 func TestHotWalletGenerate(t *testing.T) {
-	s := &settingsMock{data: make(map[string]interface{})}
+	s := &settingstestutil.SettingsMock{Data: make(map[string]interface{})}
 
 	w := NewWallet(
 		s,
@@ -42,9 +43,9 @@ func TestHotWalletGenerate(t *testing.T) {
 }
 
 func TestHotWalletConfigured(t *testing.T) {
-	s := &settingsMock{data: make(map[string]interface{})}
+	s := &settingstestutil.SettingsMock{Data: make(map[string]interface{})}
 
-	s.data["wallet.hot_wallet_address"] = testAddress
+	s.Data["wallet.hot_wallet_address"] = testAddress
 
 	w := NewWallet(
 		s,
@@ -60,9 +61,9 @@ func TestHotWalletConfigured(t *testing.T) {
 }
 
 func TestHotWalletNotMineFail(t *testing.T) {
-	s := &settingsMock{data: make(map[string]interface{})}
+	s := &settingstestutil.SettingsMock{Data: make(map[string]interface{})}
 
-	s.data["wallet.hot_wallet_address"] = testAddress
+	s.Data["wallet.hot_wallet_address"] = testAddress
 
 	w := NewWallet(
 		s,
@@ -79,9 +80,9 @@ func TestHotWalletNotMineFail(t *testing.T) {
 }
 
 func TestHotWalletGetAddressInfoFail(t *testing.T) {
-	s := &settingsMock{data: make(map[string]interface{})}
+	s := &settingstestutil.SettingsMock{Data: make(map[string]interface{})}
 
-	s.data["wallet.hot_wallet_address"] = testAddress
+	s.Data["wallet.hot_wallet_address"] = testAddress
 
 	w := NewWallet(
 		s,
