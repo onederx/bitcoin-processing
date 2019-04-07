@@ -23,12 +23,7 @@ func init() {
 }
 
 func (w *Wallet) generateNewAddress() (string, error) {
-	address, err := w.nodeAPI.CreateNewAddress()
-	if err != nil {
-		return "", err
-	}
-	addressStr := address.EncodeAddress()
-	return addressStr, nil
+	return w.nodeAPI.CreateNewAddress()
 }
 
 // CreateAccount creates new Account: generates new bitcoin address and stores

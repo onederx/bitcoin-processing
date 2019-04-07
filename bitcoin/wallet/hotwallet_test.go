@@ -8,6 +8,7 @@ import (
 )
 
 const testAddress2 = "3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyC"
+const testAddressRegtest = "2NAvKkyAJK7EQChnSCNyWo4ALX5LQt1A4tL"
 
 type nodeAPICreateNewAddressAndGetAddressInfoMineMock struct {
 	nodeAPICreateNewAddressMock
@@ -37,6 +38,27 @@ func TestHotWalletGenerate(t *testing.T) {
 	)
 	w.initHotWallet()
 	if got, want := w.GetHotWalletAddress(), testAddress2; got != want {
+		t.Errorf("Unexpected generated hot wallet address: got %s instead of %s",
+			got, want)
+	}
+}
+
+func TestHotWalletGenerateRegtest(t *testing.T) {
+	s := &settingstestutil.SettingsMock{Data: make(map[string]interface{})}
+
+	w := NewWallet(
+		s,
+		&nodeAPICreateNewAddressAndGetAddressInfoMineMock{
+			nodeAPICreateNewAddressMock: nodeAPICreateNewAddressMock{
+				address: testAddressRegtest,
+			},
+			t: t,
+		},
+		&eventBrokerMock{},
+		NewStorage("memory", s),
+	)
+	w.initHotWallet()
+	if got, want := w.GetHotWalletAddress(), testAddressRegtest; got != want {
 		t.Errorf("Unexpected generated hot wallet address: got %s instead of %s",
 			got, want)
 	}

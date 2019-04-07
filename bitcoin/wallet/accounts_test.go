@@ -5,9 +5,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcutil"
-
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/events"
 	settingstestutil "github.com/onederx/bitcoin-processing/settings/testutil"
@@ -28,20 +25,20 @@ type nodeAPICreateNewAddressMock struct {
 	address string
 }
 
-func (n *nodeAPICreateNewAddressMock) CreateNewAddress() (btcutil.Address, error) {
+func (n *nodeAPICreateNewAddressMock) CreateNewAddress() (string, error) {
 	address := n.address
 	if address == "" {
 		address = testAddress
 	}
-	return btcutil.DecodeAddress(address, &chaincfg.MainNetParams)
+	return address, nil
 }
 
 type nodeAPICreateNewAddressErrorMock struct {
 	nodeapi.NodeAPI
 }
 
-func (n *nodeAPICreateNewAddressErrorMock) CreateNewAddress() (btcutil.Address, error) {
-	return nil, errors.New(createAddressFailedErrorMsg)
+func (n *nodeAPICreateNewAddressErrorMock) CreateNewAddress() (string, error) {
+	return "", errors.New(createAddressFailedErrorMsg)
 }
 
 type eventBrokerMock struct {

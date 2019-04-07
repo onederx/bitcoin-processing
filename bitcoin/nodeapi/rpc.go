@@ -114,9 +114,23 @@ func (err JSONRPCError) Error() string {
 }
 
 // CreateNewAddress creates new Bitcoin address belonging to current wallet
-// Address is returned as type btcutil.Address
-func (n *bitcoinNodeRPCAPI) CreateNewAddress() (btcutil.Address, error) {
-	return n.btcrpc.GetNewAddress("")
+// Address is returned as a string
+func (n *bitcoinNodeRPCAPI) CreateNewAddress() (string, error) {
+	// there is GetNewAddress in btcd/rpcclient, but they have broken support for regtest
+	responseJSON, err := n.SendRequestToNode("getnewaddress", nil)
+	if err != nil {
+		return "", err
+	}
+
+	var response jsonRPCStringResponse
+	err = json.Unmarshal(responseJSON, &response)
+	if err != nil {
+		return "", err
+	}
+	if response.Error != nil {
+		return "", response.Error
+	}
+	return response.Result, nil
 }
 
 // ListTransactionsSinceBlock fetches a list of transactions relevant to current

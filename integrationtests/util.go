@@ -80,7 +80,7 @@ func getNewAddressForWithdrawOrFail(t *testing.T, env *testEnvironment) string {
 		t.Helper()
 		t.Fatalf("Failed to request new address from client node: %v", err)
 	}
-	return addressDecoded.EncodeAddress()
+	return addressDecoded
 }
 
 // runSubtest is the same as t.Run, but turns panic into t.Fatal

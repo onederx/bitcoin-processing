@@ -2,14 +2,13 @@ package nodeapi
 
 import (
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcutil"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 )
 
 // NodeAPI is responsible for communication with Bitcoin node
 type NodeAPI interface {
-	CreateNewAddress() (btcutil.Address, error)
+	CreateNewAddress() (string, error)
 	ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error)
 	GetTransaction(hash string) (*btcjson.GetTransactionResult, error)
 	GetRawTransaction(hash string) (*btcjson.TxRawResult, error)
