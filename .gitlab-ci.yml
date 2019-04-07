@@ -59,4 +59,5 @@ integration_test:
     - docker stop ${TSTPREFIX}-main || true && docker rm ${TSTPREFIX}-main || true
   after_script: *integration_test_docker_cleanup
   script:
+    - docker pull kylemanna/bitcoind && docker pull debian:stretch && docker pull postgres:10.5
     - (cd integrationtests && ./integration.test -test.v)
