@@ -208,20 +208,20 @@ func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*Transaction,
 	return transactionFromDatabaseRow(row)
 }
 
-// GetTransactionByHashAndDirection fetches tx which bitcoin tx hash equals
-// argument 'hash' and direction equals 'direction'. It allows to get correct
-// transaction in case of internal tx (when one exchange client withdraws money
-// to address of another) - in this case hash alone is ambigous (both outgoing
-// and incoming txns are created for a single bitcoin tx), but hash with
-// direction should be sufficient.
-//
-// TODO: Even hash+direction can in theory be ambigous, see #11
-func (s *PostgresWalletStorage) GetTransactionByHashAndDirection(hash string, direction TransactionDirection) (*Transaction, error) {
+// GetTransactionByDetails fetches tx which same bitcoin tx hash, direction and
+// address as given one
+func (s *PostgresWalletStorage) GetTransactionByHashDirectionAndAddress(tx *Transaction) (*Transaction, error) {
 	query := fmt.Sprintf(
-		`SELECT %s FROM transactions WHERE hash = $1 and direction = $2`,
+		`SELECT %s FROM transactions WHERE hash = $1 and direction = $2 and
+		address = $3`,
 		transactionFields,
 	)
-	row := s.db.QueryRow(query, hash, direction.String())
+	row := s.db.QueryRow(
+		query,
+		tx.Hash,
+		tx.Direction.String(),
+		tx.Address,
+	)
 	return transactionFromDatabaseRow(row)
 }
 
@@ -266,10 +266,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 	}
 
 	if txIsNew && transaction.Hash != "" {
-		existingTransaction, err = s.GetTransactionByHashAndDirection(
-			transaction.Hash,
-			transaction.Direction,
-		)
+		existingTransaction, err = s.GetTransactionByHashDirectionAndAddress(transaction)
 		switch err {
 		case nil: // tx already in database
 			txIsNew = false
