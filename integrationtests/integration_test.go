@@ -184,3 +184,31 @@ func TestMoreConfirmations(t *testing.T) {
 		testWithdrawSeveralConfirmations(t, env, neededConfirmations)
 	})
 }
+
+func TestMultipleExits(t *testing.T) {
+	ctx := context.Background()
+	env, err := newTestEnvironment(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = env.start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer env.stop(ctx)
+	env.waitForLoad()
+	err = env.startProcessingWithDefaultSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer env.stopProcessing(ctx)
+	env.waitForProcessing()
+	_, err = env.newWebsocketListener(0)
+	if err != nil {
+		t.Fatalf("Failed to connect websocket event listener %v", err)
+	}
+
+	// create several accounts (this function actually always returns 3)
+	accounts := testGenerateMultipleClientWallets(t, env)
+	testDepositSingleBitcoinTxWithMultipleExists(t, env, accounts)
+}

@@ -341,3 +341,82 @@ func testSendFundsToHotWallet(t *testing.T, env *testEnvironment, hotWalletAddre
 			"it is %s", expectedBalanceAfterIncome, balanceInfo.Balance)
 	})
 }
+
+func testDepositSingleBitcoinTxWithMultipleExists(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
+	balanceByNow := getStableBalanceOrFail(t, env)
+
+	nDeposits := len(accounts)
+	amounts := make(map[string]bitcoin.BTCAmount)
+
+	// make up amounts we will send to them (just 0.1, 0.2, 0.3)
+	for i, account := range accounts {
+		amounts[account.Address] = bitcoin.BTCAmountFromFloat(0.1 * float64(i+1))
+	}
+
+	// 0.1 + 0.2 + 0.3
+	balanceAfterDeposit := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
+
+	hash, err := env.regtest["node-client"].nodeAPI.SendToMultipleAddresses(amounts)
+
+	if err != nil {
+		t.Fatalf("Failed to send money from client node for deposit: %v", err)
+	}
+
+	deposits := make(testTxCollection, nDeposits)
+
+	for i := 0; i < nDeposits; i++ {
+		deposits[i] = &txTestData{
+			address:  accounts[i].Address,
+			amount:   amounts[accounts[i].Address],
+			hash:     hash,
+			metainfo: accounts[i].Metainfo,
+		}
+	}
+
+	runSubtest(t, "NewTransactions", func(t *testing.T) {
+		httpNotifications, wsNotifications := collectNotifications(t, env, events.NewIncomingTxEvent, nDeposits)
+
+		for _, tx := range deposits {
+			n := findNotificationForTxOrFail(t, httpNotifications, tx)
+			checkNotificationFieldsForNewDeposit(t, n, tx)
+			tx.id = n.ID
+			wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
+			checkNotificationFieldsForNewDeposit(t, wsN, tx)
+		}
+		checkBalance(t, env, balanceByNow, balanceAfterDeposit)
+	})
+
+	blockHash, err := env.mineTx(hash)
+
+	if err != nil {
+		t.Fatalf("Failed to mine deposit bitcoin tx on miner node: %v", err)
+	}
+
+	for i := 0; i < nDeposits; i++ {
+		deposits[i].blockHash = blockHash
+		deposits[i].confirmations = 1
+	}
+
+	runSubtest(t, "ConfirmedTxns", func(t *testing.T) {
+		httpNotifications, wsNotifications := collectNotifications(t, env, events.IncomingTxConfirmedEvent, nDeposits)
+
+		for _, tx := range deposits {
+			n := findNotificationForTxOrFail(t, httpNotifications, tx)
+			checkNotificationFieldsForFullyConfirmedDeposit(t, n, tx)
+			wsN := findNotificationForTxOrFail(t, wsNotifications, tx)
+			if n.ID != tx.id {
+				t.Errorf("Expected that tx id for confirmed tx in http callback "+
+					"data to match id of initial tx, but they are %s %s",
+					n.ID, tx.id)
+			}
+
+			if wsN.ID != tx.id {
+				t.Errorf("Expected that tx id for confirmed tx in websocket "+
+					"notification will match one for initial tx, but they are %s %s",
+					tx.id, wsN.ID)
+			}
+			checkNotificationFieldsForFullyConfirmedDeposit(t, wsN, tx)
+		}
+		checkBalance(t, env, balanceAfterDeposit, balanceAfterDeposit)
+	})
+}
