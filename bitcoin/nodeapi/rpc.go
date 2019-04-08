@@ -249,6 +249,43 @@ func (n *bitcoinNodeRPCAPI) sendToAddress(address string, amount uint64, recipie
 	return response.Result, nil
 }
 
+// SendToMultipleAddresses sends bitcoins to multiple receiving addresses as
+// specified by map 'addresses' in 1 bitcoin transaction. For now this is used
+// by tests only, so sender pays the fee which is not configurable.
+// On success, resulting bitcoin tx hash is returned as first return value
+func (n *bitcoinNodeRPCAPI) SendToMultipleAddresses(addresses map[string]bitcoin.BTCAmount) (hash string, err error) {
+	if len(addresses) == 0 {
+		return "", errors.New("SendToMultipleAddresses got empty list of addresses")
+	}
+
+	amountSpec := make(map[string]json.Number)
+
+	for address, amount := range addresses {
+		amountSpec[address] = json.Number(amount.ToStringedFloat())
+	}
+
+	responseJSON, err := n.SendRequestToNode(
+		"sendmany",
+		[]interface{}{
+			"", // by convention, first arg in an empty string (see docs https://bitcoin-rpc.github.io/en/doc/0.17.99/rpc/wallet/sendmany/)
+			amountSpec,
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+
+	var response jsonRPCStringResponse
+	err = json.Unmarshal(responseJSON, &response)
+	if err != nil {
+		return "", err
+	}
+	if response.Error != nil {
+		return "", response.Error
+	}
+	return response.Result, nil
+}
+
 // SendWithPerKBFee sends given amount of bitcoins to given address with per
 // kilobyte fee (meaning that given amount of fee will be multiplied by size of
 // resulting TX in kilobytes). Boolean argument recipientPaysFee determines if

@@ -14,6 +14,7 @@ type NodeAPI interface {
 	GetRawTransaction(hash string) (*btcjson.TxRawResult, error)
 	SendWithPerKBFee(address string, amount, fee bitcoin.BTCAmount, recipientPaysFee bool) (hash string, err error)
 	SendWithFixedFee(address string, amount, fee bitcoin.BTCAmount, recipientPaysFee bool) (hash string, err error)
+	SendToMultipleAddresses(addresses map[string]bitcoin.BTCAmount) (hash string, err error)
 	GetAddressInfo(address string) (*AddressInfo, error)
 	GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error)
 
