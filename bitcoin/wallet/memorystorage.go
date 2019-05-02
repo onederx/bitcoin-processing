@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 )
 
 // InMemoryWalletStorage is a Storage implementation that stores data in memory.

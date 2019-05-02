@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/onederx/bitcoin-processing/api/client"
