@@ -9,10 +9,11 @@ import (
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
-func getTransactionsOrFail(t *testing.T, env *testEnvironment, directionFilter, statusFilter string) []*wallet.Transaction {
-	resp, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
+func getTransactionsOrFail(t *testing.T, env *testenv.TestEnvironment, directionFilter, statusFilter string) []*wallet.Transaction {
+	resp, err := env.ProcessingClient.GetTransactions(&api.GetTransactionsFilter{
 		Direction: directionFilter, Status: statusFilter,
 	})
 	if err != nil {
@@ -22,7 +23,7 @@ func getTransactionsOrFail(t *testing.T, env *testEnvironment, directionFilter, 
 	return resp
 }
 
-func testGetTransactions(t *testing.T, env *testEnvironment, clientAccount *wallet.Account) {
+func testGetTransactions(t *testing.T, env *testenv.TestEnvironment, clientAccount *wallet.Account) {
 	runSubtest(t, "ExistingTransactions", func(t *testing.T) {
 		txns := getTransactionsOrFail(t, env, "", "")
 
@@ -37,8 +38,8 @@ func testGetTransactions(t *testing.T, env *testEnvironment, clientAccount *wall
 		clientAccount.Metainfo)
 
 	// skip notifications
-	env.getNextCallbackNotificationWithTimeout(t)
-	env.websocketListeners[0].getNextMessageWithTimeout(t)
+	env.GetNextCallbackNotificationWithTimeout(t)
+	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	checkThereIsDepositTx := func(t *testing.T, txns []*wallet.Transaction) *wallet.Transaction {
 		for _, tx := range txns {
@@ -88,6 +89,6 @@ func testGetTransactions(t *testing.T, env *testEnvironment, clientAccount *wall
 		})
 	})
 	deposit.mineOrFail(t, env)
-	env.getNextCallbackRequestWithTimeout(t)
-	env.websocketListeners[0].getNextMessageWithTimeout(t)
+	env.GetNextCallbackRequestWithTimeout(t)
+	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 }

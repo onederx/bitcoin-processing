@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"context"
@@ -13,7 +13,7 @@ const (
 	dbContainerName = "bitcoin-processing-integration-test-db"
 )
 
-func (e *testEnvironment) startDatabase(ctx context.Context) error {
+func (e *TestEnvironment) startDatabase(ctx context.Context) error {
 	log.Printf("Starting postgres")
 
 	containerConfig := &container.Config{Image: dbImageName}
@@ -35,16 +35,16 @@ func (e *testEnvironment) startDatabase(ctx context.Context) error {
 	}
 	e.db = &containerInfo{
 		name: "db",
-		id:   resp.ID,
+		ID:   resp.ID,
 	}
 
-	err = e.cli.ContainerStart(ctx, e.db.id, types.ContainerStartOptions{})
+	err = e.cli.ContainerStart(ctx, e.db.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
 	e.db.ip = e.getContainerIP(ctx, resp.ID)
 
-	log.Printf("db container started: id=%v", e.db.id)
+	log.Printf("db container started: id=%v", e.db.ID)
 
 	err = e.writeContainerLogs(ctx, e.db, "postgres.log")
 
@@ -55,23 +55,23 @@ func (e *testEnvironment) startDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (e *testEnvironment) stopDatabase(ctx context.Context) error {
+func (e *TestEnvironment) stopDatabase(ctx context.Context) error {
 	log.Printf("trying to stop db container")
 	if e.db == nil {
 		log.Printf("seems that db is not running")
 		return nil
 	}
 
-	if err := e.cli.ContainerStop(ctx, e.db.id, nil); err != nil {
+	if err := e.cli.ContainerStop(ctx, e.db.ID, nil); err != nil {
 		return err
 	}
 
-	log.Printf("db container stopped: id=%v", e.db.id)
+	log.Printf("db container stopped: id=%v", e.db.ID)
 	e.db = nil
 	return nil
 }
 
-func (e *testEnvironment) waitForDatabase() {
+func (e *TestEnvironment) waitForDatabase() {
 	log.Printf("waiting for postgres to start")
 	waitForPort(e.db.ip, 5432)
 	log.Printf("postgres started")

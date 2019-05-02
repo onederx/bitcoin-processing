@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 const coldStorageContainerName = "node-cold-storage"
 
-func (e *testEnvironment) startColdStorage(ctx context.Context) error {
+func (e *TestEnvironment) StartColdStorage(ctx context.Context) error {
 	log.Printf("Starting cold storage node")
 
 	containerConfig := &container.Config{Image: bitcoinNodeImageName}
@@ -50,47 +50,47 @@ func (e *testEnvironment) startColdStorage(ctx context.Context) error {
 	nodeContainerInfo := &bitcoinNodeContainerInfo{
 		containerInfo: containerInfo{
 			name: coldStorageContainerName,
-			id:   resp.ID,
+			ID:   resp.ID,
 		},
 	}
 	err = e.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
-	e.regtest[coldStorageContainerName] = nodeContainerInfo
+	e.Regtest[coldStorageContainerName] = nodeContainerInfo
 	nodeContainerInfo.ip = e.getContainerIP(ctx, resp.ID)
 	log.Printf("cold storage node started: id=%v", resp.ID)
 	return nil
 }
 
-func (e *testEnvironment) stopColdStorage(ctx context.Context) error {
+func (e *TestEnvironment) StopColdStorage(ctx context.Context) error {
 	log.Printf("trying to stop cold storage container")
-	if e.regtest == nil {
-		log.Printf("seems that regtest is not running")
+	if e.Regtest == nil {
+		log.Printf("seems that Regtest is not running")
 		return nil
 	}
-	cont, ok := e.regtest[coldStorageContainerName]
+	cont, ok := e.Regtest[coldStorageContainerName]
 
 	if !ok {
 		log.Printf("seems that cold storage container is not running")
 		return nil
 	}
 
-	delete(e.regtest, coldStorageContainerName)
+	delete(e.Regtest, coldStorageContainerName)
 
-	if err := e.cli.ContainerStop(ctx, cont.id, nil); err != nil {
+	if err := e.cli.ContainerStop(ctx, cont.ID, nil); err != nil {
 		return err
 	}
-	log.Printf("cold storage container stopped: id=%v", cont.id)
+	log.Printf("cold storage container stopped: id=%v", cont.ID)
 	return nil
 }
 
-func (e *testEnvironment) coldStorageLoadAndGenerateAddress() string {
-	csNode, err := connectToNodeWithBackoff(e.regtest[coldStorageContainerName].ip)
+func (e *TestEnvironment) ColdStorageLoadAndGenerateAddress() string {
+	csNode, err := connectToNodeWithBackoff(e.Regtest[coldStorageContainerName].ip)
 	if err != nil {
 		panic(err)
 	}
-	e.regtest[coldStorageContainerName].nodeAPI = csNode
+	e.Regtest[coldStorageContainerName].NodeAPI = csNode
 	nodeOutput, err := sendRequestToNodeWithBackoff(csNode, "getnewaddress", nil)
 	if err != nil {
 		panic(err)

@@ -9,30 +9,31 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
-func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
+func testDeposit(t *testing.T, env *testenv.TestEnvironment, clientAddress string) {
 	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount, initialTestMetainfo)
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
-		req := env.getNextCallbackRequestWithTimeout(t)
+		req := env.GetNextCallbackRequestWithTimeout(t)
 
 		runSubtest(t, "CallbackMethodAndUrl", func(t *testing.T) {
-			if got, want := req.method, "POST"; got != want {
+			if got, want := req.Method, "POST"; got != want {
 				t.Errorf("Expected callback request to use method %s, instead was %s", want, got)
 			}
-			if got, want := req.url.Path, defaultCallbackURLPath; got != want {
+			if got, want := req.URL.Path, testenv.DefaultCallbackURLPath; got != want {
 				t.Errorf("Callback path should be %s, instead got %s", want, got)
 			}
 		})
 
 		runSubtest(t, "CallbackNewDepositData", func(t *testing.T) {
-			notification := req.unmarshalOrFail(t)
+			notification := req.UnmarshalOrFail(t)
 
 			tx.id = notification.ID
 			checkNotificationFieldsForNewDeposit(t, notification, tx)
 		})
 
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 		data := event.Data.(*wallet.TxNotification)
 		if got, want := event.Type, events.NewIncomingTxEvent; got != want {
 			t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
@@ -55,8 +56,8 @@ func testDeposit(t *testing.T, env *testEnvironment, clientAddress string) {
 	})
 }
 
-func testMakeDeposit(t *testing.T, env *testEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {
-	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+func testMakeDeposit(t *testing.T, env *testenv.TestEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {
+	txHash, err := env.Regtest["node-client"].NodeAPI.SendWithPerKBFee(
 		address, amount, depositFee, false,
 	)
 
@@ -72,8 +73,8 @@ func testMakeDeposit(t *testing.T, env *testEnvironment, address string, amount 
 	}
 }
 
-func testDepositPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testDepositPartiallyConfirmed(t *testing.T, env *testenv.TestEnvironment, tx *txTestData) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 
 	if notification.ID != tx.id {
 		t.Errorf("Expected that tx id for confirmed tx in http callback "+
@@ -82,7 +83,7 @@ func testDepositPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTes
 	}
 	checkNotificationFieldsForPartiallyConfirmedDeposit(t, notification, tx)
 
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	if got, want := event.Type, events.IncomingTxConfirmedEvent; got != want {
 		t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
 			want, got)
@@ -97,8 +98,8 @@ func testDepositPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTes
 
 }
 
-func testDepositFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testDepositFullyConfirmed(t *testing.T, env *testenv.TestEnvironment, tx *txTestData) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 
 	if notification.ID != tx.id {
 		t.Errorf("Expected that tx id for confirmed tx in http callback "+
@@ -107,7 +108,7 @@ func testDepositFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestDat
 	}
 	checkNotificationFieldsForFullyConfirmedDeposit(t, notification, tx)
 
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	if got, want := event.Type, events.IncomingTxConfirmedEvent; got != want {
 		t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
 			want, got)
@@ -121,15 +122,15 @@ func testDepositFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestDat
 	checkNotificationFieldsForFullyConfirmedDeposit(t, data, tx)
 }
 
-func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientAddress string, neededConfirmations int) {
+func testDepositSeveralConfirmations(t *testing.T, env *testenv.TestEnvironment, clientAddress string, neededConfirmations int) {
 	tx := testMakeDeposit(t, env, clientAddress, testDepositAmount, nil)
 
 	runSubtest(t, "NewTransaction", func(t *testing.T) {
-		notification := env.getNextCallbackNotificationWithTimeout(t)
+		notification := env.GetNextCallbackNotificationWithTimeout(t)
 		tx.id = notification.ID
 		checkNotificationFieldsForNewDeposit(t, notification, tx)
 
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 		data := event.Data.(*wallet.TxNotification)
 		if got, want := event.Type, events.NewIncomingTxEvent; got != want {
 			t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
@@ -151,14 +152,14 @@ func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientA
 		testDepositPartiallyConfirmed(t, env, tx)
 
 		for i := 2; i < neededConfirmations; i++ {
-			_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+			_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
 			tx.confirmations = int64(i)
 			testDepositPartiallyConfirmed(t, env, tx)
 		}
-		_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+		_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +168,7 @@ func testDepositSeveralConfirmations(t *testing.T, env *testEnvironment, clientA
 	})
 }
 
-func testDepositMultiple(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
+func testDepositMultiple(t *testing.T, env *testenv.TestEnvironment, accounts []*wallet.Account) {
 	const nDeposits = 3
 
 	amounts := []bitcoin.BTCAmount{
@@ -186,7 +187,7 @@ func testDepositMultiple(t *testing.T, env *testEnvironment, accounts []*wallet.
 	}
 }
 
-func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
+func testDepositMultipleSimultaneous(t *testing.T, env *testenv.TestEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
 	balanceByNow := getStableBalanceOrFail(t, env)
 
 	// 0.1 + 0.2 + 0.3 = 0.6
@@ -245,7 +246,7 @@ func testDepositMultipleSimultaneous(t *testing.T, env *testEnvironment, account
 	})
 }
 
-func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
+func testDepositMultipleInterleaved(t *testing.T, env *testenv.TestEnvironment, accounts []*wallet.Account, amounts []bitcoin.BTCAmount, useDifferentAddresses bool, nDeposits int) {
 	balanceByNow := getStableBalanceOrFail(t, env)
 
 	var txYounger, txOlder *txTestData
@@ -300,16 +301,16 @@ func testDepositMultipleInterleaved(t *testing.T, env *testEnvironment, accounts
 	})
 }
 
-func testSendFundsToHotWallet(t *testing.T, env *testEnvironment, hotWalletAddress string) {
+func testSendFundsToHotWallet(t *testing.T, env *testenv.TestEnvironment, hotWalletAddress string) {
 	balance := getStableBalanceOrFail(t, env)
 	hotWalletIncome := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.3"))
 	expectedBalanceAfterIncome := balance + hotWalletIncome
 
-	txHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+	txHash, err := env.Regtest["node-client"].NodeAPI.SendWithPerKBFee(
 		hotWalletAddress, hotWalletIncome, depositFee, false,
 	)
 	waitForEventOrFailTest(t, func() error {
-		balanceInfo, err := env.processingClient.GetBalance()
+		balanceInfo, err := env.ProcessingClient.GetBalance()
 
 		if err != nil {
 			return err
@@ -322,12 +323,12 @@ func testSendFundsToHotWallet(t *testing.T, env *testEnvironment, hotWalletAddre
 			"after tx sending money to hot wallet address was created, but "+
 			"it is %s", expectedBalanceAfterIncome, balanceInfo.BalanceWithUnconf)
 	})
-	_, err = env.mineTx(txHash)
+	_, err = env.MineTx(txHash)
 	if err != nil {
 		t.Fatalf("Failed to mine tx %s into blockchain: %v", txHash, err)
 	}
 	waitForEventOrFailTest(t, func() error {
-		balanceInfo, err := env.processingClient.GetBalance()
+		balanceInfo, err := env.ProcessingClient.GetBalance()
 
 		if err != nil {
 			return err
@@ -342,7 +343,7 @@ func testSendFundsToHotWallet(t *testing.T, env *testEnvironment, hotWalletAddre
 	})
 }
 
-func testDepositSingleBitcoinTxWithMultipleExists(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
+func testDepositSingleBitcoinTxWithMultipleExists(t *testing.T, env *testenv.TestEnvironment, accounts []*wallet.Account) {
 	balanceByNow := getStableBalanceOrFail(t, env)
 
 	nDeposits := len(accounts)
@@ -356,7 +357,7 @@ func testDepositSingleBitcoinTxWithMultipleExists(t *testing.T, env *testEnviron
 	// 0.1 + 0.2 + 0.3
 	balanceAfterDeposit := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
 
-	hash, err := env.regtest["node-client"].nodeAPI.SendToMultipleAddresses(amounts)
+	hash, err := env.Regtest["node-client"].NodeAPI.SendToMultipleAddresses(amounts)
 
 	if err != nil {
 		t.Fatalf("Failed to send money from client node for deposit: %v", err)
@@ -386,7 +387,7 @@ func testDepositSingleBitcoinTxWithMultipleExists(t *testing.T, env *testEnviron
 		checkBalance(t, env, balanceByNow, balanceAfterDeposit)
 	})
 
-	blockHash, err := env.mineTx(hash)
+	blockHash, err := env.MineTx(hash)
 
 	if err != nil {
 		t.Fatalf("Failed to mine deposit bitcoin tx on miner node: %v", err)

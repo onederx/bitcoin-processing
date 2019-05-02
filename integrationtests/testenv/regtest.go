@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
+	"github.com/onederx/bitcoin-processing/integrationtests/util"
 	"github.com/onederx/bitcoin-processing/settings"
 )
 
@@ -61,11 +62,11 @@ var bitcoinNodes = []string{
 	"node-miner",
 }
 
-func (e *testEnvironment) startRegtest(ctx context.Context) error {
-	log.Printf("Starting regtest nodes")
+func (e *TestEnvironment) startRegtest(ctx context.Context) error {
+	log.Printf("Starting Regtest nodes")
 
 	containerConfig := &container.Config{Image: bitcoinNodeImageName}
-	e.regtest = make(map[string]*bitcoinNodeContainerInfo)
+	e.Regtest = make(map[string]*bitcoinNodeContainerInfo)
 
 	for _, node := range bitcoinNodes {
 		peers := make([]string, 0)
@@ -122,7 +123,7 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 		nodeContainerInfo := &bitcoinNodeContainerInfo{
 			containerInfo: containerInfo{
 				name: node,
-				id:   resp.ID,
+				ID:   resp.ID,
 			},
 		}
 		err = e.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
@@ -130,7 +131,7 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 			e.stopRegtest(ctx) // in case other nodes were started
 			return err
 		}
-		e.regtest[node] = nodeContainerInfo
+		e.Regtest[node] = nodeContainerInfo
 		nodeContainerInfo.ip = e.getContainerIP(ctx, resp.ID)
 
 		err = e.writeContainerLogs(ctx, &nodeContainerInfo.containerInfo, node+".log")
@@ -140,14 +141,14 @@ func (e *testEnvironment) startRegtest(ctx context.Context) error {
 			return err
 		}
 
-		log.Printf("regtest node %s started: id=%v", node, resp.ID)
+		log.Printf("Regtest node %s started: id=%v", node, resp.ID)
 	}
 	e.regtestIsLoaded = make(chan error)
 	go e.initRegtest()
 	return nil
 }
 
-func (e *testEnvironment) setProcessingAddressForNotifications(address string) {
+func (e *TestEnvironment) setProcessingAddressForNotifications(address string) {
 	templateArgs := struct{ ProcessingAddress string }{ProcessingAddress: address}
 
 	tmpl := template.Must(template.New("notifyscript").Parse(processingNotifyScriptTemplate))
@@ -190,7 +191,7 @@ func connectToNode(host string) (result nodeapi.NodeAPI, r interface{}) {
 func connectToNodeWithBackoff(host string) (nodeapi.NodeAPI, error) {
 	var api nodeapi.NodeAPI
 
-	err := waitForEvent(func() error {
+	err := util.WaitForEvent(func() error {
 		var r interface{}
 		api, r = connectToNode(host)
 		if api != nil {
@@ -209,7 +210,7 @@ func sendRequestToNodeWithBackoff(n nodeapi.NodeAPI, method string, params []int
 		Error  *nodeapi.JSONRPCError
 	}
 
-	err := waitForEvent(func() error {
+	err := util.WaitForEvent(func() error {
 		responseJSON, err := n.SendRequestToNode(method, params)
 
 		if err != nil {
@@ -228,13 +229,13 @@ func sendRequestToNodeWithBackoff(n nodeapi.NodeAPI, method string, params []int
 	return result, err
 }
 
-func (e *testEnvironment) initRegtest() {
-	clientNode, err := connectToNodeWithBackoff(e.regtest["node-client"].ip)
+func (e *TestEnvironment) initRegtest() {
+	clientNode, err := connectToNodeWithBackoff(e.Regtest["node-client"].ip)
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
 	}
-	e.regtest["node-client"].nodeAPI = clientNode
+	e.Regtest["node-client"].NodeAPI = clientNode
 	nodeOutput, err := sendRequestToNodeWithBackoff(clientNode, "generate", []interface{}{3})
 	if err != nil {
 		e.regtestIsLoaded <- err
@@ -246,12 +247,12 @@ func (e *testEnvironment) initRegtest() {
 		panic(fmt.Sprintf("Client node API returned malformed JSON %s", nodeOutput))
 	}
 	log.Printf("Client node generated %d blocks", len(blocks))
-	minerNode, err := connectToNodeWithBackoff(e.regtest["node-miner"].ip)
+	minerNode, err := connectToNodeWithBackoff(e.Regtest["node-miner"].ip)
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
 	}
-	e.regtest["node-miner"].nodeAPI = minerNode
+	e.Regtest["node-miner"].NodeAPI = minerNode
 	nodeOutput, err = sendRequestToNodeWithBackoff(minerNode, "generate", []interface{}{110})
 	if err != nil {
 		e.regtestIsLoaded <- err
@@ -262,17 +263,17 @@ func (e *testEnvironment) initRegtest() {
 		panic(fmt.Sprintf("Miner node API returned malformed JSON %s", nodeOutput))
 	}
 	log.Printf("Miner node generated %d blocks", len(blocks))
-	ourNode, err := connectToNodeWithBackoff(e.regtest["node-our"].ip)
+	ourNode, err := connectToNodeWithBackoff(e.Regtest["node-our"].ip)
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
 	}
-	e.regtest["node-our"].nodeAPI = ourNode
+	e.Regtest["node-our"].NodeAPI = ourNode
 	e.regtestIsLoaded <- nil
 }
 
-func (e *testEnvironment) waitForContainerRemoval(ctx context.Context, containerID string) error {
-	return waitForEvent(func() error {
+func (e *TestEnvironment) WaitForContainerRemoval(ctx context.Context, containerID string) error {
+	return util.WaitForEvent(func() error {
 		_, err := e.cli.ContainerInspect(ctx, containerID)
 
 		if err != nil {
@@ -282,20 +283,20 @@ func (e *testEnvironment) waitForContainerRemoval(ctx context.Context, container
 	})
 }
 
-func (e *testEnvironment) stopRegtest(ctx context.Context) error {
-	log.Printf("trying to stop regtest containers")
-	if e.regtest == nil {
-		log.Printf("seems that regtest is not running")
+func (e *TestEnvironment) stopRegtest(ctx context.Context) error {
+	log.Printf("trying to stop Regtest containers")
+	if e.Regtest == nil {
+		log.Printf("seems that Regtest is not running")
 		return nil
 	}
 
-	for _, container := range e.regtest {
-		if err := e.cli.ContainerStop(ctx, container.id, nil); err != nil {
+	for _, container := range e.Regtest {
+		if err := e.cli.ContainerStop(ctx, container.ID, nil); err != nil {
 			return err
 		}
-		log.Printf("regtest container stopped: id=%v", container.id)
+		log.Printf("Regtest container stopped: id=%v", container.ID)
 	}
-	e.regtest = nil
+	e.Regtest = nil
 	if e.notifyScriptFile != nil {
 		e.notifyScriptFile.Close()
 		e.notifyScriptFile = nil
@@ -303,16 +304,16 @@ func (e *testEnvironment) stopRegtest(ctx context.Context) error {
 	return nil
 }
 
-func (e *testEnvironment) waitForRegtest() {
-	log.Printf("waiting for regtest to start and load")
+func (e *TestEnvironment) waitForRegtest() {
+	log.Printf("waiting for Regtest to start and load")
 	err := <-e.regtestIsLoaded
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("regtest ready")
+	log.Printf("Regtest ready")
 }
 
-func generateBlocks(nodeAPI nodeapi.NodeAPI, amount int) ([]string, error) {
+func GenerateBlocks(nodeAPI nodeapi.NodeAPI, amount int) ([]string, error) {
 	var response struct {
 		Result []string
 		Error  *nodeapi.JSONRPCError
@@ -333,10 +334,10 @@ func generateBlocks(nodeAPI nodeapi.NodeAPI, amount int) ([]string, error) {
 	return response.Result, nil
 }
 
-func (e *testEnvironment) mineTx(txHash string) (string, error) {
-	miner := e.regtest["node-miner"].nodeAPI
+func (e *TestEnvironment) MineTx(txHash string) (string, error) {
+	miner := e.Regtest["node-miner"].NodeAPI
 	log.Printf("Mine tx: waiting for tx %s to get into miner mempool", txHash)
-	err := waitForEvent(func() error {
+	err := util.WaitForEvent(func() error {
 		var response rawMempoolResponse
 		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
 		if err != nil {
@@ -360,17 +361,17 @@ func (e *testEnvironment) mineTx(txHash string) (string, error) {
 		return "", err
 	}
 	log.Printf("Mine tx: tx %s is in miner mempool generating new block", txHash)
-	generatedBlocks, err := generateBlocks(miner, 1)
+	generatedBlocks, err := GenerateBlocks(miner, 1)
 	if err != nil {
 		return "", err
 	}
 	return generatedBlocks[0], nil
 }
 
-func (e *testEnvironment) mineAnyTx() (string, error) {
-	miner := e.regtest["node-miner"].nodeAPI
+func (e *TestEnvironment) MineAnyTx() (string, error) {
+	miner := e.Regtest["node-miner"].NodeAPI
 	log.Print("Mine tx: waiting for any tx to get into miner mempool")
-	err := waitForEvent(func() error {
+	err := util.WaitForEvent(func() error {
 		var response rawMempoolResponse
 		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
 		if err != nil {
@@ -391,17 +392,17 @@ func (e *testEnvironment) mineAnyTx() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	generatedBlocks, err := generateBlocks(miner, 1)
+	generatedBlocks, err := GenerateBlocks(miner, 1)
 	if err != nil {
 		return "", err
 	}
 	return generatedBlocks[0], nil
 }
 
-func (e *testEnvironment) mineMultipleTxns(txHashes []string) (string, error) {
-	miner := e.regtest["node-miner"].nodeAPI
+func (e *TestEnvironment) MineMultipleTxns(txHashes []string) (string, error) {
+	miner := e.Regtest["node-miner"].NodeAPI
 	log.Printf("Mine tx: waiting for txns %v to get into miner mempool", txHashes)
-	err := waitForEvent(func() error {
+	err := util.WaitForEvent(func() error {
 		var response rawMempoolResponse
 		responseJSON, err := miner.SendRequestToNode("getrawmempool", nil)
 		if err != nil {
@@ -431,14 +432,14 @@ func (e *testEnvironment) mineMultipleTxns(txHashes []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	generatedBlocks, err := generateBlocks(miner, 1)
+	generatedBlocks, err := GenerateBlocks(miner, 1)
 	if err != nil {
 		return "", err
 	}
 	return generatedBlocks[0], nil
 }
 
-func (e *testEnvironment) getNodeBalance(node nodeapi.NodeAPI) (*api.BalanceInfo, error) {
+func (e *TestEnvironment) GetNodeBalance(node nodeapi.NodeAPI) (*api.BalanceInfo, error) {
 	balanceConfU64, balanceUnconfU64, err := node.GetConfirmedAndUnconfirmedBalance()
 
 	if err != nil {
@@ -452,6 +453,6 @@ func (e *testEnvironment) getNodeBalance(node nodeapi.NodeAPI) (*api.BalanceInfo
 	return result, nil
 }
 
-func (e *testEnvironment) getClientBalance() (*api.BalanceInfo, error) {
-	return e.getNodeBalance(e.regtest["node-client"].nodeAPI)
+func (e *TestEnvironment) GetClientBalance() (*api.BalanceInfo, error) {
+	return e.GetNodeBalance(e.Regtest["node-client"].NodeAPI)
 }

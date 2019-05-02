@@ -8,6 +8,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
 const zeroBTC = bitcoin.BTCAmount(0)
@@ -37,24 +38,24 @@ var initialTestMetainfo = testMetainfo{
 
 func TestSmoke(t *testing.T) {
 	ctx := context.Background()
-	env, err := newTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = env.start(ctx)
+	err = env.Start(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stop(ctx)
-	env.waitForLoad()
-	err = env.startProcessingWithDefaultSettings(ctx)
+	defer env.Stop(ctx)
+	env.WaitForLoad()
+	err = env.StartProcessingWithDefaultSettings(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stopProcessing(ctx)
-	env.waitForProcessing()
+	defer env.StopProcessing(ctx)
+	env.WaitForProcessing()
 
-	_, err = env.processingClient.GetEvents(0)
+	_, err = env.ProcessingClient.GetEvents(0)
 
 	if err != nil {
 		t.Fatal(err)
@@ -63,23 +64,23 @@ func TestSmoke(t *testing.T) {
 
 func TestCommonUsage(t *testing.T) {
 	ctx := context.Background()
-	env, err := newTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = env.start(ctx)
+	err = env.Start(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stop(ctx)
-	env.waitForLoad()
-	err = env.startProcessingWithDefaultSettings(ctx)
+	defer env.Stop(ctx)
+	env.WaitForLoad()
+	err = env.StartProcessingWithDefaultSettings(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stopProcessing(ctx)
-	env.waitForProcessing()
-	_, err = env.newWebsocketListener(0)
+	defer env.StopProcessing(ctx)
+	env.WaitForProcessing()
+	_, err = env.NewWebsocketListener(0)
 	if err != nil {
 		t.Fatalf("Failed to connect websocket event listener %v", err)
 	}
@@ -142,37 +143,37 @@ func TestMoreConfirmations(t *testing.T) {
 	const neededConfirmations = 4
 
 	ctx := context.Background()
-	env, err := newTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = env.start(ctx)
+	err = env.Start(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stop(ctx)
-	env.waitForLoad()
+	defer env.Stop(ctx)
+	env.WaitForLoad()
 
-	processingSettings := defaultSettings
+	processingSettings := testenv.DefaultSettings
 
 	processingSettings.MaxConfirmations = neededConfirmations
-	processingSettings.CallbackURL = env.callbackURL
+	processingSettings.CallbackURL = env.CallbackURL
 
-	err = env.startProcessing(ctx, &processingSettings)
+	err = env.StartProcessing(ctx, &processingSettings)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stopProcessing(ctx)
-	env.waitForProcessing()
-	_, err = env.newWebsocketListener(0)
+	defer env.StopProcessing(ctx)
+	env.WaitForProcessing()
+	_, err = env.NewWebsocketListener(0)
 	if err != nil {
 		t.Fatalf("Failed to connect websocket event listener %v", err)
 	}
 
-	clientWallet, err := env.processingClient.NewWallet(nil)
+	clientWallet, err := env.ProcessingClient.NewWallet(nil)
 
 	// skip new wallet notification
-	env.websocketListeners[0].getNextMessageWithTimeout(t)
+	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	runSubtest(t, "Deposit", func(t *testing.T) {
 		testDepositSeveralConfirmations(t, env, clientWallet.Address, neededConfirmations)
@@ -187,23 +188,23 @@ func TestMoreConfirmations(t *testing.T) {
 
 func TestMultipleExits(t *testing.T) {
 	ctx := context.Background()
-	env, err := newTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = env.start(ctx)
+	err = env.Start(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stop(ctx)
-	env.waitForLoad()
-	err = env.startProcessingWithDefaultSettings(ctx)
+	defer env.Stop(ctx)
+	env.WaitForLoad()
+	err = env.StartProcessingWithDefaultSettings(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer env.stopProcessing(ctx)
-	env.waitForProcessing()
-	_, err = env.newWebsocketListener(0)
+	defer env.StopProcessing(ctx)
+	env.WaitForProcessing()
+	_, err = env.NewWebsocketListener(0)
 	if err != nil {
 		t.Fatalf("Failed to connect websocket event listener %v", err)
 	}

@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"context"
@@ -18,7 +18,7 @@ const (
 	baseImageName           = "debian:stretch"
 	processingContainerName = "bitcoin-processing-integration-test-main"
 
-	defaultCallbackURLPath = "/wallets/cb"
+	DefaultCallbackURLPath = "/wallets/cb"
 
 	configTemplate = `transaction:
   callback:
@@ -49,21 +49,21 @@ type processingSettings struct {
 	AdditionalWalletSettings             string
 }
 
-var defaultSettings = processingSettings{
+var DefaultSettings = processingSettings{
 	MaxConfirmations:                     1,
-	CallbackURL:                          "http://127.0.0.1:9000" + defaultCallbackURLPath,
+	CallbackURL:                          "http://127.0.0.1:9000" + DefaultCallbackURLPath,
 	MinWithdrawWithoutManualConfirmation: "0.1",
 }
 
-func (e *testEnvironment) startProcessingWithDefaultSettings(ctx context.Context) error {
-	settings := defaultSettings
-	if e.callbackURL != "" {
-		settings.CallbackURL = e.callbackURL
+func (e *TestEnvironment) StartProcessingWithDefaultSettings(ctx context.Context) error {
+	settings := DefaultSettings
+	if e.CallbackURL != "" {
+		settings.CallbackURL = e.CallbackURL
 	}
-	return e.startProcessing(ctx, &settings)
+	return e.StartProcessing(ctx, &settings)
 }
 
-func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSettings) error {
+func (e *TestEnvironment) StartProcessing(ctx context.Context, s *processingSettings) error {
 	log.Printf("Starting bitcoin processing container")
 
 	configTempFile, err := ioutil.TempFile("", "")
@@ -98,23 +98,23 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 	if err != nil {
 		return err
 	}
-	e.processing = &containerInfo{name: "main", id: resp.ID}
+	e.Processing = &containerInfo{name: "main", ID: resp.ID}
 
-	err = e.cli.ContainerStart(ctx, e.processing.id, types.ContainerStartOptions{})
+	err = e.cli.ContainerStart(ctx, e.Processing.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
-	e.processing.ip = e.getContainerIP(ctx, resp.ID)
+	e.Processing.ip = e.getContainerIP(ctx, resp.ID)
 
-	e.setProcessingAddressForNotifications(e.processing.ip)
+	e.setProcessingAddressForNotifications(e.Processing.ip)
 
-	e.processingClient = client.NewClient(e.processingURL("/"))
+	e.ProcessingClient = client.NewClient(e.processingURL("/"))
 
-	e.processingSettings = s
+	e.ProcessingSettings = s
 
-	log.Printf("processing container started: id=%v", e.processing.id)
+	log.Printf("processing container started: id=%v", e.Processing.ID)
 
-	err = e.writeContainerLogs(ctx, e.processing, "processing.log")
+	err = e.writeContainerLogs(ctx, e.Processing, "processing.log")
 
 	if err != nil {
 		return err
@@ -123,25 +123,25 @@ func (e *testEnvironment) startProcessing(ctx context.Context, s *processingSett
 	return nil
 }
 
-func (e *testEnvironment) stopProcessing(ctx context.Context) error {
+func (e *TestEnvironment) StopProcessing(ctx context.Context) error {
 	log.Printf("stopping bitcoin processing container")
 
-	if e.processing == nil {
+	if e.Processing == nil {
 		log.Printf("seems that processing is not running")
 		return nil
 	}
 
-	if err := e.cli.ContainerStop(ctx, e.processing.id, nil); err != nil {
+	if err := e.cli.ContainerStop(ctx, e.Processing.ID, nil); err != nil {
 		return err
 	}
 
-	log.Printf("bitcoin processing container stopped: id=%v", e.processing.id)
-	e.processing = nil
+	log.Printf("bitcoin processing container stopped: id=%v", e.Processing.ID)
+	e.Processing = nil
 	return nil
 }
 
-func (e *testEnvironment) waitForProcessing() {
+func (e *TestEnvironment) WaitForProcessing() {
 	log.Printf("waiting for processing to start")
-	waitForPort(e.processing.ip, 8000)
+	waitForPort(e.Processing.ip, 8000)
 	log.Printf("processing started")
 }

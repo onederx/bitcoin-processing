@@ -8,14 +8,15 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
-func testHotWallet(t *testing.T, env *testEnvironment, ctx context.Context) {
+func testHotWallet(t *testing.T, env *testenv.TestEnvironment, ctx context.Context) {
 	var hotWalletAddress string
 
 	runSubtest(t, "WasGenerated", func(t *testing.T) {
 		var err error
-		hotWalletAddress, err = env.processingClient.GetHotStorageAddress()
+		hotWalletAddress, err = env.ProcessingClient.GetHotStorageAddress()
 		if err != nil {
 			t.Fatalf("Failed to request hot wallet address %v", err)
 		}
@@ -30,18 +31,18 @@ func testHotWallet(t *testing.T, env *testEnvironment, ctx context.Context) {
 		// restart processing
 
 		// stop
-		processingContainerID := env.processing.id
-		lastSeq := env.websocketListeners[0].lastSeq
-		env.websocketListeners[0].stop()
-		env.websocketListeners = nil
-		env.stopProcessing(ctx)
-		env.waitForContainerRemoval(ctx, processingContainerID)
+		processingContainerID := env.Processing.ID
+		lastSeq := env.WebsocketListeners[0].LastSeq
+		env.WebsocketListeners[0].Stop()
+		env.WebsocketListeners = nil
+		env.StopProcessing(ctx)
+		env.WaitForContainerRemoval(ctx, processingContainerID)
 
 		// start
-		env.startProcessingWithDefaultSettings(ctx)
-		env.waitForProcessing()
+		env.StartProcessingWithDefaultSettings(ctx)
+		env.WaitForProcessing()
 
-		hotWalletAddressNow, err := env.processingClient.GetHotStorageAddress()
+		hotWalletAddressNow, err := env.ProcessingClient.GetHotStorageAddress()
 		if err != nil {
 			t.Fatalf("Failed to request hot wallet address %v", err)
 		}
@@ -51,14 +52,14 @@ func testHotWallet(t *testing.T, env *testEnvironment, ctx context.Context) {
 				hotWalletAddressNow)
 		}
 		// restore stopped websocket listener
-		_, err = env.newWebsocketListener(lastSeq + 1)
+		_, err = env.NewWebsocketListener(lastSeq + 1)
 		if err != nil {
 			t.Fatalf("Failed to connect websocket event listener %v", err)
 		}
 	})
 }
 
-func testGenerateClientWallet(t *testing.T, env *testEnvironment) *wallet.Account {
+func testGenerateClientWallet(t *testing.T, env *testenv.TestEnvironment) *wallet.Account {
 	var clientAccount *wallet.Account
 	runSubtest(t, "EmptyMetainfo", func(t *testing.T) {
 		testGenerateClientWalletWithMetainfo(t, env, nil, 1)
@@ -69,8 +70,8 @@ func testGenerateClientWallet(t *testing.T, env *testEnvironment) *wallet.Accoun
 	return clientAccount
 }
 
-func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, metainfo interface{}, checkSeq int) *wallet.Account {
-	result, err := env.processingClient.NewWallet(metainfo)
+func testGenerateClientWalletWithMetainfo(t *testing.T, env *testenv.TestEnvironment, metainfo interface{}, checkSeq int) *wallet.Account {
+	result, err := env.ProcessingClient.NewWallet(metainfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +88,7 @@ func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, me
 	if address == "" {
 		t.Errorf("Generated address is empty")
 	}
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	if checkSeq >= 0 {
 		if got, want := event.Seq, checkSeq; got != want {
 			t.Errorf("Unxpected sequence number of second event: %d, wanted %d", got, want)
@@ -109,7 +110,7 @@ func testGenerateClientWalletWithMetainfo(t *testing.T, env *testEnvironment, me
 	return result
 }
 
-func testGenerateMultipleClientWallets(t *testing.T, env *testEnvironment) []*wallet.Account {
+func testGenerateMultipleClientWallets(t *testing.T, env *testenv.TestEnvironment) []*wallet.Account {
 	type testData struct {
 		ID int `json:"id"`
 	}

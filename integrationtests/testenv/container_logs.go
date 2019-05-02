@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (e *testEnvironment) writeContainerLogs(ctx context.Context, container *containerInfo, filename string) error {
+func (e *TestEnvironment) writeContainerLogs(ctx context.Context, container *containerInfo, filename string) error {
 	logFile, err := os.OpenFile(
 		filename,
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
@@ -20,7 +20,7 @@ func (e *testEnvironment) writeContainerLogs(ctx context.Context, container *con
 		return err
 	}
 
-	logReader, err := e.cli.ContainerLogs(ctx, container.id, types.ContainerLogsOptions{
+	logReader, err := e.cli.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: true,
@@ -39,14 +39,14 @@ func (e *testEnvironment) writeContainerLogs(ctx context.Context, container *con
 
 		if err != nil {
 			log.Printf("Log reader for container %s (id %s) got error %v",
-				container.name, container.id, err)
+				container.name, container.ID, err)
 		} else {
 			log.Printf("Done streaming logs from container %s (id %s)",
-				container.name, container.id)
+				container.name, container.ID)
 		}
 	}()
 	log.Printf("Started streaming logs from container %s (id %s) to log %s",
-		container.name, container.id, filename,
+		container.name, container.ID, filename,
 	)
 	return nil
 }

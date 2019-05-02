@@ -12,9 +12,10 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
-func testWithdraw(t *testing.T, env *testEnvironment) {
+func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
 	clientBalance := getStableClientBalanceOrFail(t, env)
 
@@ -50,7 +51,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 		})
 		expectedClientBalanceAfterWithdraw := clientBalance + withdrawAmountBig - withdrawFee
 		runSubtest(t, "ManuallyConfirmTransaction", func(t *testing.T) {
-			err := env.processingClient.Confirm(tx.id)
+			err := env.ProcessingClient.Confirm(tx.id)
 
 			if err != nil {
 				t.Fatalf("Failed to confirm tx: %v", err)
@@ -72,7 +73,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountBig, nil)
 			testWithdrawTransactionPendingManualConfirmation(t, env, tx,
 				wantBalance, true)
-			err := env.processingClient.Cancel(tx.id)
+			err := env.ProcessingClient.Cancel(tx.id)
 
 			if err != nil {
 				t.Fatalf("Failed to cancel tx pending manual confirmation: %v",
@@ -98,7 +99,7 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			Address: withdrawAddress,
 			Fee:     withdrawFee,
 		}
-		resp, err := env.processingClient.Withdraw(req)
+		resp, err := env.ProcessingClient.Withdraw(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,29 +108,29 @@ func testWithdraw(t *testing.T, env *testEnvironment) {
 			t.Errorf("Expected resulting withdraw id to be equal to "+
 				"requested one %s, but got %s", withdrawID, resp.ID)
 		}
-		notification := env.getNextCallbackNotificationWithTimeout(t)
+		notification := env.GetNextCallbackNotificationWithTimeout(t)
 		if notification.ID != withdrawID {
 			t.Errorf("Expected withdraw id in http notification to be equal "+
 				"to requested one %s, but got %s", withdrawID, notification.ID)
 		}
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 		data := event.Data.(*wallet.TxNotification)
 		if data.ID != req.ID {
 			t.Errorf("Expected withdraw id in http notification to be equal "+
 				"to requested one %s, but got %s", withdrawID, data.ID)
 		}
-		env.mineTx(notification.Hash)
+		env.MineTx(notification.Hash)
 		// skip corresponding notifications
-		env.getNextCallbackNotificationWithTimeout(t)
-		env.websocketListeners[0].getNextMessageWithTimeout(t)
+		env.GetNextCallbackNotificationWithTimeout(t)
+		env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	})
 }
 
-func testMakeWithdraw(t *testing.T, env *testEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {
+func testMakeWithdraw(t *testing.T, env *testenv.TestEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {
 	req := &wallet.WithdrawRequest{
 		Address: address, Amount: amount, Fee: withdrawFee, Metainfo: metainfo,
 	}
-	resp, err := env.processingClient.Withdraw(req)
+	resp, err := env.ProcessingClient.Withdraw(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +145,7 @@ func testMakeWithdraw(t *testing.T, env *testEnvironment, address string, amount
 	}
 }
 
-func testWithdrawInsufficientFunds(t *testing.T, env *testEnvironment) {
+func testWithdrawInsufficientFunds(t *testing.T, env *testenv.TestEnvironment) {
 	testNames := map[bool]string{false: "PayMissing", true: "Cancel"}
 	for _, doCancel := range []bool{false, true} {
 		name := testNames[doCancel]
@@ -159,25 +160,25 @@ func testWithdrawInsufficientFunds(t *testing.T, env *testEnvironment) {
 	}
 }
 
-func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, cancel bool) {
+func testWithdrawInsufficientFundsPending(t *testing.T, env *testenv.TestEnvironment, cancel bool) {
 	ourBalance := getStableBalanceOrFail(t, env)
 	withdrawAmountTooBig := ourBalance + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
 	unconfirmedIncome := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("2"))
 
-	clientAccount, err := env.processingClient.NewWallet(nil)
+	clientAccount, err := env.ProcessingClient.NewWallet(nil)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 	// skip corresponding notification
-	env.websocketListeners[0].getNextMessageWithTimeout(t)
-	unconfirmedIncomeTxHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
+	unconfirmedIncomeTxHash, err := env.Regtest["node-client"].NodeAPI.SendWithPerKBFee(
 		clientAccount.Address, unconfirmedIncome, depositFee, false,
 	)
 
 	// skip corresponding notifications
-	env.getNextCallbackNotificationWithTimeout(t)
-	env.websocketListeners[0].getNextMessageWithTimeout(t)
+	env.GetNextCallbackNotificationWithTimeout(t)
+	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	checkBalance(t, env, ourBalance, ourBalance+unconfirmedIncome)
 
@@ -190,7 +191,7 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, ca
 	})
 
 	if cancel {
-		err := env.processingClient.Cancel(tx.id)
+		err := env.ProcessingClient.Cancel(tx.id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -198,7 +199,7 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, ca
 		checkBalance(t, env, ourBalance, ourBalance+unconfirmedIncome)
 	}
 
-	_, err = env.mineTx(unconfirmedIncomeTxHash)
+	_, err = env.MineTx(unconfirmedIncomeTxHash)
 
 	if err != nil {
 		t.Fatal(err)
@@ -206,8 +207,8 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, ca
 
 	if cancel {
 		// skip notifications from incoming tx confirmation
-		env.getNextCallbackNotificationWithTimeout(t)
-		env.websocketListeners[0].getNextMessageWithTimeout(t)
+		env.GetNextCallbackNotificationWithTimeout(t)
+		env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 		ourBalanceAfterIncome := ourBalance + unconfirmedIncome
 		checkBalance(t, env, ourBalanceAfterIncome, ourBalanceAfterIncome)
 		return
@@ -228,7 +229,7 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testEnvironment, ca
 	testWithdrawFullyConfirmed(t, env, tx, clientBalanceAfterWithdraw)
 }
 
-func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvironment, cancel bool) {
+func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testenv.TestEnvironment, cancel bool) {
 	ourBalance := getStableBalanceOrFail(t, env)
 	overflowAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
 	withdrawAmountTooBig := ourBalance + overflowAmount
@@ -246,7 +247,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 	})
 
 	if cancel {
-		err := env.processingClient.Cancel(tx.id)
+		err := env.ProcessingClient.Cancel(tx.id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -256,7 +257,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 		return
 	}
 
-	hsAddress, err := env.processingClient.GetHotStorageAddress()
+	hsAddress, err := env.ProcessingClient.GetHotStorageAddress()
 
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +265,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 
 	incomeAmount := overflowAmount + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
 
-	incomeTxHash, err := env.regtest["node-client"].nodeAPI.SendWithPerKBFee(
+	incomeTxHash, err := env.Regtest["node-client"].NodeAPI.SendWithPerKBFee(
 		hsAddress, incomeAmount, depositFee, false,
 	)
 
@@ -284,7 +285,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 	})
 	checkRequiredFromColdStorage(t, env, zeroBTC)
 
-	_, err = env.mineTx(incomeTxHash)
+	_, err = env.MineTx(incomeTxHash)
 
 	if err != nil {
 		t.Fatal(err)
@@ -300,7 +301,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testEnvi
 	testWithdrawFullyConfirmed(t, env, tx, clientBalanceAfterWithdraw)
 }
 
-func testMakePendingWithdraw(t *testing.T, env *testEnvironment, amount bitcoin.BTCAmount) *txTestData {
+func testMakePendingWithdraw(t *testing.T, env *testenv.TestEnvironment, amount bitcoin.BTCAmount) *txTestData {
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
 
 	tx := testMakeWithdraw(t, env, withdrawAddress, amount, nil)
@@ -308,7 +309,7 @@ func testMakePendingWithdraw(t *testing.T, env *testEnvironment, amount bitcoin.
 	// first, this withdraw will wait for manual confirmation
 	testWithdrawTransactionPendingManualConfirmation(t, env, tx, zeroBTC, false)
 
-	err := env.processingClient.Confirm(tx.id)
+	err := env.ProcessingClient.Confirm(tx.id)
 
 	if err != nil {
 		t.Fatal(err)
@@ -320,17 +321,17 @@ func testMakePendingWithdraw(t *testing.T, env *testEnvironment, amount bitcoin.
 	return tx
 }
 
-func testWithdrawNewTransaction(t *testing.T, env *testEnvironment, tx *txTestData, clientBalance, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+func testWithdrawNewTransaction(t *testing.T, env *testenv.TestEnvironment, tx *txTestData, clientBalance, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	checkNewWithdrawTransactionNotificationAndEvent(t, env, notification,
 		event, tx, clientBalance, expectedClientBalanceAfterWithdraw)
 }
 
-func testWithdrawPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testWithdrawPartiallyConfirmed(t *testing.T, env *testenv.TestEnvironment, tx *txTestData, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 	checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t, notification, tx)
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	if got, want := event.Type, events.OutgoingTxConfirmedEvent; got != want {
 		t.Errorf("Expected type of event for confirmed successful withdraw "+
@@ -343,10 +344,10 @@ func testWithdrawPartiallyConfirmed(t *testing.T, env *testEnvironment, tx *txTe
 		expectedClientBalanceAfterWithdraw)
 }
 
-func testWithdrawFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestData, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testWithdrawFullyConfirmed(t *testing.T, env *testenv.TestEnvironment, tx *txTestData, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, tx)
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	if got, want := event.Type, events.OutgoingTxConfirmedEvent; got != want {
 		t.Errorf("Expected type of event for confirmed successful withdraw "+
@@ -359,12 +360,12 @@ func testWithdrawFullyConfirmed(t *testing.T, env *testEnvironment, tx *txTestDa
 		expectedClientBalanceAfterWithdraw)
 }
 
-func testWithdrawTransactionPendingManualConfirmation(t *testing.T, env *testEnvironment, tx *txTestData, ourOldBalance bitcoin.BTCAmount, testBalance bool) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testWithdrawTransactionPendingManualConfirmation(t *testing.T, env *testenv.TestEnvironment, tx *txTestData, ourOldBalance bitcoin.BTCAmount, testBalance bool) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 
 	checkNotificationFieldsForWithdrawPendingManualConfirmation(t, notification, tx)
 
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	if got, want := event.Type, events.PendingStatusUpdatedEvent; got != want {
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
@@ -380,12 +381,12 @@ func testWithdrawTransactionPendingManualConfirmation(t *testing.T, env *testEnv
 	}
 }
 
-func testWithdrawTransactionPendingColdStorage(t *testing.T, env *testEnvironment, tx *txTestData, ourOldBalance bitcoin.BTCAmount, testBalance bool) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testWithdrawTransactionPendingColdStorage(t *testing.T, env *testenv.TestEnvironment, tx *txTestData, ourOldBalance bitcoin.BTCAmount, testBalance bool) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 
 	checkNotificationFieldsForWithdrawPendingColdStorage(t, notification, tx)
 
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	if got, want := event.Type, events.PendingStatusUpdatedEvent; got != want {
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
@@ -401,12 +402,12 @@ func testWithdrawTransactionPendingColdStorage(t *testing.T, env *testEnvironmen
 	}
 }
 
-func testWithdrawTransactionPending(t *testing.T, env *testEnvironment, tx *txTestData, ourOldBalance bitcoin.BTCAmount, testBalance bool) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testWithdrawTransactionPending(t *testing.T, env *testenv.TestEnvironment, tx *txTestData, ourOldBalance bitcoin.BTCAmount, testBalance bool) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 
 	checkNotificationFieldsForWithdrawPending(t, notification, tx)
 
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	if got, want := event.Type, events.PendingStatusUpdatedEvent; got != want {
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
@@ -422,12 +423,12 @@ func testWithdrawTransactionPending(t *testing.T, env *testEnvironment, tx *txTe
 	}
 }
 
-func testWithdrawTransactionCancelled(t *testing.T, env *testEnvironment, tx *txTestData) {
-	notification := env.getNextCallbackNotificationWithTimeout(t)
+func testWithdrawTransactionCancelled(t *testing.T, env *testenv.TestEnvironment, tx *txTestData) {
+	notification := env.GetNextCallbackNotificationWithTimeout(t)
 
 	checkNotificationFieldsForCancelledWithdrawal(t, notification, tx)
 
-	event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	if got, want := event.Type, events.PendingTxCancelledEvent; got != want {
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
@@ -438,7 +439,7 @@ func testWithdrawTransactionCancelled(t *testing.T, env *testEnvironment, tx *tx
 	checkNotificationFieldsForCancelledWithdrawal(t, data, tx)
 }
 
-func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, neededConfirmations int) {
+func testWithdrawSeveralConfirmations(t *testing.T, env *testenv.TestEnvironment, neededConfirmations int) {
 	clientBalance := getStableClientBalanceOrFail(t, env)
 	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
 	expectedClientBalanceAfterWithdraw := clientBalance + withdrawAmountSmall - withdrawFee
@@ -458,14 +459,14 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 		testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
 
 		for i := 2; i < neededConfirmations; i++ {
-			_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+			_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
 			tx.confirmations = int64(i)
 			testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
 		}
-		_, err := generateBlocks(env.regtest["node-miner"].nodeAPI, 1)
+		_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -475,9 +476,9 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testEnvironment, needed
 	})
 }
 
-func testGetTransactionsTxFoundByStatus(t *testing.T, env *testEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
+func testGetTransactionsTxFoundByStatus(t *testing.T, env *testenv.TestEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
 	statusStr := status.String()
-	txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
+	txns, err := env.ProcessingClient.GetTransactions(&api.GetTransactionsFilter{
 		Status: statusStr,
 	})
 	if err != nil {
@@ -492,9 +493,9 @@ func testGetTransactionsTxFoundByStatus(t *testing.T, env *testEnvironment, txID
 		"status %s", statusStr)
 }
 
-func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
+func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testenv.TestEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
 	statusStr := status.String()
-	txns, err := env.processingClient.GetTransactions(&api.GetTransactionsFilter{
+	txns, err := env.ProcessingClient.GetTransactions(&api.GetTransactionsFilter{
 		Status: statusStr,
 	})
 	if err != nil {
@@ -508,7 +509,7 @@ func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testEnvironment, t
 	}
 }
 
-func testWithdrawMultiple(t *testing.T, env *testEnvironment) {
+func testWithdrawMultiple(t *testing.T, env *testenv.TestEnvironment) {
 	const nWithdrawals = 3
 
 	var (
@@ -535,7 +536,7 @@ func testWithdrawMultiple(t *testing.T, env *testEnvironment) {
 	}
 }
 
-func testWithdrawMultipleSimultaneous(t *testing.T, env *testEnvironment, addresses []string, amounts []bitcoin.BTCAmount, useDifferentAddresses bool) {
+func testWithdrawMultipleSimultaneous(t *testing.T, env *testenv.TestEnvironment, addresses []string, amounts []bitcoin.BTCAmount, useDifferentAddresses bool) {
 	balanceByNow := getStableBalanceOrFail(t, env)
 	nWithdrawals := len(amounts)
 
@@ -603,7 +604,7 @@ func testWithdrawMultipleSimultaneous(t *testing.T, env *testEnvironment, addres
 	})
 }
 
-func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, addresses []string, amounts []bitcoin.BTCAmount, useDifferentAddresses bool) {
+func testWithdrawMultipleInterleaved(t *testing.T, env *testenv.TestEnvironment, addresses []string, amounts []bitcoin.BTCAmount, useDifferentAddresses bool) {
 	balanceByNow := getStableBalanceOrFail(t, env)
 	nWithdrawals := len(amounts)
 
@@ -669,16 +670,16 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testEnvironment, address
 	checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
 }
 
-func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.Context) {
-	err := env.startColdStorage(ctx)
+func testWithdrawToColdStorage(t *testing.T, env *testenv.TestEnvironment, ctx context.Context) {
+	err := env.StartColdStorage(ctx)
 
 	if err != nil {
 		t.Fatalf("Failed to start cold storage: %v", err)
 	}
 
-	defer env.stopColdStorage(ctx)
+	defer env.StopColdStorage(ctx)
 
-	csAddress := env.coldStorageLoadAndGenerateAddress()
+	csAddress := env.ColdStorageLoadAndGenerateAddress()
 
 	runSubtest(t, "Successful", func(t *testing.T) {
 		balance := getStableBalanceOrFail(t, env)
@@ -690,7 +691,7 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		withdrawRequest := &wallet.WithdrawRequest{
 			Address: csAddress, Amount: withdrawAmount, Fee: withdrawFee,
 		}
-		resp, err := env.processingClient.WithdrawToColdStorage(withdrawRequest)
+		resp, err := env.ProcessingClient.WithdrawToColdStorage(withdrawRequest)
 		if err != nil {
 			t.Fatalf("Failed to perform withdraw to cold storage: %v", err)
 		}
@@ -701,7 +702,7 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		// wait for miner to get this tx. We don't know the hash, but there
 		// should be no other txns in our test bitcoin network at this moment so
 		// just wait for miner to get any tx
-		_, err = env.mineAnyTx()
+		_, err = env.MineAnyTx()
 
 		if err != nil {
 			t.Fatalf("Mining cold storage withdraw tx failed: %v", err)
@@ -711,14 +712,14 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		// some delay (when its node receives new block), so wait a bit
 		coldStorageIncome := withdrawAmount - withdrawFee
 		checkBalanceBecame(t, func() (*api.BalanceInfo, error) {
-			return env.getNodeBalance(env.regtest["node-cold-storage"].nodeAPI)
+			return env.GetNodeBalance(env.Regtest["node-cold-storage"].NodeAPI)
 		}, coldStorageIncome, coldStorageIncome)
 	})
 
 	runSubtest(t, "InsufficientFunds", func(t *testing.T) {
 		balance := getStableBalanceOrFail(t, env)
 		withdrawAmountTooBig := balance + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
-		_, err := env.processingClient.WithdrawToColdStorage(&wallet.WithdrawRequest{
+		_, err := env.ProcessingClient.WithdrawToColdStorage(&wallet.WithdrawRequest{
 			Address: csAddress, Amount: withdrawAmountTooBig, Fee: withdrawFee,
 		})
 		if err == nil {
@@ -727,31 +728,31 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		}
 	})
 
-	lastSeq := env.websocketListeners[0].lastSeq
+	lastSeq := env.WebsocketListeners[0].LastSeq
 	runSubtest(t, "AddressFromConfig", func(t *testing.T) {
 		// we need to change processing config for this test, so we'll have to
 		// restart it
-		env.websocketListeners[0].stop()
-		env.websocketListeners = nil
+		env.WebsocketListeners[0].Stop()
+		env.WebsocketListeners = nil
 
-		processingContainerID := env.processing.id
-		err := env.stopProcessing(ctx)
-		env.waitForContainerRemoval(ctx, processingContainerID)
+		processingContainerID := env.Processing.ID
+		err := env.StopProcessing(ctx)
+		env.WaitForContainerRemoval(ctx, processingContainerID)
 
 		if err != nil {
 			t.Fatalf("Failed to stop processing for restart: %v", err)
 		}
 
-		settings := env.processingSettings
+		settings := env.ProcessingSettings
 		settings.AdditionalWalletSettings = "cold_wallet_address: " + csAddress
 
-		err = env.startProcessing(ctx, settings)
+		err = env.StartProcessing(ctx, settings)
 
 		if err != nil {
 			t.Fatalf("Failed to start processing: %v", err)
 		}
 
-		env.waitForProcessing()
+		env.WaitForProcessing()
 
 		balance := getStableBalanceOrFail(t, env)
 		withdrawAmount := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
@@ -760,7 +761,7 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 			t.Fatal("Expected that wallet balance will be >= 1 BTC by now")
 		}
 
-		csBalance, err := env.getNodeBalance(env.regtest["node-cold-storage"].nodeAPI)
+		csBalance, err := env.GetNodeBalance(env.Regtest["node-cold-storage"].NodeAPI)
 
 		if err != nil {
 			t.Fatalf("Failed to request balance from cold storage %v", err)
@@ -773,7 +774,7 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		withdrawRequest := &wallet.WithdrawRequest{
 			Amount: withdrawAmount, Fee: withdrawFee,
 		}
-		resp, err := env.processingClient.WithdrawToColdStorage(withdrawRequest)
+		resp, err := env.ProcessingClient.WithdrawToColdStorage(withdrawRequest)
 		if err != nil {
 			t.Fatalf("Failed to perform withdraw to cold storage: %v", err)
 		}
@@ -784,7 +785,7 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		// wait for miner to get this tx. We don't know the hash, but there
 		// should be no other txns in our test bitcoin network at this moment so
 		// just wait for miner to get any tx
-		_, err = env.mineAnyTx()
+		_, err = env.MineAnyTx()
 
 		if err != nil {
 			t.Fatalf("Mining cold storage withdraw tx failed: %v", err)
@@ -794,10 +795,10 @@ func testWithdrawToColdStorage(t *testing.T, env *testEnvironment, ctx context.C
 		// some delay (when its node receives new block), so wait a bit
 		coldStorageIncome := withdrawAmount - withdrawFee
 		checkBalanceBecame(t, func() (*api.BalanceInfo, error) {
-			return env.getNodeBalance(env.regtest["node-cold-storage"].nodeAPI)
+			return env.GetNodeBalance(env.Regtest["node-cold-storage"].NodeAPI)
 		}, csBalance.Balance+coldStorageIncome, csBalance.Balance+coldStorageIncome)
 	})
 
 	// recreate stopped WS listener
-	_, err = env.newWebsocketListener(lastSeq + 1)
+	_, err = env.NewWebsocketListener(lastSeq + 1)
 }

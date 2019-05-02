@@ -8,9 +8,10 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
-func testDepositAndWithdrawMultipleMixed(t *testing.T, env *testEnvironment, accounts []*wallet.Account) {
+func testDepositAndWithdrawMultipleMixed(t *testing.T, env *testenv.TestEnvironment, accounts []*wallet.Account) {
 	balanceByNow := getStableBalanceOrFail(t, env)
 
 	deposits := testTxCollection{

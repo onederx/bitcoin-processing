@@ -1,13 +1,8 @@
 package integrationtests
 
 import (
-	"fmt"
-	"net"
-	"os"
-	"path"
 	"runtime/debug"
 	"testing"
-	"time"
 
 	"github.com/gofrs/uuid"
 
@@ -15,86 +10,9 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	"github.com/onederx/bitcoin-processing/integrationtests/util"
 )
-
-const waitForEventRetries = 120
-
-func getFullSourcePath(dirName string) string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	return path.Join(path.Dir(cwd), dirName)
-}
-
-func waitForEventOrPanic(callback func() error) {
-	err := waitForEvent(callback)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func waitForEventOrFailTest(t *testing.T, callback func() error) {
-	err := waitForEvent(callback)
-	if err != nil {
-		t.Helper()
-		t.Fatal(err)
-	}
-}
-
-func waitForEvent(callback func() error) error {
-	retries := waitForEventRetries
-
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		err := callback()
-		if err != nil {
-			retries--
-			if retries <= 0 {
-				return err
-			}
-		} else {
-			return nil
-		}
-	}
-	return nil
-}
-
-func waitForPort(host string, port uint16) {
-	waitForEventOrPanic(func() error {
-		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
-		if err != nil {
-			return err
-		}
-		conn.Close()
-		return nil
-	})
-}
-
-func getNewAddressForWithdrawOrFail(t *testing.T, env *testEnvironment) string {
-	addressDecoded, err := env.regtest["node-client"].nodeAPI.CreateNewAddress()
-
-	if err != nil {
-		t.Helper()
-		t.Fatalf("Failed to request new address from client node: %v", err)
-	}
-	return addressDecoded
-}
-
-// runSubtest is the same as t.Run, but turns panic into t.Fatal
-func runSubtest(t *testing.T, name string, f func(t *testing.T)) {
-	t.Run(name, func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("Test %s failed with panic: %v. Stack %s", name, r,
-					debug.Stack())
-			}
-		}()
-		f(t)
-	})
-}
 
 func findNotificationForTxOrFail(t *testing.T, notifications []*wallet.TxNotification, tx *txTestData) *wallet.TxNotification {
 	for _, n := range notifications {
@@ -111,6 +29,76 @@ func findNotificationForTxOrFail(t *testing.T, notifications []*wallet.TxNotific
 		"address %s amount %s.", tx.id, tx.hash,
 		tx.address, tx.amount)
 	return nil
+}
+
+// runSubtest is the same as t.Run, but turns panic into t.Fatal
+func runSubtest(t *testing.T, name string, f func(t *testing.T)) {
+	t.Run(name, func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Test %s failed with panic: %v. Stack %s", name, r,
+					debug.Stack())
+			}
+		}()
+		f(t)
+	})
+}
+
+func waitForEventOrFailTest(t *testing.T, callback func() error) {
+	err := util.WaitForEvent(callback)
+	if err != nil {
+		t.Helper()
+		t.Fatal(err)
+	}
+}
+
+func getStableClientBalanceOrFail(t *testing.T, env *testenv.TestEnvironment) bitcoin.BTCAmount {
+	clientBalance, err := env.GetClientBalance()
+
+	if err != nil {
+		t.Helper()
+		t.Fatal(err)
+	}
+
+	return stableBalanceOrFail(t, "client balance", clientBalance)
+}
+
+func getStableBalanceOrFail(t *testing.T, env *testenv.TestEnvironment) bitcoin.BTCAmount {
+	balanceInfo, err := env.ProcessingClient.GetBalance()
+
+	if err != nil {
+		t.Helper()
+		t.Fatal(err)
+	}
+
+	return stableBalanceOrFail(t, "balance", balanceInfo)
+}
+
+func getNewAddressForWithdrawOrFail(t *testing.T, env *testenv.TestEnvironment) string {
+	addressDecoded, err := env.Regtest["node-client"].NodeAPI.CreateNewAddress()
+
+	if err != nil {
+		t.Helper()
+		t.Fatalf("Failed to request new address from client node: %v", err)
+	}
+	return addressDecoded
+}
+
+func collectNotificationsAndEvents(t *testing.T, env *testenv.TestEnvironment, n int) (httpNotifications []*wallet.TxNotification, wsEvents []*events.NotificationWithSeq) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		httpNotifications = append(httpNotifications, env.GetNextCallbackNotificationWithTimeout(t))
+		wsEvents = append(wsEvents, env.WebsocketListeners[0].GetNextMessageWithTimeout(t))
+	}
+	return
+}
+
+func findAllWsNotificationsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType, n int) (wsNotifications []*wallet.TxNotification) {
+	t.Helper()
+	for _, event := range findAllEventsWithTypeOrFail(t, evts, et, n) {
+		wsNotifications = append(wsNotifications, event.Data.(*wallet.TxNotification))
+	}
+	return
 }
 
 func findEventWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType) *events.NotificationWithSeq {
@@ -138,28 +126,11 @@ func findAllEventsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSe
 	return nil
 }
 
-func collectNotificationsAndEvents(t *testing.T, env *testEnvironment, n int) (httpNotifications []*wallet.TxNotification, wsEvents []*events.NotificationWithSeq) {
+func collectNotifications(t *testing.T, env *testenv.TestEnvironment, eventType events.EventType, n int) (httpNotifications []*wallet.TxNotification, wsNotifications []*wallet.TxNotification) {
 	t.Helper()
 	for i := 0; i < n; i++ {
-		httpNotifications = append(httpNotifications, env.getNextCallbackNotificationWithTimeout(t))
-		wsEvents = append(wsEvents, env.websocketListeners[0].getNextMessageWithTimeout(t))
-	}
-	return
-}
-
-func findAllWsNotificationsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType, n int) (wsNotifications []*wallet.TxNotification) {
-	t.Helper()
-	for _, event := range findAllEventsWithTypeOrFail(t, evts, et, n) {
-		wsNotifications = append(wsNotifications, event.Data.(*wallet.TxNotification))
-	}
-	return
-}
-
-func collectNotifications(t *testing.T, env *testEnvironment, eventType events.EventType, n int) (httpNotifications []*wallet.TxNotification, wsNotifications []*wallet.TxNotification) {
-	t.Helper()
-	for i := 0; i < n; i++ {
-		httpNotifications = append(httpNotifications, env.getNextCallbackNotificationWithTimeout(t))
-		event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+		httpNotifications = append(httpNotifications, env.GetNextCallbackNotificationWithTimeout(t))
+		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 		if got, want := event.Type, eventType; got != want {
 			t.Fatalf("Unexpected event type for event, wanted %s, got %s:",
@@ -178,26 +149,4 @@ func stableBalanceOrFail(t *testing.T, name string, bal *api.BalanceInfo) bitcoi
 			bal.BalanceWithUnconf)
 	}
 	return bal.Balance
-}
-
-func getStableBalanceOrFail(t *testing.T, env *testEnvironment) bitcoin.BTCAmount {
-	balanceInfo, err := env.processingClient.GetBalance()
-
-	if err != nil {
-		t.Helper()
-		t.Fatal(err)
-	}
-
-	return stableBalanceOrFail(t, "balance", balanceInfo)
-}
-
-func getStableClientBalanceOrFail(t *testing.T, env *testEnvironment) bitcoin.BTCAmount {
-	clientBalance, err := env.getClientBalance()
-
-	if err != nil {
-		t.Helper()
-		t.Fatal(err)
-	}
-
-	return stableBalanceOrFail(t, "client balance", clientBalance)
 }

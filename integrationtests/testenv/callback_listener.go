@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"encoding/json"
@@ -16,8 +16,8 @@ import (
 )
 
 type callbackRequest struct {
-	method string
-	url    *url.URL
+	Method string
+	URL    *url.URL
 	body   []byte
 }
 
@@ -27,7 +27,7 @@ func (c *callbackRequest) unmarshal() (*wallet.TxNotification, error) {
 	return &notification, err
 }
 
-func (c *callbackRequest) unmarshalOrFail(t *testing.T) *wallet.TxNotification {
+func (c *callbackRequest) UnmarshalOrFail(t *testing.T) *wallet.TxNotification {
 	notification, err := c.unmarshal()
 	if err != nil {
 		t.Fatalf("Failed to deserialize notification data from http "+
@@ -44,17 +44,17 @@ func newTestRandomFreePortListener(host string) net.Listener {
 	return l
 }
 
-func (e *testEnvironment) startCallbackListener() {
+func (e *TestEnvironment) startCallbackListener() {
 	log.Println("Starting callback listener server")
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if e.callbackHandler != nil {
-			e.callbackHandler(w, r)
+		if e.CallbackHandler != nil {
+			e.CallbackHandler(w, r)
 			return
 		}
 		var err error
 		cbRequest := callbackRequest{
-			method: r.Method,
-			url:    r.URL,
+			Method: r.Method,
+			URL:    r.URL,
 		}
 		cbRequest.body, err = ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -64,20 +64,20 @@ func (e *testEnvironment) startCallbackListener() {
 	}))
 	server.Listener = newTestRandomFreePortListener(e.networkGateway)
 	server.Start()
-	e.callbackURL = server.URL + defaultCallbackURLPath
+	e.CallbackURL = server.URL + DefaultCallbackURLPath
 	e.callbackListener = server
 	e.callbackMessageQueue = make(chan *callbackRequest, listenersMessageQueueSize)
 	log.Printf("Callback listener server started on %s", server.URL)
 }
 
-func (e *testEnvironment) stopCallbackListener() {
+func (e *TestEnvironment) stopCallbackListener() {
 	log.Println("Stopping callback listener")
 	e.callbackListener.Close()
 	close(e.callbackMessageQueue)
 	log.Println("Callback listener stopped")
 }
 
-func (e *testEnvironment) getNextCallbackRequestWithTimeout(t *testing.T) *callbackRequest {
+func (e *TestEnvironment) GetNextCallbackRequestWithTimeout(t *testing.T) *callbackRequest {
 	select {
 	case req := <-e.callbackMessageQueue:
 		return req
@@ -87,7 +87,7 @@ func (e *testEnvironment) getNextCallbackRequestWithTimeout(t *testing.T) *callb
 	return nil
 }
 
-func (e *testEnvironment) getNextCallbackNotificationWithTimeout(t *testing.T) *wallet.TxNotification {
-	req := e.getNextCallbackRequestWithTimeout(t)
-	return req.unmarshalOrFail(t)
+func (e *TestEnvironment) GetNextCallbackNotificationWithTimeout(t *testing.T) *wallet.TxNotification {
+	req := e.GetNextCallbackRequestWithTimeout(t)
+	return req.UnmarshalOrFail(t)
 }

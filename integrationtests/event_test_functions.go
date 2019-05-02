@@ -11,29 +11,30 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 	"github.com/onederx/bitcoin-processing/util"
 )
 
-func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx context.Context, accounts []*wallet.Account) {
+func testProcessingCatchesMissedEvents(t *testing.T, env *testenv.TestEnvironment, ctx context.Context, accounts []*wallet.Account) {
 	withdraw := testMakeWithdraw(t, env, getNewAddressForWithdrawOrFail(t, env),
 		bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.088")), nil)
 
-	n := env.getNextCallbackNotificationWithTimeout(t)
+	n := env.GetNextCallbackNotificationWithTimeout(t)
 	if n.ID != withdraw.id {
 		t.Fatalf("Expected that notification will correspond to tx %s, but "+
 			"got %s", withdraw.id, n.ID)
 	}
 	withdraw.hash = n.Hash
 	// skip websocket notification
-	env.websocketListeners[0].getNextMessageWithTimeout(t)
+	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
 	// stop processing
-	env.websocketListeners[0].stop()
-	env.websocketListeners = nil
+	env.WebsocketListeners[0].Stop()
+	env.WebsocketListeners = nil
 
-	processingContainerID := env.processing.id
-	env.stopProcessing(ctx)
-	env.waitForContainerRemoval(ctx, processingContainerID)
+	processingContainerID := env.Processing.ID
+	env.StopProcessing(ctx)
+	env.WaitForContainerRemoval(ctx, processingContainerID)
 
 	deposits := testTxCollection{
 		testMakeDeposit(t, env, accounts[0].Address,
@@ -43,7 +44,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 	}
 	append(deposits, withdraw).mineOrFail(t, env)
 
-	env.startProcessingWithDefaultSettings(ctx)
+	env.StartProcessingWithDefaultSettings(ctx)
 
 	maxSeq := 0
 
@@ -72,7 +73,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 		depositNotifications := make(map[string][]*wallet.TxNotification)
 
 		for i := 0; i < 5; i++ {
-			httpNotification := env.getNextCallbackNotificationWithTimeout(t)
+			httpNotification := env.GetNextCallbackNotificationWithTimeout(t)
 			maxSeq = util.Max(maxSeq, httpNotification.Seq)
 
 			switch httpNotification.Hash {
@@ -115,7 +116,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 	}
 	runSubtest(t, "WebsocketNotifications", func(t *testing.T) {
 		runSubtest(t, "GetAllNotifications", func(t *testing.T) {
-			listener, err := env.newWebsocketListener(0)
+			listener, err := env.NewWebsocketListener(0)
 			if err != nil {
 				t.Fatalf("Failed to connect websocket event listener %v", err)
 			}
@@ -124,7 +125,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 				t.Fatal(err)
 			}
 			for {
-				msg := listener.getNextMessageWithTimeout(t)
+				msg := listener.GetNextMessageWithTimeout(t)
 				allMessages = append(allMessages, msg)
 				if msg.Seq == maxSeq {
 					break
@@ -133,7 +134,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 			testWebsocketEvents(t, allMessages[len(allMessages)-5:])
 		})
 		runSubtest(t, "GetOnlyNeededNotifications", func(t *testing.T) {
-			listener, err := env.newWebsocketListener(maxSeq - 4)
+			listener, err := env.NewWebsocketListener(maxSeq - 4)
 			if err != nil {
 				t.Fatalf("Failed to connect websocket event listener %v", err)
 			}
@@ -142,7 +143,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 				t.Fatal(err)
 			}
 			for i := 0; i < 5; i++ {
-				msg := listener.getNextMessageWithTimeout(t)
+				msg := listener.GetNextMessageWithTimeout(t)
 				neededMessages = append(neededMessages, msg)
 			}
 			if neededMessages[len(neededMessages)-1].Seq != maxSeq {
@@ -150,35 +151,35 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testEnvironment, ctx c
 					"instead it is %d", maxSeq, neededMessages[len(neededMessages)-1].Seq)
 			}
 			testWebsocketEvents(t, neededMessages)
-			listener.stop()
-			env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+			listener.Stop()
+			env.WebsocketListeners = []*testenv.WebsocketListener{env.WebsocketListeners[0]}
 		})
 	})
 }
 
-func testWebsocketListeners(t *testing.T, env *testEnvironment) {
+func testWebsocketListeners(t *testing.T, env *testenv.TestEnvironment) {
 	runSubtest(t, "ExistingEvents", func(t *testing.T) {
-		listener, err := env.newWebsocketListener(0)
+		listener, err := env.NewWebsocketListener(0)
 		if err != nil {
 			t.Fatalf("Failed to connect websocket event listener %v", err)
 		}
 
-		event := listener.getNextMessageWithTimeout(t)
+		event := listener.GetNextMessageWithTimeout(t)
 
 		if event == nil {
 			t.Fatal("Expected existing event to be non-nil")
 		}
-		listener.stop()
-		env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+		listener.Stop()
+		env.WebsocketListeners = []*testenv.WebsocketListener{env.WebsocketListeners[0]}
 	})
 	runSubtest(t, "GetEventsFromSeq", func(t *testing.T) {
 		runSubtest(t, "Sanity", func(t *testing.T) {
-			seq := env.websocketListeners[0].lastSeq - 10
-			listener, err := env.newWebsocketListener(seq)
+			seq := env.WebsocketListeners[0].LastSeq - 10
+			listener, err := env.NewWebsocketListener(seq)
 			if err != nil {
 				t.Fatalf("Failed to connect websocket event listener %v", err)
 			}
-			event := listener.getNextMessageWithTimeout(t)
+			event := listener.GetNextMessageWithTimeout(t)
 
 			if event == nil {
 				t.Fatal("Expected existing event to be non-nil")
@@ -187,18 +188,18 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 				t.Errorf("Expected event requested from seq to have seq >= %d, "+
 					"but received %d", seq, event.Seq)
 			}
-			listener.stop()
-			env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+			listener.Stop()
+			env.WebsocketListeners = []*testenv.WebsocketListener{env.WebsocketListeners[0]}
 		})
 		runSubtest(t, "GetLostEvents", func(t *testing.T) {
 			// create a couple of events that listener will catch in time
 			account1 := testGenerateClientWalletWithMetainfo(t, env,
-				initialTestMetainfo, env.websocketListeners[0].lastSeq+1)
+				initialTestMetainfo, env.WebsocketListeners[0].LastSeq+1)
 			deposit1 := testMakeDeposit(t, env, account1.Address, testDepositAmount,
 				account1.Metainfo)
 
-			deposit1.id = env.getNextCallbackNotificationWithTimeout(t).ID
-			event := env.websocketListeners[0].getNextMessageWithTimeout(t)
+			deposit1.id = env.GetNextCallbackNotificationWithTimeout(t).ID
+			event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 			lastSeq := event.Seq
 			if got, want := event.Type, events.NewIncomingTxEvent; got != want {
 				t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
@@ -208,8 +209,8 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 
 			// stop this listener to simulate situation that client has gone away
 			// while some events are happening
-			env.websocketListeners[0].stop()
-			env.websocketListeners = nil
+			env.WebsocketListeners[0].Stop()
+			env.WebsocketListeners = nil
 
 			// (this withdraw will be put on hold until manual confirmation
 			// because it's amount is 0.4)
@@ -218,21 +219,21 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 				bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.4")), nil)
 
 			// skip http callback notification about this withdraw
-			env.getNextCallbackNotificationWithTimeout(t)
+			env.GetNextCallbackNotificationWithTimeout(t)
 
-			account2, err := env.processingClient.NewWallet(nil)
+			account2, err := env.ProcessingClient.NewWallet(nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			deposit1.mineOrFail(t, env)
 
 			// skip http callback notification about deposit confirmation
-			env.getNextCallbackNotificationWithTimeout(t)
+			env.GetNextCallbackNotificationWithTimeout(t)
 
 			// ok, now client is going back online
-			listener, err := env.newWebsocketListener(lastSeq + 1)
+			listener, err := env.NewWebsocketListener(lastSeq + 1)
 
-			withdrawEvent := listener.getNextMessageWithTimeout(t)
+			withdrawEvent := listener.GetNextMessageWithTimeout(t)
 
 			if withdrawEvent.Type != events.PendingStatusUpdatedEvent {
 				t.Errorf("Unexpected event type: wanted %s, got %s",
@@ -241,7 +242,7 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 			checkNotificationFieldsForWithdrawPendingManualConfirmation(t,
 				withdrawEvent.Data.(*wallet.TxNotification), withdraw)
 
-			newAccountEvent := listener.getNextMessageWithTimeout(t)
+			newAccountEvent := listener.GetNextMessageWithTimeout(t)
 
 			if got, want := newAccountEvent.Type, events.NewAddressEvent; got != want {
 				t.Errorf("Unexpected event type for new wallet generation, wanted %s, got %s:",
@@ -257,7 +258,7 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 					newAccountEventData.Metainfo)
 			}
 
-			deposit1ConfirmedEvent := listener.getNextMessageWithTimeout(t)
+			deposit1ConfirmedEvent := listener.GetNextMessageWithTimeout(t)
 
 			if got, want := deposit1ConfirmedEvent.Type, events.IncomingTxConfirmedEvent; got != want {
 				t.Errorf("Unexpected event type: wanted %s, got %s", want, got)
@@ -267,20 +268,20 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 		})
 	})
 	runSubtest(t, "ParallelListeners", func(t *testing.T) {
-		seq := env.websocketListeners[0].lastSeq + 1
-		listener1, err := env.newWebsocketListener(seq)
+		seq := env.WebsocketListeners[0].LastSeq + 1
+		listener1, err := env.NewWebsocketListener(seq)
 		if err != nil {
 			t.Fatalf("Failed to connect websocket event listener %v", err)
 		}
-		listener2, err := env.newWebsocketListener(seq)
+		listener2, err := env.NewWebsocketListener(seq)
 		if err != nil {
 			t.Fatalf("Failed to connect websocket event listener %v", err)
 		}
 
 		account := testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, seq)
 
-		event1 := listener1.getNextMessageWithTimeout(t)
-		event2 := listener2.getNextMessageWithTimeout(t)
+		event1 := listener1.GetNextMessageWithTimeout(t)
+		event2 := listener2.GetNextMessageWithTimeout(t)
 
 		if event1.Seq != seq {
 			t.Errorf("Expected next notification seqnum be %d, but it is %d",
@@ -302,16 +303,16 @@ func testWebsocketListeners(t *testing.T, env *testEnvironment) {
 			t.Errorf("Expected notifications from 2 websocket listeners to be"+
 				"identical, but they are %v %v", event1, event2)
 		}
-		listener1.stop()
-		listener2.stop()
-		env.websocketListeners = []*websocketListener{env.websocketListeners[0]}
+		listener1.Stop()
+		listener2.Stop()
+		env.WebsocketListeners = []*testenv.WebsocketListener{env.WebsocketListeners[0]}
 	})
 }
 
-func testGetEvents(t *testing.T, env *testEnvironment) {
+func testGetEvents(t *testing.T, env *testenv.TestEnvironment) {
 	var lastSeq int
 	runSubtest(t, "ExistingEvents", func(t *testing.T) {
-		evts, err := env.processingClient.GetEvents(0)
+		evts, err := env.ProcessingClient.GetEvents(0)
 		if err != nil {
 			t.Fatalf("API call /get_events with seq 0 failed: %v", err)
 		}
@@ -324,7 +325,7 @@ func testGetEvents(t *testing.T, env *testEnvironment) {
 	runSubtest(t, "GetEventsFromSeq", func(t *testing.T) {
 		seq := lastSeq - 10
 
-		evts, err := env.processingClient.GetEvents(seq)
+		evts, err := env.ProcessingClient.GetEvents(seq)
 		if err != nil {
 			t.Fatalf("API call /get_events with seq %d failed: %v", seq, err)
 		}
@@ -341,7 +342,7 @@ func testGetEvents(t *testing.T, env *testEnvironment) {
 	runSubtest(t, "NewEvent", func(t *testing.T) {
 		seq := lastSeq + 1
 		account := testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, seq)
-		evts, err := env.processingClient.GetEvents(seq)
+		evts, err := env.ProcessingClient.GetEvents(seq)
 		if err != nil {
 			t.Fatalf("API call /get_events with seq %d failed: %v",
 				seq, err)
@@ -369,15 +370,15 @@ func testGetEvents(t *testing.T, env *testEnvironment) {
 	})
 }
 
-func testHTTPCallbackBackoff(t *testing.T, env *testEnvironment, clientAccount *wallet.Account) {
+func testHTTPCallbackBackoff(t *testing.T, env *testenv.TestEnvironment, clientAccount *wallet.Account) {
 	errorCount := 3
 
-	env.callbackHandler = func(w http.ResponseWriter, r *http.Request) {
+	env.CallbackHandler = func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		if errorCount > 1 {
 			errorCount--
 		} else {
-			env.callbackHandler = nil
+			env.CallbackHandler = nil
 		}
 	}
 
@@ -385,15 +386,15 @@ func testHTTPCallbackBackoff(t *testing.T, env *testEnvironment, clientAccount *
 		bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.076")),
 		clientAccount.Metainfo)
 
-	n := env.getNextCallbackNotificationWithTimeout(t)
+	n := env.GetNextCallbackNotificationWithTimeout(t)
 	deposit.id = n.ID
 	checkNotificationFieldsForNewDeposit(t, n, deposit)
 	deposit.mineOrFail(t, env)
-	n = env.getNextCallbackNotificationWithTimeout(t)
+	n = env.GetNextCallbackNotificationWithTimeout(t)
 	checkNotificationFieldsForFullyConfirmedDeposit(t, n, deposit)
 
 	// skip websocket notifications about deposit
 	for i := 0; i < 2; i++ {
-		env.websocketListeners[0].getNextMessageWithTimeout(t)
+		env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	}
 }

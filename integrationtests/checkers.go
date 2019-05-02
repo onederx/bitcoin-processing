@@ -12,6 +12,7 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
 type txTestData struct {
@@ -26,9 +27,9 @@ type txTestData struct {
 	confirmations int64
 }
 
-func (tx *txTestData) mineOrFail(t *testing.T, e *testEnvironment) {
+func (tx *txTestData) mineOrFail(t *testing.T, e *testenv.TestEnvironment) {
 	t.Helper()
-	blockHash, err := e.mineTx(tx.hash)
+	blockHash, err := e.MineTx(tx.hash)
 	if err != nil {
 		t.Fatalf("Failed to mine tx %s into blockchain: %v", tx.hash, err)
 	}
@@ -38,13 +39,13 @@ func (tx *txTestData) mineOrFail(t *testing.T, e *testEnvironment) {
 
 type testTxCollection []*txTestData
 
-func (tc testTxCollection) mineOrFail(t *testing.T, e *testEnvironment) {
+func (tc testTxCollection) mineOrFail(t *testing.T, e *testenv.TestEnvironment) {
 	t.Helper()
 	var hashes []string
 	for _, tx := range tc {
 		hashes = append(hashes, tx.hash)
 	}
-	blockHash, err := e.mineMultipleTxns(hashes)
+	blockHash, err := e.MineMultipleTxns(hashes)
 	if err != nil {
 		t.Fatalf("Failed to mine txns %v into blockchain: %v", hashes, err)
 	}
@@ -85,9 +86,9 @@ func compareMetainfo(t *testing.T, got, want interface{}) {
 	}
 }
 
-func checkBalance(t *testing.T, e *testEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
+func checkBalance(t *testing.T, e *testenv.TestEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
 	t.Helper()
-	balanceInfo, err := e.processingClient.GetBalance()
+	balanceInfo, err := e.ProcessingClient.GetBalance()
 
 	if err != nil {
 		t.Fatalf("Failed to get balance from processing: %v", err)
@@ -102,9 +103,9 @@ func checkBalance(t *testing.T, e *testEnvironment, balance, balanceWithUnconf b
 	}
 }
 
-func checkRequiredFromColdStorage(t *testing.T, e *testEnvironment, balance bitcoin.BTCAmount) {
+func checkRequiredFromColdStorage(t *testing.T, e *testenv.TestEnvironment, balance bitcoin.BTCAmount) {
 	t.Helper()
-	required, err := e.processingClient.GetRequiredFromColdStorage()
+	required, err := e.ProcessingClient.GetRequiredFromColdStorage()
 
 	if err != nil {
 		t.Fatalf("Failed request amount required from cold storage from processing: %v", err)
@@ -135,9 +136,9 @@ func checkBalanceBecame(t *testing.T, balanceFunc func() (*api.BalanceInfo, erro
 	})
 }
 
-func checkClientBalanceBecame(t *testing.T, e *testEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
+func checkClientBalanceBecame(t *testing.T, e *testenv.TestEnvironment, balance, balanceWithUnconf bitcoin.BTCAmount) {
 	t.Helper()
-	checkBalanceBecame(t, e.getClientBalance, balance, balanceWithUnconf)
+	checkBalanceBecame(t, e.GetClientBalance, balance, balanceWithUnconf)
 }
 
 func checkTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
@@ -435,7 +436,7 @@ func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNot
 	}
 }
 
-func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testEnvironment,
+func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testenv.TestEnvironment,
 	notification *wallet.TxNotification, event *events.NotificationWithSeq,
 	tx *txTestData, clientBalance, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
 	t.Helper()

@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"log"
@@ -9,36 +9,36 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 )
 
-type websocketListener struct {
+type WebsocketListener struct {
 	wsClient *client.WebsocketClient
 	stopped  bool
 
 	messages chan *events.NotificationWithSeq
 
-	lastSeq int
+	LastSeq int
 }
 
-func (e *testEnvironment) newWebsocketListener(startSeq int) (*websocketListener, error) {
-	listener := &websocketListener{
+func (e *TestEnvironment) NewWebsocketListener(startSeq int) (*WebsocketListener, error) {
+	listener := &WebsocketListener{
 		messages: make(chan *events.NotificationWithSeq, listenersMessageQueueSize),
 	}
-	wsClient, err := e.processingClient.NewWebsocketClient(
+	wsClient, err := e.ProcessingClient.NewWebsocketClient(
 		startSeq, listener.processMessage,
 	)
 	if err != nil {
 		return nil, err
 	}
 	listener.wsClient = wsClient
-	e.websocketListeners = append(e.websocketListeners, listener)
+	e.WebsocketListeners = append(e.WebsocketListeners, listener)
 	return listener, nil
 }
 
-func (l *websocketListener) processMessage(message *events.NotificationWithSeq) {
-	l.lastSeq = message.Seq
+func (l *WebsocketListener) processMessage(message *events.NotificationWithSeq) {
+	l.LastSeq = message.Seq
 	l.messages <- message
 }
 
-func (l *websocketListener) stop() {
+func (l *WebsocketListener) Stop() {
 	if l.stopped {
 		log.Println("Websocket listener stop called on already stopped listener")
 		return
@@ -49,7 +49,7 @@ func (l *websocketListener) stop() {
 	log.Printf("Websocket listener stopped")
 }
 
-func (l *websocketListener) getNextMessageWithTimeout(t *testing.T) *events.NotificationWithSeq {
+func (l *WebsocketListener) GetNextMessageWithTimeout(t *testing.T) *events.NotificationWithSeq {
 	select {
 	case msg := <-l.messages:
 		return msg

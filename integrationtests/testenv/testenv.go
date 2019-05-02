@@ -1,4 +1,4 @@
-package integrationtests
+package testenv
 
 import (
 	"context"
@@ -27,42 +27,42 @@ const (
 )
 
 type containerInfo struct {
+	ID   string
 	name string
-	id   string
 	ip   string
 }
 
 type bitcoinNodeContainerInfo struct {
 	containerInfo
-	nodeAPI nodeapi.NodeAPI
+	NodeAPI nodeapi.NodeAPI
 }
 
-type testEnvironment struct {
+type TestEnvironment struct {
 	cli            *dockerclient.Client
 	network        string
 	networkGateway string
 
 	db *containerInfo
 
-	regtest          map[string]*bitcoinNodeContainerInfo
+	Regtest          map[string]*bitcoinNodeContainerInfo
 	regtestIsLoaded  chan error
 	notifyScriptFile *os.File
 
-	processing           *containerInfo
-	processingSettings   *processingSettings
+	Processing           *containerInfo
+	ProcessingSettings   *processingSettings
 	processingConfigPath string
-	processingClient     *processingapiclient.Client
+	ProcessingClient     *processingapiclient.Client
 
 	callbackListener     *httptest.Server
-	callbackURL          string
+	CallbackURL          string
 	callbackMessageQueue chan *callbackRequest
-	callbackHandler      func(http.ResponseWriter, *http.Request)
+	CallbackHandler      func(http.ResponseWriter, *http.Request)
 
-	websocketListeners []*websocketListener
+	WebsocketListeners []*WebsocketListener
 }
 
-func newTestEnvironment(ctx context.Context) (*testEnvironment, error) {
-	env := &testEnvironment{}
+func NewTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
+	env := &TestEnvironment{}
 
 	err := env.setupDockerClient(ctx)
 	if err != nil {
@@ -71,7 +71,7 @@ func newTestEnvironment(ctx context.Context) (*testEnvironment, error) {
 	return env, nil
 }
 
-func (e *testEnvironment) setupDockerClient(ctx context.Context) error {
+func (e *TestEnvironment) setupDockerClient(ctx context.Context) error {
 	cli, err := dockerclient.NewEnvClient()
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (e *testEnvironment) setupDockerClient(ctx context.Context) error {
 	return nil
 }
 
-func (e *testEnvironment) setupNetwork(ctx context.Context) error {
+func (e *TestEnvironment) setupNetwork(ctx context.Context) error {
 	e.network = networkName
 
 	resp, err := e.cli.NetworkList(ctx, types.NetworkListOptions{})
@@ -116,7 +116,7 @@ func (e *testEnvironment) setupNetwork(ctx context.Context) error {
 	return nil
 }
 
-func (e *testEnvironment) getContainerIP(ctx context.Context, id string) string {
+func (e *TestEnvironment) getContainerIP(ctx context.Context, id string) string {
 	resp, err := e.cli.ContainerInspect(ctx, id)
 	if err != nil {
 		panic(err)
@@ -131,7 +131,7 @@ func (e *testEnvironment) getContainerIP(ctx context.Context, id string) string 
 	panic("Failed to find container ip in network " + e.network)
 }
 
-func (e *testEnvironment) start(ctx context.Context) error {
+func (e *TestEnvironment) Start(ctx context.Context) error {
 	err := e.startDatabase(ctx)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (e *testEnvironment) start(ctx context.Context) error {
 	return nil
 }
 
-func (e *testEnvironment) stop(ctx context.Context) error {
+func (e *TestEnvironment) Stop(ctx context.Context) error {
 	foundErrors := make([]string, 0)
 
 	dbStopErr := e.stopDatabase(ctx)
@@ -165,10 +165,10 @@ func (e *testEnvironment) stop(ctx context.Context) error {
 
 	e.stopCallbackListener()
 
-	for _, wsListener := range e.websocketListeners {
-		wsListener.stop()
+	for _, wsListener := range e.WebsocketListeners {
+		wsListener.Stop()
 	}
-	e.websocketListeners = nil
+	e.WebsocketListeners = nil
 
 	if len(foundErrors) > 0 {
 		return errors.New(strings.Join(foundErrors, " "))
@@ -176,15 +176,15 @@ func (e *testEnvironment) stop(ctx context.Context) error {
 	return nil
 }
 
-func (e *testEnvironment) waitForLoad() {
+func (e *TestEnvironment) WaitForLoad() {
 	e.waitForDatabase()
 	e.waitForRegtest()
 }
 
-func (e *testEnvironment) processingURL(relative string) string {
+func (e *TestEnvironment) processingURL(relative string) string {
 	return (&url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:8000", e.processing.ip),
+		Host:   fmt.Sprintf("%s:8000", e.Processing.ip),
 		Path:   relative,
 	}).String()
 }
