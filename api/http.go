@@ -112,12 +112,7 @@ func (s *Server) newBitcoinAddress(response http.ResponseWriter, request *http.R
 		metainfo = nil
 	}
 	account, err := s.wallet.CreateAccount(metainfo)
-	if err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	s.eventBroker.Notify(events.NewAddressEvent, account)
-	s.respond(response, account, nil)
+	s.respond(response, account, err)
 }
 
 func (s *Server) notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
@@ -140,11 +135,8 @@ func (s *Server) withdraw(toColdStorage bool, response http.ResponseWriter, requ
 		log.Printf("Fee type not specified: setting to 'fixed' by default")
 		req.FeeType = "fixed"
 	}
-	if err := s.wallet.Withdraw(&req, toColdStorage); err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	s.respond(response, req, nil)
+	err := s.wallet.Withdraw(&req, toColdStorage)
+	s.respond(response, req, err)
 }
 
 func (s *Server) withdrawRegular(response http.ResponseWriter, request *http.Request) {
@@ -205,11 +197,7 @@ func (s *Server) cancelPending(response http.ResponseWriter, request *http.Reque
 		return
 	}
 	err = s.wallet.CancelPendingTx(id)
-	if err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	s.respond(response, nil, nil)
+	s.respond(response, nil, err)
 }
 
 func (s *Server) confirmPendingTransaction(response http.ResponseWriter, request *http.Request) {
@@ -226,11 +214,7 @@ func (s *Server) confirmPendingTransaction(response http.ResponseWriter, request
 		return
 	}
 	err = s.wallet.ConfirmPendingTransaction(id)
-	if err != nil {
-		s.respond(response, nil, err)
-		return
-	}
-	s.respond(response, nil, nil)
+	s.respond(response, nil, err)
 }
 
 func (s *Server) getEvents(response http.ResponseWriter, request *http.Request) {
@@ -251,11 +235,7 @@ func (s *Server) getEvents(response http.ResponseWriter, request *http.Request) 
 		seq = subscription.Seq
 	}
 	events, err := s.eventBroker.GetEventsFromSeq(seq)
-
-	if err != nil {
-		s.respond(response, nil, err)
-	}
-	s.respond(response, events, nil)
+	s.respond(response, events, err)
 }
 
 func (s *Server) initHTTPAPIServer() {

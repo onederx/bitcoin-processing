@@ -45,6 +45,8 @@ type eventBrokerMock struct {
 	events.EventBroker
 }
 
+func (b *eventBrokerMock) Notify(eventType events.EventType, data interface{}) {}
+
 type accountStoreFailureMock struct {
 	Storage
 }

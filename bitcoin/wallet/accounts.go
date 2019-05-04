@@ -41,5 +41,6 @@ func (w *Wallet) CreateAccount(metainfo map[string]interface{}) (*Account, error
 	if err != nil {
 		return nil, err
 	}
+	w.eventBroker.Notify(events.NewAddressEvent, account)
 	return account, nil
 }
