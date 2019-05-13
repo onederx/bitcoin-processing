@@ -456,23 +456,26 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testenv.TestEnvironment
 	tx.mineOrFail(t, env)
 
 	runSubtest(t, "Confirmation", func(t *testing.T) {
-		testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
-
-		for i := 2; i < neededConfirmations; i++ {
+		runSubtest(t, "First", func(t *testing.T) {
+			testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
+		})
+		runSubtest(t, "Successive", func(t *testing.T) {
+			for i := 2; i < neededConfirmations; i++ {
+				_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tx.confirmations = int64(i)
+				testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
+			}
 			_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
-			tx.confirmations = int64(i)
-			testWithdrawPartiallyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
-		}
-		_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tx.confirmations++
+			tx.confirmations++
 
-		testWithdrawFullyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
+			testWithdrawFullyConfirmed(t, env, tx, expectedClientBalanceAfterWithdraw)
+		})
 	})
 }
 

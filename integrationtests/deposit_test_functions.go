@@ -149,22 +149,25 @@ func testDepositSeveralConfirmations(t *testing.T, env *testenv.TestEnvironment,
 	tx.mineOrFail(t, env)
 
 	runSubtest(t, "Confirmation", func(t *testing.T) {
-		testDepositPartiallyConfirmed(t, env, tx)
-
-		for i := 2; i < neededConfirmations; i++ {
+		runSubtest(t, "First", func(t *testing.T) {
+			testDepositPartiallyConfirmed(t, env, tx)
+		})
+		runSubtest(t, "Successive", func(t *testing.T) {
+			for i := 2; i < neededConfirmations; i++ {
+				_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				tx.confirmations = int64(i)
+				testDepositPartiallyConfirmed(t, env, tx)
+			}
 			_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
-			tx.confirmations = int64(i)
-			testDepositPartiallyConfirmed(t, env, tx)
-		}
-		_, err := testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tx.confirmations++
-		testDepositFullyConfirmed(t, env, tx)
+			tx.confirmations++
+			testDepositFullyConfirmed(t, env, tx)
+		})
 	})
 }
 
