@@ -25,10 +25,13 @@ type WithdrawRequest struct {
 	Metainfo interface{}       `json:"metainfo"`
 }
 
-type internalWithdrawRequest struct {
+type internalTxRequest struct {
 	tx     *Transaction
 	result chan error
 }
+
+type internalWithdrawRequest internalTxRequest
+type internalHoldRequest internalTxRequest
 
 func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 	log.Printf(
@@ -96,6 +99,17 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 		return errors.New("Fee type not supported: " + tx.FeeType.String())
 	}
 
+	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		return currWallet.storage.LockWallet(map[string]interface{}{
+			"operation": "withdraw",
+			"tx":        tx,
+		})
+	})
+
+	if err != nil {
+		return err
+	}
+
 	txHash, err := sendMoneyFunc(
 		tx.Address,
 		tx.Amount,
@@ -104,11 +118,20 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	)
 
 	if err != nil {
+		unlockErr := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+			return currWallet.storage.ClearWallet()
+		})
+		if unlockErr != nil {
+			// TODO: retry and more graceful crash
+			log.Fatal(unlockErr)
+		}
 		if tx.ColdStorage || !isInsufficientFundsError(err) {
 			return err
 		}
 		log.Printf("Not enough funds to send tx %v, marking as pending", tx)
-		err = w.updatePendingTxStatus(tx, PendingTransaction)
+		err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+			return currWallet.updatePendingTxStatus(tx, PendingTransaction)
+		})
 		if err != nil {
 			return err
 		}
@@ -121,14 +144,28 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 			tx,
 		)
 
-		_, err = w.storage.StoreTransaction(tx)
+		err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+			_, err := currWallet.storage.StoreTransaction(tx)
+			if err != nil {
+				return err
+			}
+			if !tx.ColdStorage {
+				err = currWallet.notifyTransaction(tx)
+
+				if err != nil {
+					return err
+				}
+			}
+			return currWallet.storage.ClearWallet()
+		})
+
 		if err != nil {
-			return err
-		}
-		if !tx.ColdStorage {
-			w.notifyTransaction(tx)
+			// TODO: retry and more graceful crash
+			log.Fatal(err)
 		}
 	}
+
+	w.eventBroker.SendNotifications()
 
 	if updatePending {
 		w.updatePendingTxns()
@@ -148,7 +185,9 @@ func (w *Wallet) sendWithdrawalViaWalletUpdater(tx *Transaction) error {
 	return <-resultCh
 }
 
-func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
+func (w *Wallet) holdWithdrawalUntilConfirmedViaWalletUpdater(tx *Transaction) error {
+	// to prevent races, actual hold will be done in wallet updater
+	// goroutine
 	log.Printf(
 		"Withdrawal %v has amount %s which is more than configured max "+
 			"amount to be processed without manual confirmation. Holding it "+
@@ -156,7 +195,26 @@ func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
 		tx,
 		tx.Amount,
 	)
-	return w.updatePendingTxStatus(tx, PendingManualConfirmationTransaction)
+	resultCh := make(chan error)
+	w.holdQueue <- internalHoldRequest{
+		tx:     tx,
+		result: resultCh,
+	}
+	return <-resultCh
+}
+
+func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
+	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		return currWallet.updatePendingTxStatus(
+			tx,
+			PendingManualConfirmationTransaction,
+		)
+	})
+	if err != nil {
+		return err
+	}
+	w.eventBroker.SendNotifications()
+	return nil
 }
 
 // Withdraw makes a new withdrawal using parameters set in given WithdrawRequest
@@ -233,5 +291,5 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 		// withdraw to cold storage does not need confirmation
 		return w.sendWithdrawalViaWalletUpdater(outgoingTx)
 	}
-	return w.holdWithdrawalUntilConfirmed(outgoingTx)
+	return w.holdWithdrawalUntilConfirmedViaWalletUpdater(outgoingTx)
 }
