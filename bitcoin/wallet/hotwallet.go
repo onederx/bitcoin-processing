@@ -14,7 +14,7 @@ func (w *Wallet) generateHotWalletAddress() (string, error) {
 		)
 	}
 
-	err = w.storage.SetHotWalletAddress(newHotWalletAddress)
+	err = w.storage.setHotWalletAddress(newHotWalletAddress)
 	if err != nil {
 		return "", errors.New(
 			"Error storing generated hot wallet address " + err.Error(),
@@ -34,13 +34,16 @@ func (w *Wallet) getOrCreateHotWallet() string {
 		return addressFromSettings
 	}
 
-	addressFromStorage := w.storage.GetHotWalletAddress()
-	if addressFromStorage != "" {
+	addressFromStorage, err := w.storage.GetHotWalletAddress()
+
+	if addressFromStorage != "" && err == nil {
 		log.Printf(
 			"Loaded hot wallet address from storage: %s",
 			addressFromStorage,
 		)
 		return addressFromStorage
+	} else if err != ErrHotWalletAddressNotGeneratedYet {
+		panic(err)
 	}
 
 	newHotWalletAddress, err := w.generateHotWalletAddress()
