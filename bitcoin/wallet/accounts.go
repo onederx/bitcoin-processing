@@ -37,10 +37,20 @@ func (w *Wallet) CreateAccount(metainfo map[string]interface{}) (*Account, error
 		Address:  address,
 		Metainfo: metainfo,
 	}
-	err = w.storage.StoreAccount(account)
+
+	err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		err := currWallet.storage.StoreAccount(account)
+		if err != nil {
+			return err
+		}
+		return currWallet.eventBroker.Notify(events.NewAddressEvent, account)
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	w.eventBroker.Notify(events.NewAddressEvent, account)
+
+	w.eventBroker.SendNotifications()
+
 	return account, nil
 }
