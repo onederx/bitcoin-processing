@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"database/sql"
+
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/events"
@@ -9,17 +11,10 @@ import (
 
 const internalQueueSize = 10000
 
-// Wallet is responsible for processing and storing payments. It stores
-// transactions and accounts using its storage and uses bitcoin/nodeapi.NodeAPI
-// to make requests directly to Bitcoin node. Wallet runs a persistent goroutine
-// ("wallet updater goroutine") that polls bitcoin node for updates on watched
-// txns and processes requests that make changes to wallet (making withdrawals,
-// cancelling or confirming txns etc.)
-type Wallet struct {
+type walletData struct {
 	settings                             settings.Settings
 	nodeAPI                              nodeapi.NodeAPI
-	eventBroker                          events.EventBroker
-	storage                              Storage
+	database                             *sql.DB
 	hotWalletAddress                     string
 	coldWalletAddress                    string
 	minWithdraw                          bitcoin.BTCAmount
@@ -28,9 +23,23 @@ type Wallet struct {
 	minWithdrawWithoutManualConfirmation bitcoin.BTCAmount
 	maxConfirmations                     int64
 
-	withdrawQueue chan internalWithdrawRequest
-	cancelQueue   chan internalCancelRequest
-	confirmQueue  chan internalConfirmRequest
+	withdrawQueue           chan internalWithdrawRequest
+	cancelQueue             chan internalCancelRequest
+	confirmQueue            chan internalConfirmRequest
+	holdQueue               chan internalHoldRequest
+	externalTxNotifications chan struct{}
+}
+
+// Wallet is responsible for processing and storing payments. It stores
+// transactions and accounts using its storage and uses bitcoin/nodeapi.NodeAPI
+// to make requests directly to Bitcoin node. Wallet runs a persistent goroutine
+// ("wallet updater goroutine") that polls bitcoin node for updates on watched
+// txns and processes requests that make changes to wallet (making withdrawals,
+// cancelling or confirming txns etc.)
+type Wallet struct {
+	*walletData
+	eventBroker events.EventBroker
+	storage     Storage
 }
 
 // NewWallet creates new Wallet instance. It requires a NodeAPI instance to
@@ -41,18 +50,23 @@ func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.
 	maxConfirmations := int64(s.GetInt("transaction.max_confirmations"))
 	minWithdrawWithoutManualConfirmation := s.GetBTCAmount("wallet.min_withdraw_without_manual_confirmation")
 	return &Wallet{
-		settings:                             s,
-		nodeAPI:                              nodeAPI,
-		eventBroker:                          eventBroker,
-		storage:                              storage,
-		minWithdraw:                          s.GetBTCAmount("wallet.min_withdraw"),
-		minFeePerKb:                          s.GetBTCAmount("wallet.min_fee.per_kb"),
-		minFeeFixed:                          s.GetBTCAmount("wallet.min_fee.fixed"),
-		minWithdrawWithoutManualConfirmation: minWithdrawWithoutManualConfirmation,
-		maxConfirmations:                     maxConfirmations,
-		withdrawQueue:                        make(chan internalWithdrawRequest, internalQueueSize),
-		cancelQueue:                          make(chan internalCancelRequest, internalQueueSize),
-		confirmQueue:                         make(chan internalConfirmRequest, internalQueueSize),
+		storage:     storage,
+		eventBroker: eventBroker,
+		walletData: &walletData{
+			settings:                             s,
+			nodeAPI:                              nodeAPI,
+			database:                             storage.GetDB(),
+			minWithdraw:                          s.GetBTCAmount("wallet.min_withdraw"),
+			minFeePerKb:                          s.GetBTCAmount("wallet.min_fee.per_kb"),
+			minFeeFixed:                          s.GetBTCAmount("wallet.min_fee.fixed"),
+			minWithdrawWithoutManualConfirmation: minWithdrawWithoutManualConfirmation,
+			maxConfirmations:                     maxConfirmations,
+			withdrawQueue:                        make(chan internalWithdrawRequest, internalQueueSize),
+			cancelQueue:                          make(chan internalCancelRequest, internalQueueSize),
+			confirmQueue:                         make(chan internalConfirmRequest, internalQueueSize),
+			holdQueue:                            make(chan internalHoldRequest, internalQueueSize),
+			externalTxNotifications:              make(chan struct{}, 3),
+		},
 	}
 }
 
