@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 
@@ -21,12 +23,14 @@ type InMemoryWalletStorage struct {
 	transactions                 []*Transaction
 	hotWalletAddress             string
 	moneyRequiredFromColdStorage uint64
+	walletOperationLock          string
+	hotWalletAddressWasSet       bool
 }
 
 // GetLastSeenBlockHash returns last seen block hash - a string set by
 // SetLastSeenBlockHash
-func (s *InMemoryWalletStorage) GetLastSeenBlockHash() string {
-	return s.lastSeenBlockHash
+func (s *InMemoryWalletStorage) GetLastSeenBlockHash() (string, error) {
+	return s.lastSeenBlockHash, nil
 }
 
 // SetLastSeenBlockHash sets last seen block hash - a string returned by
@@ -38,8 +42,8 @@ func (s *InMemoryWalletStorage) SetLastSeenBlockHash(hash string) error {
 
 // GetMoneyRequiredFromColdStorage returns money required to transfer from
 // cold storage - uint64 value set by SetMoneyRequiredFromColdStorage
-func (s *InMemoryWalletStorage) GetMoneyRequiredFromColdStorage() uint64 {
-	return s.moneyRequiredFromColdStorage
+func (s *InMemoryWalletStorage) GetMoneyRequiredFromColdStorage() (uint64, error) {
+	return s.moneyRequiredFromColdStorage, nil
 }
 
 // SetMoneyRequiredFromColdStorage stores money required to transfer from
@@ -114,7 +118,7 @@ func (s *InMemoryWalletStorage) GetAccountByAddress(address string) (*Account, e
 			return account, nil
 		}
 	}
-	return nil, errors.New("Account with address " + address + " not found")
+	return nil, nil
 }
 
 // StoreAccount stores Account information. No checks, including checks for
@@ -158,14 +162,18 @@ func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transac
 
 // GetHotWalletAddress returns hot wallet address - string value set by
 // SetHotWalletAddress
-func (s *InMemoryWalletStorage) GetHotWalletAddress() string {
-	return s.hotWalletAddress
+func (s *InMemoryWalletStorage) GetHotWalletAddress() (string, error) {
+	if s.hotWalletAddress == "" && !s.hotWalletAddressWasSet {
+		return "", ErrHotWalletAddressNotGeneratedYet
+	}
+	return s.hotWalletAddress, nil
 }
 
 // SetHotWalletAddress sets hot wallet address - string value returned by
 // GetHotWalletAddress
-func (s *InMemoryWalletStorage) SetHotWalletAddress(address string) error {
+func (s *InMemoryWalletStorage) setHotWalletAddress(address string) error {
 	s.hotWalletAddress = address
+	s.hotWalletAddressWasSet = true
 	return nil
 }
 
@@ -208,4 +216,42 @@ func (s *InMemoryWalletStorage) GetTransactionsWithFilter(directionFilter string
 	}
 
 	return result, nil
+}
+
+func (s *InMemoryWalletStorage) WithTransaction(sqlTX *sql.Tx) Storage {
+	log.Printf(
+		"Warning: WithTransaction called on memory wallet storage. Memory " +
+			"storage does not support transactions, so it just does nothing.",
+	)
+	return s
+}
+
+func (s *InMemoryWalletStorage) CurrentTransaction() *sql.Tx {
+	log.Printf(
+		"Warning: CurrentTransaction called on memory wallet storage. Memory " +
+			"storage does not support transactions, so it always returns nil.",
+	)
+	return nil
+}
+
+func (s *InMemoryWalletStorage) GetDB() *sql.DB {
+	return nil
+}
+func (s *InMemoryWalletStorage) LockWallet(operation interface{}) error {
+	operationMarshaled, err := json.Marshal(operation)
+	if err != nil {
+		return err
+	}
+	s.walletOperationLock = string(operationMarshaled)
+	return nil
+}
+
+func (s *InMemoryWalletStorage) ClearWallet() error {
+	s.walletOperationLock = ""
+	return nil
+}
+
+func (s *InMemoryWalletStorage) CheckWalletLock() (bool, string, error) {
+	operation := s.walletOperationLock
+	return operation == "", operation, nil
 }

@@ -135,7 +135,7 @@ func TestNotify(t *testing.T) {
 			},
 		}
 
-		w := NewWallet(s, nil, brokerMock, NewStorage("memory", s))
+		w := NewWallet(s, nil, brokerMock, NewStorage(nil))
 		w.NotifyTransaction(test.eventType, Transaction{
 			ID:            txid,
 			BlockHash:     test.blockHash,

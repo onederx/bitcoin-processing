@@ -54,7 +54,7 @@ func TestColdWalletOK(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoNotMineMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	w.initColdWallet()
 	if got, want := w.coldWalletAddress, testAddress; got != want {
@@ -71,7 +71,7 @@ func TestColdWalletOurOwnWallet(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoMineMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	defer func() {
 		if r := recover(); r == nil {
@@ -89,7 +89,7 @@ func TestColdWalletCheckFail(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoFailMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	defer func() {
 		if r := recover(); r == nil {
@@ -105,7 +105,7 @@ func TestColdWalletNotConfigured(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoNotMineMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	w.initColdWallet()
 	if got, want := w.coldWalletAddress, ""; got != want {

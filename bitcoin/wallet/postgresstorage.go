@@ -8,12 +8,11 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/gofrs/uuid"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
-	"github.com/onederx/bitcoin-processing/settings"
+	"github.com/onederx/bitcoin-processing/storage"
 )
 
 // PostgresWalletStorage is a Storage implementation that stores data in
@@ -21,10 +20,7 @@ import (
 // used in production. Currently, most methods are implemented by directly
 // making SQL queries to DB and returning their results.
 type PostgresWalletStorage struct {
-	db                           *sql.DB
-	lastSeenBlockHash            atomic.Value
-	hotWalletAddress             atomic.Value
-	moneyRequiredFromColdStorage *uint64
+	db storage.SQLQueryExecutor
 }
 
 type queryResult interface {
@@ -47,85 +43,34 @@ const transactionFields string = `
 	reported_confirmations
 `
 
-func newPostgresWalletStorage(s settings.Settings) *PostgresWalletStorage {
-	dsn := s.GetStringMandatory("storage.dsn")
-
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		panic(err)
-	}
-
-	storage := &PostgresWalletStorage{
-		db: db,
-	}
-
-	lastSeenBlockHash, err := storage.getMeta("last_seen_block_hash", "")
-	if err != nil {
-		panic(err)
-	}
-	storage.lastSeenBlockHash.Store(lastSeenBlockHash)
-
-	hotWalletAddress, err := storage.getMeta("hot_wallet_address", "")
-	if err != nil {
-		panic(err)
-	}
-	storage.hotWalletAddress.Store(hotWalletAddress)
-
-	moneyRequiredFromColdStorageString, err := storage.getMeta(
-		"money_required_from_cold_storage",
-		"0",
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	moneyRequiredFromColdStorageU64, err := strconv.ParseUint(
-		moneyRequiredFromColdStorageString,
-		10,
-		64,
-	)
-	storage.moneyRequiredFromColdStorage = &moneyRequiredFromColdStorageU64
-	if err != nil {
-		panic(err)
-	}
-
+func newPostgresWalletStorage(db *sql.DB) *PostgresWalletStorage {
+	storage := &PostgresWalletStorage{db: db}
 	return storage
 }
 
 func (s *PostgresWalletStorage) getMeta(name string, defaultVal string) (string, error) {
-	result := defaultVal
-	err := s.db.QueryRow(`SELECT value FROM metadata WHERE key = $1`, name).Scan(&result)
-	if err == nil || err == sql.ErrNoRows {
-		return result, nil
-	}
-	return "", err
+	return storage.GetMeta(s.db, name, defaultVal)
 }
 
 func (s *PostgresWalletStorage) setMeta(name string, value string) error {
-	_, err := s.db.Exec(`INSERT INTO metadata (key, value) VALUES ($1, $2)
-		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, name, value)
-	return err
+	return storage.SetMeta(s.db, name, value)
 }
 
 // GetLastSeenBlockHash returns last seen block hash - a string set by
-// SetLastSeenBlockHash. This value is stored (cached) in memory, so this
-// operation always succeeds. Value is loaded from DB on start and updated
-// by SetLastSeenBlockHash. In case someone connects to DB and manually changes
-// it there, processing won't notice it, so restart will be required to update
-func (s *PostgresWalletStorage) GetLastSeenBlockHash() string {
-	return s.lastSeenBlockHash.Load().(string)
+// SetLastSeenBlockHash. "Last seen block hash" is a hash of the last bitcoin
+// block processed, processing needs to store it to distinguish seen blocks
+// and request only new info from bitcoin node. The return value can be an
+// empty string in case to seen block hash was stored (by SetLastSeenBlockHash)
+// yet. This is considered normal and can happen in case processing was started
+// for the first time and has not seen any blocks yet.
+func (s *PostgresWalletStorage) GetLastSeenBlockHash() (string, error) {
+	return s.getMeta("last_seen_block_hash", "")
 }
 
 // SetLastSeenBlockHash sets last seen block hash - a string returned by
-// GetLastSeenBlockHash. The value is written to DB and also stored in memory,
-// so that it's reads do not have to access postgres each time
+// GetLastSeenBlockHash. The value is written to DB.
 func (s *PostgresWalletStorage) SetLastSeenBlockHash(hash string) error {
-	s.lastSeenBlockHash.Store(hash)
-	if err := s.setMeta("last_seen_block_hash", hash); err != nil {
-		return err
-	}
-
-	return nil
+	return s.setMeta("last_seen_block_hash", hash)
 }
 
 func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
@@ -345,7 +290,12 @@ func (s *PostgresWalletStorage) GetAccountByAddress(address string) (*Account, e
 		"SELECT metainfo FROM accounts WHERE address = $1",
 		address,
 	).Scan(&marshaledMetainfo)
-	if err != nil {
+
+	switch err {
+	case nil:
+	case sql.ErrNoRows:
+		return nil, nil
+	default:
 		return nil, err
 	}
 	err = json.Unmarshal([]byte(marshaledMetainfo), &metainfo)
@@ -418,23 +368,24 @@ func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transac
 }
 
 // GetHotWalletAddress returns hot wallet address - string value set by
-// SetHotWalletAddress. This operation always succeeds because hot wallet
-// address is stored in memory in the same way as last seen block hash
-func (s *PostgresWalletStorage) GetHotWalletAddress() string {
-	return s.hotWalletAddress.Load().(string)
+// SetHotWalletAddress.
+func (s *PostgresWalletStorage) GetHotWalletAddress() (string, error) {
+	address, err := s.getMeta("hot_wallet_address", "")
+
+	if err != nil {
+		return "", err
+	}
+
+	if address == "" {
+		return "", ErrHotWalletAddressNotGeneratedYet
+	}
+	return address, nil
 }
 
 // SetHotWalletAddress sets hot wallet address - string value returned by
-// GetHotWalletAddress. This operation makes an update in DB and also updates
-// value cached in memory
-func (s *PostgresWalletStorage) SetHotWalletAddress(address string) error {
-	s.hotWalletAddress.Store(address)
-	err := s.setMeta("hot_wallet_address", address)
-	if err != nil {
-		return err
-	}
-
-	return nil
+// GetHotWalletAddress. This operation makes an update in DB.
+func (s *PostgresWalletStorage) setHotWalletAddress(address string) error {
+	return s.setMeta("hot_wallet_address", address)
 }
 
 // GetPendingTransactions returns txns referring to withdrawals with status
@@ -472,25 +423,25 @@ func (s *PostgresWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 
 // GetMoneyRequiredFromColdStorage returns money required to transfer from
 // cold storage - uint64 value set by SetMoneyRequiredFromColdStorage.
-// This operation always succeeds because the value is stored in memory in the
-// same way as last seen block hash
-func (s *PostgresWalletStorage) GetMoneyRequiredFromColdStorage() uint64 {
-	return atomic.LoadUint64(s.moneyRequiredFromColdStorage)
+func (s *PostgresWalletStorage) GetMoneyRequiredFromColdStorage() (uint64, error) {
+	moneyRequiredFromColdStorageString, err := s.getMeta(
+		"money_required_from_cold_storage",
+		"0",
+	)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(moneyRequiredFromColdStorageString, 10, 64)
 }
 
 // SetMoneyRequiredFromColdStorage stores money required to transfer from
 // cold storage - uint64 value returned by GetMoneyRequiredFromColdStorage. The
 // value is updated in DB and in memory
 func (s *PostgresWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) error {
-	atomic.StoreUint64(s.moneyRequiredFromColdStorage, amount)
-	err := s.setMeta(
+	return s.setMeta(
 		"money_required_from_cold_storage",
 		strconv.FormatUint(amount, 10),
 	)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // GetTransactionsWithFilter gets txns filtered by direction and/or status.
@@ -535,4 +486,34 @@ func (s *PostgresWalletStorage) GetTransactionsWithFilter(directionFilter string
 		return result, err
 	}
 	return result, nil
+}
+
+func (s *PostgresWalletStorage) WithTransaction(sqlTX *sql.Tx) Storage {
+	return &PostgresWalletStorage{db: sqlTX}
+}
+
+func (s *PostgresWalletStorage) CurrentTransaction() *sql.Tx {
+	sqlTX, _ := s.db.(*sql.Tx)
+	return sqlTX
+}
+
+func (s *PostgresWalletStorage) GetDB() *sql.DB {
+	return s.db.(*sql.DB)
+}
+
+func (s *PostgresWalletStorage) LockWallet(operation interface{}) error {
+	operationMarshaled, err := json.Marshal(operation)
+	if err != nil {
+		return err
+	}
+	return s.setMeta("wallet_operation", string(operationMarshaled))
+}
+
+func (s *PostgresWalletStorage) ClearWallet() error {
+	return s.setMeta("wallet_operation", "")
+}
+
+func (s *PostgresWalletStorage) CheckWalletLock() (bool, string, error) {
+	operation, err := s.getMeta("wallet_operation", "")
+	return operation == "", operation, err
 }

@@ -34,7 +34,7 @@ func TestHotWalletGenerate(t *testing.T) {
 			t: t,
 		},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	w.initHotWallet()
 	if got, want := w.GetHotWalletAddress(), testAddress2; got != want {
@@ -55,7 +55,7 @@ func TestHotWalletGenerateRegtest(t *testing.T) {
 			t: t,
 		},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	w.initHotWallet()
 	if got, want := w.GetHotWalletAddress(), testAddressRegtest; got != want {
@@ -73,7 +73,7 @@ func TestHotWalletConfigured(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoMineMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	w.initHotWallet()
 	if got, want := w.GetHotWalletAddress(), testAddress; got != want {
@@ -91,7 +91,7 @@ func TestHotWalletNotMineFail(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoNotMineMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	defer func() {
 		if r := recover(); r == nil {
@@ -110,7 +110,7 @@ func TestHotWalletGetAddressInfoFail(t *testing.T) {
 		s,
 		&nodeAPIGetAddressInfoFailMock{t: t},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 	defer func() {
 		if r := recover(); r == nil {

@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"database/sql"
 	"errors"
 	"reflect"
 	"testing"
@@ -51,6 +52,10 @@ type accountStoreFailureMock struct {
 	Storage
 }
 
+func (a *accountStoreFailureMock) GetDB() *sql.DB {
+	return nil
+}
+
 func (s *accountStoreFailureMock) StoreAccount(account *Account) error {
 	return errors.New(storeAccountError)
 }
@@ -62,7 +67,7 @@ func TestCreateAccountSuccessful(t *testing.T) {
 		s,
 		&nodeAPICreateNewAddressMock{},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 
 	account, err := w.CreateAccount(testMetainfo)
@@ -87,7 +92,7 @@ func TestCreateAccountAddressGenerationFailure(t *testing.T) {
 		s,
 		&nodeAPICreateNewAddressErrorMock{},
 		&eventBrokerMock{},
-		NewStorage("memory", s),
+		NewStorage(nil),
 	)
 
 	_, err := w.CreateAccount(testMetainfo)
