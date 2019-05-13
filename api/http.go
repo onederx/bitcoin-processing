@@ -11,7 +11,6 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
-	"github.com/onederx/bitcoin-processing/events"
 )
 
 const (
@@ -116,7 +115,7 @@ func (s *Server) newBitcoinAddress(response http.ResponseWriter, request *http.R
 }
 
 func (s *Server) notifyWalletTxStatusChanged(response http.ResponseWriter, request *http.Request) {
-	s.eventBroker.Notify(events.CheckTxStatusEvent, "")
+	s.wallet.TriggerWalletUpdate()
 	s.respond(response, nil, nil)
 }
 

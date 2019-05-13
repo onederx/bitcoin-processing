@@ -201,11 +201,10 @@ func (w *Wallet) checkForWalletUpdates() {
 func (w *Wallet) pollWalletUpdates() {
 	pollInterval := time.Duration(w.settings.GetInt("bitcoin.poll_interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
-	externalTxNotifications := w.eventBroker.GetExternalTxNotificationChannel()
 	for {
 		select {
 		case <-ticker:
-		case <-externalTxNotifications:
+		case <-w.externalTxNotifications:
 		case withdrawRequest := <-w.withdrawQueue:
 			withdrawRequest.result <- w.sendWithdrawal(withdrawRequest.tx, true)
 			close(withdrawRequest.result)
@@ -225,4 +224,11 @@ func (w *Wallet) pollWalletUpdates() {
 
 func (w *Wallet) startWatchingWalletUpdates() {
 	w.pollWalletUpdates()
+}
+
+func (w *Wallet) TriggerWalletUpdate() {
+	select {
+	case w.externalTxNotifications <- struct{}{}:
+	default:
+	}
 }
