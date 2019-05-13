@@ -35,25 +35,13 @@ func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus
 	} else {
 		eventType = events.PendingStatusUpdatedEvent
 	}
-	w.NotifyTransaction(eventType, *tx)
-
-	return nil
+	return w.NotifyTransaction(eventType, *tx)
 }
 
-func (w *Wallet) updatePendingTxStatusOrLogError(tx *Transaction, status TransactionStatus) {
-	if err := w.updatePendingTxStatus(tx, status); err != nil {
-		log.Printf(
-			"Error: failed to store updated pending tx status: %s",
-			err,
-		)
-	}
-}
-
-func (w *Wallet) updatePendingTxns() {
+func (w *Wallet) updatePendingTxns() error {
 	pendingTxns, err := w.storage.GetPendingTransactions()
 	if err != nil {
-		log.Printf("Error: failed to get pending txns for update %s", err)
-		return
+		return err
 	}
 	sort.Slice(pendingTxns, func(i, j int) bool {
 		return pendingTxns[i].Amount < pendingTxns[j].Amount
@@ -61,8 +49,7 @@ func (w *Wallet) updatePendingTxns() {
 
 	confBal, unconfBal, err := w.nodeAPI.GetConfirmedAndUnconfirmedBalance()
 	if err != nil {
-		log.Printf("Error: failed to get wallet balance %s", err)
-		return
+		return err
 	}
 	availableBalance := int64(confBal)
 
@@ -75,7 +62,7 @@ func (w *Wallet) updatePendingTxns() {
 			log.Printf("There is now enough money to send tx %v, resending", tx)
 			err = w.sendWithdrawal(tx, false)
 			if err != nil {
-				log.Printf("Error re-sending pending tx: %s", err)
+				return err
 			}
 		} else {
 			exceedingTx = i
@@ -94,7 +81,10 @@ func (w *Wallet) updatePendingTxns() {
 			amount = int64(tx.Amount)
 			if availableBalance-amount >= 0 {
 				availableBalance -= amount
-				w.updatePendingTxStatusOrLogError(tx, PendingTransaction)
+				err = w.updatePendingTxStatus(tx, PendingTransaction)
+				if err != nil {
+					return err
+				}
 			} else {
 				exceedingTx = i
 				break
@@ -105,15 +95,29 @@ func (w *Wallet) updatePendingTxns() {
 	if exceedingTx != -1 {
 		for _, tx := range pendingTxns[exceedingTx:] {
 			availableBalance -= int64(tx.Amount)
-			w.updatePendingTxStatusOrLogError(tx, PendingColdStorageTransaction)
+			err = w.updatePendingTxStatus(tx, PendingColdStorageTransaction)
+			if err != nil {
+				return err
+			}
 		}
 		err := w.storage.SetMoneyRequiredFromColdStorage(uint64(-availableBalance))
 		if err != nil {
 			log.Printf("Error saving amount required from cold storage %s", err)
 		}
-	} else if w.storage.GetMoneyRequiredFromColdStorage() > 0 {
-		w.storage.SetMoneyRequiredFromColdStorage(0)
+	} else {
+		requiredAmount, err := w.storage.GetMoneyRequiredFromColdStorage()
+		if err != nil {
+			return err
+		}
+		if requiredAmount > 0 {
+			err = w.storage.SetMoneyRequiredFromColdStorage(0)
+			if err != nil {
+				return err
+			}
+		}
 	}
+	w.eventBroker.SendNotifications()
+	return nil
 }
 
 func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
