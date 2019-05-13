@@ -30,17 +30,18 @@ func getTransactionNotificationType(confirmations int64, tx *Transaction) events
 	}
 }
 
-func (w *Wallet) getAccountMetainfo(tx *Transaction) map[string]interface{} {
+func (w *Wallet) getAccountMetainfo(tx *Transaction) (map[string]interface{}, error) {
 	account, err := w.storage.GetAccountByAddress(tx.Address)
 	if err != nil {
-		log.Printf("Error: failed to match account by address %s "+
-			"(transaction %s) for incoming payment", tx.Address, tx.Hash)
-		return unknownAccountError
+		return nil, err
 	}
-	return account.Metainfo
+	if account == nil {
+		return unknownAccountError, nil
+	}
+	return account.Metainfo, nil
 }
 
-func (w *Wallet) notifyTransaction(tx *Transaction) {
+func (w *Wallet) notifyTransaction(tx *Transaction) error {
 	confirmationsToNotify := util.Min64(tx.Confirmations, w.maxConfirmations)
 
 	for i := tx.reportedConfirmations + 1; i <= confirmationsToNotify; i++ {
@@ -59,22 +60,28 @@ func (w *Wallet) notifyTransaction(tx *Transaction) {
 		}
 		w.setTxStatusByConfirmations(&notification)
 
-		w.NotifyTransaction(eventType, notification)
-		err := w.storage.updateReportedConfirmations(tx, i)
+		err := w.NotifyTransaction(eventType, notification)
 		if err != nil {
-			log.Printf(
-				"Error: failed to update count of reported transaction "+
-					"confirmations in storage: %s", err)
-			return
+			return err
+		}
+		err = w.storage.updateReportedConfirmations(tx, i)
+		if err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
-func (w *Wallet) updateTxInfo(tx *Transaction) bool {
+func (w *Wallet) updateTxInfo(tx *Transaction) (bool, error) {
+	var err error
+
 	isHotStorageTx := tx.Address == w.hotWalletAddress
 	if tx.Direction == IncomingDirection {
 		if !isHotStorageTx {
-			tx.Metainfo = w.getAccountMetainfo(tx)
+			tx.Metainfo, err = w.getAccountMetainfo(tx)
+			if err != nil {
+				return false, err
+			}
 		} else {
 			tx.Metainfo = hotStorageMeta
 		}
@@ -83,10 +90,9 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 	oldStatus := tx.Status
 	w.setTxStatusByConfirmations(tx)
 
-	tx, err := w.storage.StoreTransaction(tx)
+	tx, err = w.storage.StoreTransaction(tx)
 	if err != nil {
-		log.Printf("Error: failed to store tx data in database: %s", err)
-		return false
+		return false, err
 	}
 
 	txInfoChanged := tx.fresh || (oldStatus != tx.Status)
@@ -103,41 +109,49 @@ func (w *Wallet) updateTxInfo(tx *Transaction) bool {
 		)
 	}
 	if !isHotStorageTx && !tx.ColdStorage { // don't notify about internal txns
-		w.notifyTransaction(tx)
+		err = w.notifyTransaction(tx)
 	}
 
-	return txInfoChanged
+	return txInfoChanged, err
 }
 
 func (w *Wallet) checkForNewTransactions() {
-	lastSeenBlock := w.storage.GetLastSeenBlockHash()
-	lastTxData, err := w.nodeAPI.ListTransactionsSinceBlock(lastSeenBlock)
+	anyTxInfoChanged := false
+	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		lastSeenBlock, err := currWallet.storage.GetLastSeenBlockHash()
+		if err != nil {
+			return err
+		}
+		lastTxData, err := currWallet.nodeAPI.ListTransactionsSinceBlock(lastSeenBlock)
+		if err != nil {
+			return err
+		}
+		if lastTxData.LastBlock != lastSeenBlock {
+			log.Printf(
+				"Got %d transactions from node. Last block hash is %s",
+				len(lastTxData.Transactions),
+				lastTxData.LastBlock,
+			)
+		}
+		for _, btcNodeTransaction := range lastTxData.Transactions {
+			tx := newTransaction(&btcNodeTransaction)
+			currentTxInfoChanged, err := currWallet.updateTxInfo(tx)
+			if err != nil {
+				return err
+			}
+			anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
+		}
+		return currWallet.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
+	})
 	if err != nil {
-		log.Print("Error: Checking for wallet updates failed: ", err)
+		log.Printf("wallet: error: failed to process new bitcoin txns: %v", err)
 		return
 	}
-	if lastTxData.LastBlock != lastSeenBlock {
-		log.Printf(
-			"Got %d transactions from node. Last block hash is %s",
-			len(lastTxData.Transactions),
-			lastTxData.LastBlock,
-		)
-	}
 
-	anyTxInfoChanged := false
-	for _, btcNodeTransaction := range lastTxData.Transactions {
-		tx := newTransaction(&btcNodeTransaction)
-		currentTxInfoChanged := w.updateTxInfo(tx)
-		anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
-	}
-	err = w.storage.SetLastSeenBlockHash(lastTxData.LastBlock)
-	if err != nil {
-		log.Printf(
-			"Error: failed to update last seen block hash in db: %s",
-			err,
-		)
-	}
+	w.eventBroker.SendNotifications()
+
 	if anyTxInfoChanged {
+		// TODO: make updating pending txns reliable
 		w.updatePendingTxns()
 	}
 }
@@ -163,32 +177,42 @@ func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
 }
 
 func (w *Wallet) checkForExistingTransactionUpdates() {
-	transactionsToCheck, err := w.storage.GetBroadcastedTransactionsWithLessConfirmations(
-		w.maxConfirmations,
-	)
+	anyTxInfoChanged := false
+
+	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		transactionsToCheck, err := currWallet.storage.GetBroadcastedTransactionsWithLessConfirmations(
+			w.maxConfirmations,
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, tx := range transactionsToCheck {
+			fullTxInfo, err := currWallet.nodeAPI.GetTransaction(tx.Hash)
+			if err != nil {
+				return err
+			}
+			tx.updateFromFullTxInfo(fullTxInfo)
+			currentTxInfoChanged, err := currWallet.updateTxInfo(tx)
+			if err != nil {
+				return err
+			}
+			anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
+		}
+		return nil
+	})
+
 	if err != nil {
 		log.Printf(
-			"Error: failed to fetch transactions from storage for update: %s",
-			err,
-		)
+			"wallet: error: failed to process updates on existing bitcoin "+
+				"txns: %v", err)
 		return
 	}
 
-	anyTxInfoChanged := false
-	for _, tx := range transactionsToCheck {
-		fullTxInfo, err := w.nodeAPI.GetTransaction(tx.Hash)
-		if err != nil {
-			log.Printf(
-				"Error: could not get tx %s from node for update",
-				tx.Hash,
-			)
-			continue
-		}
-		tx.updateFromFullTxInfo(fullTxInfo)
-		currentTxInfoChanged := w.updateTxInfo(tx)
-		anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
-	}
+	w.eventBroker.SendNotifications()
+
 	if anyTxInfoChanged {
+		// TODO: make updating pending txns reliable
 		w.updatePendingTxns()
 	}
 }
