@@ -121,30 +121,43 @@ func (w *Wallet) updatePendingTxns() error {
 }
 
 func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
-	tx, err := w.storage.GetTransactionByID(id)
+	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		tx, err := currWallet.storage.GetTransactionByID(id)
+		if err != nil {
+			return err
+		}
+
+		switch tx.Status {
+		case PendingTransaction:
+		case PendingColdStorageTransaction:
+		case PendingManualConfirmationTransaction:
+		default:
+			return errors.New("Transaction is not pending")
+		}
+
+		return currWallet.updatePendingTxStatus(tx, CancelledTransaction)
+	})
+
 	if err != nil {
 		return err
 	}
 
-	switch tx.Status {
-	case PendingTransaction:
-	case PendingColdStorageTransaction:
-	case PendingManualConfirmationTransaction:
-	default:
-		return errors.New("Transaction is not pending")
-	}
+	w.eventBroker.SendNotifications()
 
-	err = w.updatePendingTxStatus(tx, CancelledTransaction)
-	if err != nil {
-		return err
-	}
-
-	w.updatePendingTxns()
-	return nil
+	return w.updatePendingTxns()
 }
 
 func (w *Wallet) confirmPendingTx(id uuid.UUID) error {
-	tx, err := w.storage.GetTransactionByID(id)
+	var (
+		tx  *Transaction
+		err error
+	)
+
+	err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		tx, err = currWallet.storage.GetTransactionByID(id)
+		return err
+	})
+
 	if err != nil {
 		return err
 	}
