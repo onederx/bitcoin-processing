@@ -11,7 +11,7 @@ func TestMoreEventsThanChannelSize(t *testing.T) {
 	}
 	const msgCount = channelSize*2 + 100
 
-	storage := NewEventStorage("memory", nil)
+	storage := NewEventStorage(nil)
 	bcaster := newBroadcasterWithStorage(storage)
 
 	for i := 0; i < msgCount; i++ {

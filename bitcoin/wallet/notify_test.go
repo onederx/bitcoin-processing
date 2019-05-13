@@ -13,11 +13,11 @@ import (
 
 type eventBrokerNotifyCheckMock struct {
 	eventBrokerMock
-	notifyChecker func(eventType events.EventType, data interface{})
+	notifyChecker func(eventType events.EventType, data interface{}) error
 }
 
-func (e *eventBrokerNotifyCheckMock) Notify(eventType events.EventType, data interface{}) {
-	e.notifyChecker(eventType, data)
+func (e *eventBrokerNotifyCheckMock) Notify(eventType events.EventType, data interface{}) error {
+	return e.notifyChecker(eventType, data)
 }
 
 func TestNotify(t *testing.T) {
@@ -81,7 +81,7 @@ func TestNotify(t *testing.T) {
 		}
 
 		brokerMock := &eventBrokerNotifyCheckMock{
-			notifyChecker: func(eventType events.EventType, data interface{}) {
+			notifyChecker: func(eventType events.EventType, data interface{}) error {
 				if got, want := eventType, test.eventType; got != want {
 					t.Errorf("Expected event type %v for notification, got %v", want, got)
 				}
@@ -132,6 +132,7 @@ func TestNotify(t *testing.T) {
 				if got, want := notification.FeeType, test.feeType; got != want {
 					t.Errorf("Expected fee type %v in notification, got %v", want, got)
 				}
+				return nil
 			},
 		}
 
