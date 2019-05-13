@@ -1,6 +1,9 @@
 package events
 
 import (
+	"database/sql"
+	"encoding/json"
+	"log"
 	"sync"
 
 	"github.com/onederx/bitcoin-processing/util"
@@ -17,6 +20,12 @@ import (
 type InMemoryEventStorage struct {
 	mutex  *sync.Mutex
 	events []*storedEvent
+
+	lastHTTPSentSeq int
+	lastWSSentSeq   int
+
+	httpCallbackOperation string
+	wsOperation           string
 }
 
 // StoreEvent adds event to storage. Implementation is naive: it actually just
@@ -41,4 +50,70 @@ func (s *InMemoryEventStorage) GetEventsFromSeq(seq int) ([]*storedEvent, error)
 	defer s.mutex.Unlock()
 
 	return s.events[util.Min(seq, len(s.events)):], nil
+}
+
+func (s *InMemoryEventStorage) WithTransaction(sqlTX *sql.Tx) EventStorage {
+	log.Printf(
+		"Warning: WithTransaction called on memory event storage. Memory " +
+			"storage does not support transactions, so it just does nothing.",
+	)
+	return s
+}
+
+func (s *InMemoryEventStorage) GetDB() *sql.DB {
+	return nil
+}
+
+func (s *InMemoryEventStorage) GetLastHTTPSentSeq() (int, error) {
+	return s.lastHTTPSentSeq, nil
+}
+
+func (s *InMemoryEventStorage) StoreLastHTTPSentSeq(seq int) error {
+	s.lastHTTPSentSeq = seq
+	return nil
+}
+
+func (s *InMemoryEventStorage) GetLastWSSentSeq() (int, error) {
+	return s.lastWSSentSeq, nil
+}
+
+func (s *InMemoryEventStorage) StoreLastWSSentSeq(seq int) error {
+	s.lastWSSentSeq = seq
+	return nil
+}
+
+func (s *InMemoryEventStorage) LockHTTPCallback(operation interface{}) error {
+	operationMarshaled, err := json.Marshal(operation)
+	if err != nil {
+		return err
+	}
+	s.httpCallbackOperation = string(operationMarshaled)
+	return nil
+}
+
+func (s *InMemoryEventStorage) ClearHTTPCallback() error {
+	s.httpCallbackOperation = ""
+	return nil
+}
+
+func (s *InMemoryEventStorage) CheckHTTPCallbackLock() (bool, string, error) {
+	return s.httpCallbackOperation == "", s.httpCallbackOperation, nil
+}
+
+func (s *InMemoryEventStorage) LockWS(operation interface{}) error {
+	operationMarshaled, err := json.Marshal(operation)
+	if err != nil {
+		return err
+	}
+	s.wsOperation = string(operationMarshaled)
+	return nil
+}
+
+func (s *InMemoryEventStorage) ClearWS() error {
+	s.wsOperation = ""
+	return nil
+}
+
+func (s *InMemoryEventStorage) CheckWSLock() (bool, string, error) {
+	return s.wsOperation == "", s.wsOperation, nil
 }

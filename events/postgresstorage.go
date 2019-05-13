@@ -3,33 +3,27 @@ package events
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 
-	_ "github.com/lib/pq" // Enable postgresql driver
-
-	"github.com/onederx/bitcoin-processing/settings"
+	"github.com/onederx/bitcoin-processing/storage"
 )
 
 // PostgresEventStorage stores events in postgresql database. Methods directly
 // execute SQL queries that store/fetch required data.
 type PostgresEventStorage struct {
-	db *sql.DB
+	db storage.SQLQueryExecutor
 }
 
-func newPostgresEventStorage(s settings.Settings) *PostgresEventStorage {
-	dsn := s.GetStringMandatory("storage.dsn")
-
-	db, err := sql.Open("postgres", dsn)
-
-	if err != nil {
-		panic(err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		panic(err)
-	}
-
+func newPostgresEventStorage(db *sql.DB) *PostgresEventStorage {
 	return &PostgresEventStorage{db: db}
+}
+
+func (s *PostgresEventStorage) getMeta(name string, defaultVal string) (string, error) {
+	return storage.GetMeta(s.db, name, defaultVal)
+}
+
+func (s *PostgresEventStorage) setMeta(name string, value string) error {
+	return storage.SetMeta(s.db, name, value)
 }
 
 // StoreEvent stores event in database, assigning a sequence number to it.
@@ -101,4 +95,74 @@ func (s *PostgresEventStorage) GetEventsFromSeq(seq int) ([]*storedEvent, error)
 	}
 
 	return result, nil
+}
+
+func (s *PostgresEventStorage) WithTransaction(sqlTX *sql.Tx) EventStorage {
+	return &PostgresEventStorage{db: sqlTX}
+}
+
+func (s *PostgresEventStorage) GetDB() *sql.DB {
+	return s.db.(*sql.DB)
+}
+
+func (s *PostgresEventStorage) GetLastHTTPSentSeq() (int, error) {
+	lastSeqStr, err := storage.GetMeta(s.db, "last_http_sent_seq", "0")
+
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.Atoi(lastSeqStr)
+}
+
+func (s *PostgresEventStorage) StoreLastHTTPSentSeq(seq int) error {
+	return storage.SetMeta(s.db, "last_http_sent_seq", strconv.Itoa(seq))
+}
+
+func (s *PostgresEventStorage) GetLastWSSentSeq() (int, error) {
+	lastSeqStr, err := storage.GetMeta(s.db, "last_ws_sent_seq", "0")
+
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.Atoi(lastSeqStr)
+}
+
+func (s *PostgresEventStorage) StoreLastWSSentSeq(seq int) error {
+	return storage.SetMeta(s.db, "last_ws_sent_seq", strconv.Itoa(seq))
+}
+
+func (s *PostgresEventStorage) LockHTTPCallback(operation interface{}) error {
+	operationMarshaled, err := json.Marshal(operation)
+	if err != nil {
+		return err
+	}
+	return s.setMeta("http_callback_operation", string(operationMarshaled))
+}
+
+func (s *PostgresEventStorage) ClearHTTPCallback() error {
+	return s.setMeta("http_callback_operation", "")
+}
+
+func (s *PostgresEventStorage) CheckHTTPCallbackLock() (bool, string, error) {
+	operation, err := s.getMeta("http_callback_operation", "")
+	return operation == "", operation, err
+}
+
+func (s *PostgresEventStorage) LockWS(operation interface{}) error {
+	operationMarshaled, err := json.Marshal(operation)
+	if err != nil {
+		return err
+	}
+	return s.setMeta("ws_operation", string(operationMarshaled))
+}
+
+func (s *PostgresEventStorage) ClearWS() error {
+	return s.setMeta("ws_operation", "")
+}
+
+func (s *PostgresEventStorage) CheckWSLock() (bool, string, error) {
+	operation, err := s.getMeta("ws_operation", "")
+	return operation == "", operation, err
 }

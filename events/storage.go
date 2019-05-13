@@ -1,9 +1,9 @@
 package events
 
 import (
+	"database/sql"
+	"log"
 	"sync"
-
-	"github.com/onederx/bitcoin-processing/settings"
 )
 
 type storedEvent = NotificationWithSeq
@@ -29,22 +29,31 @@ type EventStorage interface {
 	// ascending order. In case given sequece number is larger than maximum
 	// sequence number in storage, empty slice should be returned.
 	GetEventsFromSeq(seq int) ([]*storedEvent, error)
+
+	GetLastHTTPSentSeq() (int, error)
+	StoreLastHTTPSentSeq(seq int) error
+	GetLastWSSentSeq() (int, error)
+	StoreLastWSSentSeq(seq int) error
+
+	LockHTTPCallback(operation interface{}) error
+	ClearHTTPCallback() error
+	CheckHTTPCallbackLock() (bool, string, error)
+	LockWS(operation interface{}) error
+	ClearWS() error
+	CheckWSLock() (bool, string, error)
+
+	WithTransaction(sqlTX *sql.Tx) EventStorage
+	GetDB() *sql.DB
 }
 
-func NewEventStorage(storageType string, s settings.Settings) EventStorage {
-	var storage EventStorage
-
-	switch storageType {
-	case "memory":
-		storage = &InMemoryEventStorage{
+func NewEventStorage(db *sql.DB) EventStorage {
+	if db == nil {
+		log.Print("Warning: initializing in-memory event storage since no db " +
+			"connection is passed. Note it should not be used in production")
+		return &InMemoryEventStorage{
 			mutex:  &sync.Mutex{},
 			events: make([]*storedEvent, 0),
 		}
-	case "postgres":
-		storage = newPostgresEventStorage(s)
-	default:
-		panic("Error: unsupported storage type " + storageType)
 	}
-
-	return storage
+	return newPostgresEventStorage(db)
 }
