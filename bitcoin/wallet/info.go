@@ -32,6 +32,12 @@ func (w *Wallet) GetBalance() (bitcoin.BTCAmount, bitcoin.BTCAmount, error) {
 // withdrawals that processing won't be able to cover with balance it has will
 // receive status 'pending-cold-storage' and GetMoneyRequiredFromColdStorage()
 // will return how much more money wallet needs to pay for them all
-func (w *Wallet) GetMoneyRequiredFromColdStorage() bitcoin.BTCAmount {
-	return bitcoin.BTCAmount(w.storage.GetMoneyRequiredFromColdStorage())
+func (w *Wallet) GetMoneyRequiredFromColdStorage() (bitcoin.BTCAmount, error) {
+	amount, err := w.storage.GetMoneyRequiredFromColdStorage()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return bitcoin.BTCAmount(amount), nil
 }

@@ -180,7 +180,8 @@ func (s *Server) getBalance(response http.ResponseWriter, request *http.Request)
 }
 
 func (s *Server) getRequiredFromColdStorage(response http.ResponseWriter, request *http.Request) {
-	s.respond(response, s.wallet.GetMoneyRequiredFromColdStorage(), nil)
+	amount, err := s.wallet.GetMoneyRequiredFromColdStorage()
+	s.respond(response, amount, err)
 }
 
 func (s *Server) cancelPending(response http.ResponseWriter, request *http.Request) {
