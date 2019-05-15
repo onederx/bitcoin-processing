@@ -163,9 +163,10 @@ func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
 		return err
 	}
 
+	w.updatePendingTxns()
 	w.eventBroker.SendNotifications()
 
-	return w.updatePendingTxns()
+	return nil
 }
 
 func (w *Wallet) confirmPendingTx(id uuid.UUID) error {
