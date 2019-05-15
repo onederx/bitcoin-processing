@@ -168,7 +168,10 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	w.eventBroker.SendNotifications()
 
 	if updatePending {
-		w.updatePendingTxns()
+		// we are eager to return response telling withdrawal is accepted
+		// to client as soon as possible, so schedule updating pendings txns
+		// anynchronously instead of blocking on it now
+		w.schedulePendingTxUpdate()
 	}
 
 	return nil

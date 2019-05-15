@@ -151,7 +151,6 @@ func (w *Wallet) checkForNewTransactions() {
 	w.eventBroker.SendNotifications()
 
 	if anyTxInfoChanged {
-		// TODO: make updating pending txns reliable
 		w.updatePendingTxns()
 	}
 }
@@ -212,7 +211,6 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 	w.eventBroker.SendNotifications()
 
 	if anyTxInfoChanged {
-		// TODO: make updating pending txns reliable
 		w.updatePendingTxns()
 	}
 }
@@ -241,6 +239,8 @@ func (w *Wallet) pollWalletUpdates() {
 		case holdRequest := <-w.holdQueue:
 			holdRequest.result <- w.holdWithdrawalUntilConfirmed(holdRequest.tx)
 			close(holdRequest.result)
+		case <-w.pendingTxUpdateTrigger:
+			w.updatePendingTxns()
 		}
 		w.checkForWalletUpdates()
 	}
