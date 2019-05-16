@@ -135,7 +135,7 @@ func (e *eventBroker) sendHTTPCallbackNotifications() {
 			e.httpCallbackRetryDelay = 0
 
 			err = e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
-				err := e.storage.StoreLastHTTPSentSeq(event.Seq)
+				err := currBroker.storage.StoreLastHTTPSentSeq(event.Seq)
 				if err != nil {
 					return err
 				}
@@ -162,7 +162,10 @@ func (e *eventBroker) sendHTTPCallbackNotifications() {
 			return
 		} else {
 			err = e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
-				currBroker.storage.StoreLastHTTPSentSeq(event.Seq)
+				err := currBroker.storage.StoreLastHTTPSentSeq(event.Seq)
+				if err != nil {
+					return err
+				}
 				return currBroker.storage.ClearHTTPCallback()
 			})
 			if err != nil {
