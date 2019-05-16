@@ -118,21 +118,30 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	)
 
 	if err != nil {
+		makePending := false
+
+		if isInsufficientFundsError(err) && !tx.ColdStorage {
+			// this is a regular withdrawal and we got response that we
+			// don't have enough funds to send it: OK, make this tx pending
+			log.Printf("Not enough funds to send tx %v, marking as pending", tx)
+			makePending = true
+		}
+
 		unlockErr := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+			if makePending {
+				err := currWallet.updatePendingTxStatus(tx, PendingTransaction)
+				if err != nil {
+					return err
+				}
+			}
 			return currWallet.storage.ClearWallet()
 		})
+
 		if unlockErr != nil {
-			// TODO: retry and more graceful crash
-			log.Fatal(unlockErr)
+			log.Fatal(err) // TODO: retry and more graceful crash
 		}
-		if tx.ColdStorage || !isInsufficientFundsError(err) {
-			return err
-		}
-		log.Printf("Not enough funds to send tx %v, marking as pending", tx)
-		err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
-			return currWallet.updatePendingTxStatus(tx, PendingTransaction)
-		})
-		if err != nil {
+
+		if !makePending {
 			return err
 		}
 	} else {
