@@ -3,11 +3,17 @@ package wallet
 import (
 	"errors"
 	"log"
+	"time"
 
 	"github.com/gofrs/uuid"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
+)
+
+const (
+	withdrawSaveRetries       = 10
+	withdrawRetryBaseInterval = time.Second
 )
 
 // WithdrawRequest is a structure with parameters that can be set for new
@@ -118,42 +124,37 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	)
 
 	if err != nil {
-		makePending := false
-
-		if isInsufficientFundsError(err) && !tx.ColdStorage {
-			// this is a regular withdrawal and we got response that we
-			// don't have enough funds to send it: OK, make this tx pending
-			log.Printf("Not enough funds to send tx %v, marking as pending", tx)
-			makePending = true
-		}
-
-		unlockErr := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
-			if makePending {
-				err := currWallet.updatePendingTxStatus(tx, PendingTransaction)
-				if err != nil {
-					return err
-				}
-			}
-			return currWallet.storage.ClearWallet()
-		})
-
-		if unlockErr != nil {
-			log.Fatal(err) // TODO: retry and more graceful crash
-		}
-
-		if !makePending {
+		err = w.handleWithdrawalError(err, tx)
+		if err != nil {
 			return err
 		}
 	} else {
-		tx.Status = NewTransaction
-		tx.Hash = txHash
+		w.handleWithdrawalSuccess(tx, txHash)
+	}
 
-		log.Printf(
-			"Successfully created and broadcasted outgoing tx (withdrawal) %v",
-			tx,
-		)
+	w.eventBroker.SendNotifications()
 
-		err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+	if updatePending {
+		// we are eager to return response telling withdrawal is accepted
+		// to client as soon as possible, so schedule updating pendings txns
+		// anynchronously instead of blocking on it now
+		w.schedulePendingTxUpdate()
+	}
+
+	return nil
+}
+
+func (w *Wallet) handleWithdrawalSuccess(tx *Transaction, txHash string) {
+	tx.Status = NewTransaction
+	tx.Hash = txHash
+
+	log.Printf(
+		"Successfully created and broadcasted outgoing tx (withdrawal) %v",
+		tx,
+	)
+
+	persistWithdrawResultWithRetry(func() error {
+		return w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
 			_, err := currWallet.storage.StoreTransaction(tx)
 			if err != nil {
 				return err
@@ -167,23 +168,76 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 			}
 			return currWallet.storage.ClearWallet()
 		})
+	}, nil, false)
+}
 
-		if err != nil {
-			// TODO: retry and more graceful crash
-			log.Fatal(err)
-		}
+func (w *Wallet) handleWithdrawalError(err error, tx *Transaction) error {
+	makePending := false
+	if isInsufficientFundsError(err) && !tx.ColdStorage {
+		// this is a regular withdrawal and we got response that we
+		// don't have enough funds to send it: OK, make this tx pending
+		log.Printf("Not enough funds to send tx %v, marking as pending", tx)
+		makePending = true
 	}
 
-	w.eventBroker.SendNotifications()
+	persistWithdrawResultWithRetry(func() error {
+		return w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+			if makePending {
+				err := currWallet.updatePendingTxStatus(tx, PendingTransaction)
+				if err != nil {
+					return err
+				}
+			}
+			return currWallet.storage.ClearWallet()
+		})
+	}, err, makePending)
 
-	if updatePending {
-		// we are eager to return response telling withdrawal is accepted
-		// to client as soon as possible, so schedule updating pendings txns
-		// anynchronously instead of blocking on it now
-		w.schedulePendingTxUpdate()
+	if !makePending {
+		return err
 	}
-
 	return nil
+}
+
+func persistWithdrawResultWithRetry(persistFunc func() error, prevError error, makePending bool) {
+	retries := withdrawSaveRetries
+	interval := withdrawRetryBaseInterval
+
+	for {
+		err := persistFunc()
+
+		if err == nil {
+			return
+		}
+		logFailureToPersistWithdrawResult(
+			err, prevError, retries, interval, makePending,
+		)
+		if retries == 0 {
+			log.Panic("FATAL: given up, aborting wallet")
+		}
+		time.Sleep(interval)
+		retries--
+		interval += withdrawRetryBaseInterval
+	}
+}
+
+func logFailureToPersistWithdrawResult(err, prevErr error, retries int, interval time.Duration, makePending bool) {
+	log.Printf(
+		"wallet: CRITICAL: unable to store withdraw result in DB: %v",
+		err,
+	)
+	if prevErr != nil {
+		log.Printf(
+			"(result being stored is withdraw failure, error %v, making "+
+				"pending: %t)",
+			prevErr,
+			makePending,
+		)
+	} else {
+		log.Print("(result being stored is withdraw success)")
+	}
+	if retries > 0 {
+		log.Printf("Will retry after %s, %d retries left", interval, retries)
+	}
 }
 
 func (w *Wallet) sendWithdrawalViaWalletUpdater(tx *Transaction) error {
