@@ -22,10 +22,8 @@ type InMemoryEventStorage struct {
 	events []*storedEvent
 
 	lastHTTPSentSeq int
-	lastWSSentSeq   int
 
 	httpCallbackOperation string
-	wsOperation           string
 }
 
 // StoreEvent adds event to storage. Implementation is naive: it actually just
@@ -73,15 +71,6 @@ func (s *InMemoryEventStorage) StoreLastHTTPSentSeq(seq int) error {
 	return nil
 }
 
-func (s *InMemoryEventStorage) GetLastWSSentSeq() (int, error) {
-	return s.lastWSSentSeq, nil
-}
-
-func (s *InMemoryEventStorage) StoreLastWSSentSeq(seq int) error {
-	s.lastWSSentSeq = seq
-	return nil
-}
-
 func (s *InMemoryEventStorage) LockHTTPCallback(operation interface{}) error {
 	operationMarshaled, err := json.Marshal(operation)
 	if err != nil {
@@ -98,22 +87,4 @@ func (s *InMemoryEventStorage) ClearHTTPCallback() error {
 
 func (s *InMemoryEventStorage) CheckHTTPCallbackLock() (bool, string, error) {
 	return s.httpCallbackOperation == "", s.httpCallbackOperation, nil
-}
-
-func (s *InMemoryEventStorage) LockWS(operation interface{}) error {
-	operationMarshaled, err := json.Marshal(operation)
-	if err != nil {
-		return err
-	}
-	s.wsOperation = string(operationMarshaled)
-	return nil
-}
-
-func (s *InMemoryEventStorage) ClearWS() error {
-	s.wsOperation = ""
-	return nil
-}
-
-func (s *InMemoryEventStorage) CheckWSLock() (bool, string, error) {
-	return s.wsOperation == "", s.wsOperation, nil
 }

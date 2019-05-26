@@ -56,10 +56,18 @@ func (e *eventBroker) Notify(eventType EventType, data interface{}) error {
 }
 
 func (e *eventBroker) SendNotifications() {
+	e.triggerWSNotificationSending()
+	e.triggerHTTPNotificationSending()
+}
+
+func (e *eventBroker) triggerWSNotificationSending() {
 	select {
 	case e.wsNotificationTrigger <- struct{}{}:
 	default:
 	}
+}
+
+func (e *eventBroker) triggerHTTPNotificationSending() {
 	select {
 	case e.httpCallbackNotificationTrigger <- struct{}{}:
 	default:
@@ -73,14 +81,16 @@ func (e *eventBroker) SendNotifications() {
 // events channel may overflow. Subscriber should iterate over each slice to
 // get all events.
 // This method is used for websocket subscription
-func (e *eventBroker) SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq {
-	return e.eventBroadcaster.SubscribeFromSeq(seq)
+func (e *eventBroker) SubscribeFromSeq(seq int) chan []*NotificationWithSeq {
+	subch := e.eventBroadcaster.SubscribeFromSeq(seq)
+	e.triggerWSNotificationSending()
+	return subch
 }
 
 // UnsubscribeFromSeq cancels subscription created by SubscribeFromSeq. Channel
 // given to it as an argument must be one returned by SubscribeFromSeq
-func (e *eventBroker) UnsubscribeFromSeq(eventChannel <-chan []*NotificationWithSeq) {
-	e.eventBroadcaster.UnsubscribeFromSeq(eventChannel)
+func (e *eventBroker) UnsubscribeFromSeq(eventChannel chan []*NotificationWithSeq) {
+	e.eventBroadcaster.Unsubscribe(eventChannel)
 }
 
 // GetEventsFromSeq returns a slice of old events starting with given sequence

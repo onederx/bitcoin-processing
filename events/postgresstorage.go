@@ -149,20 +149,3 @@ func (s *PostgresEventStorage) CheckHTTPCallbackLock() (bool, string, error) {
 	operation, err := s.getMeta("http_callback_operation", "")
 	return operation == "", operation, err
 }
-
-func (s *PostgresEventStorage) LockWS(operation interface{}) error {
-	operationMarshaled, err := json.Marshal(operation)
-	if err != nil {
-		return err
-	}
-	return s.setMeta("ws_operation", string(operationMarshaled))
-}
-
-func (s *PostgresEventStorage) ClearWS() error {
-	return s.setMeta("ws_operation", "")
-}
-
-func (s *PostgresEventStorage) CheckWSLock() (bool, string, error) {
-	operation, err := s.getMeta("ws_operation", "")
-	return operation == "", operation, err
-}

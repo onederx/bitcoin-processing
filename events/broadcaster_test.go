@@ -22,7 +22,13 @@ func TestMoreEventsThanChannelSize(t *testing.T) {
 	}
 
 	sub := bcaster.SubscribeFromSeq(0)
-	defer bcaster.UnsubscribeFromSeq(sub)
+	defer bcaster.Unsubscribe(sub)
+
+	err := bcaster.Broadcast()
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	done := make(chan struct{})
 	events := make(chan *NotificationWithSeq)
@@ -30,7 +36,10 @@ func TestMoreEventsThanChannelSize(t *testing.T) {
 	go func() {
 		for {
 			select {
-			case eventSequence := <-sub:
+			case eventSequence, ok := <-sub:
+				if !ok {
+					return
+				}
 				for _, event := range eventSequence {
 					select {
 					case events <- event:

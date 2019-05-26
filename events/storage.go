@@ -32,15 +32,10 @@ type EventStorage interface {
 
 	GetLastHTTPSentSeq() (int, error)
 	StoreLastHTTPSentSeq(seq int) error
-	GetLastWSSentSeq() (int, error)
-	StoreLastWSSentSeq(seq int) error
 
 	LockHTTPCallback(operation interface{}) error
 	ClearHTTPCallback() error
 	CheckHTTPCallbackLock() (bool, string, error)
-	LockWS(operation interface{}) error
-	ClearWS() error
-	CheckWSLock() (bool, string, error)
 
 	WithTransaction(sqlTX *sql.Tx) EventStorage
 	GetDB() *sql.DB

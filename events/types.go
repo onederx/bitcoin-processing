@@ -10,8 +10,8 @@ import (
 // via http callback and websocket and storing them in DB
 type EventBroker interface {
 	Notify(eventType EventType, data interface{}) error
-	SubscribeFromSeq(seq int) <-chan []*NotificationWithSeq
-	UnsubscribeFromSeq(<-chan []*NotificationWithSeq)
+	SubscribeFromSeq(seq int) chan []*NotificationWithSeq
+	UnsubscribeFromSeq(chan []*NotificationWithSeq)
 	GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error)
 	SendNotifications()
 

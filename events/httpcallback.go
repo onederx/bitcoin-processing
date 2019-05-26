@@ -156,9 +156,10 @@ func (e *eventBroker) sendHTTPCallbackNotifications() {
 			if err != nil {
 				panic(err) // TODO: retry
 			}
-			time.AfterFunc(e.httpCallbackRetryDelay, func() {
-				e.httpCallbackNotificationTrigger <- struct{}{}
-			})
+			time.AfterFunc(
+				e.httpCallbackRetryDelay,
+				e.triggerHTTPNotificationSending,
+			)
 			return
 		} else {
 			err = e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
