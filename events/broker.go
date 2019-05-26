@@ -23,7 +23,8 @@ type eventBrokerData struct {
 	httpCallbackRetryDelay time.Duration
 
 	wsNotificationTrigger           chan struct{}
-	httpCallbackNotificationTrigger chan struct{}
+	httpCallbackNotificationTrigger chan bool
+	httpCallbackIsRetrying          bool
 }
 
 // eventBroker is responsible for processing events - sending them to client
@@ -43,7 +44,7 @@ func NewEventBroker(s settings.Settings, storage EventStorage) EventBroker {
 			callbackURL:                     s.GetURL("transaction.callback.url"),
 			httpCallbackBackoff:             s.GetInt("transaction.callback.backoff"),
 			wsNotificationTrigger:           make(chan struct{}, 3),
-			httpCallbackNotificationTrigger: make(chan struct{}, 3),
+			httpCallbackNotificationTrigger: make(chan bool, 3),
 		},
 	}
 }
@@ -69,9 +70,14 @@ func (e *eventBroker) triggerWSNotificationSending() {
 
 func (e *eventBroker) triggerHTTPNotificationSending() {
 	select {
-	case e.httpCallbackNotificationTrigger <- struct{}{}:
+	case e.httpCallbackNotificationTrigger <- false:
 	default:
 	}
+}
+
+func (e *eventBroker) triggerHTTPNotificationRetry() {
+	// NB: blocking send so that retry is not lost
+	e.httpCallbackNotificationTrigger <- true
 }
 
 // SubscribeFromSeq allows to get old events starting with given sequence number
@@ -111,8 +117,8 @@ func (e *eventBroker) sendNotifications() {
 		select {
 		case <-e.wsNotificationTrigger:
 			e.sendWSNotifications()
-		case <-e.httpCallbackNotificationTrigger:
-			e.sendHTTPCallbackNotifications()
+		case isRetry := <-e.httpCallbackNotificationTrigger:
+			e.sendHTTPCallbackNotifications(isRetry)
 		}
 	}
 }

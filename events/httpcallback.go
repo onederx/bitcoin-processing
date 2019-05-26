@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	httpCBResultSaveRetries           = 10
+	httpCBResultSaveRetryBaseInterval = time.Second
+)
+
 func marshalFlattenedEvent(event *NotificationWithSeq) []byte {
 	notificationDataJSON, err := json.Marshal(event.Data)
 	if err != nil {
@@ -63,6 +68,7 @@ func (e *eventBroker) sendDataToHTTPCallback(event *NotificationWithSeq) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
+		log.Printf("Successfully sent HTTP notification.")
 		return nil
 	}
 
@@ -104,14 +110,35 @@ func (e *eventBroker) handleHTTPCallbackError(event *NotificationWithSeq, err er
 	return retry
 }
 
-func (e *eventBroker) sendHTTPCallbackNotifications() {
+func (e *eventBroker) handleEarlyErrorPreparingHTTPCallback(err error, action string) {
+	// early error means we haven't sent anything yet, so we can survive this
+	// error and try again later
+	log.Printf("events: http callback sender: got error %s: %v", action, err)
+	log.Printf("will retry after a delay")
+	time.AfterFunc(
+		e.httpCallbackRetryDelay,
+		e.triggerHTTPNotificationSending,
+	)
+}
+
+func (e *eventBroker) sendHTTPCallbackNotifications(isRetry bool) {
+	if e.httpCallbackIsRetrying {
+		if !isRetry {
+			// avoid retries before interval elapses
+			return
+		}
+		e.httpCallbackIsRetrying = false
+	}
+
 	seq, err := e.storage.GetLastHTTPSentSeq()
 	if err != nil {
-		panic(err) // TODO: retry
+		e.handleEarlyErrorPreparingHTTPCallback(err, "getting last sent seqnum")
+		return
 	}
 	events, err := e.GetEventsFromSeq(seq + 1)
 	if err != nil {
-		panic(err) // TODO: retry
+		e.handleEarlyErrorPreparingHTTPCallback(err, "getting events from storage")
+		return
 	}
 	for _, event := range events {
 		if event.Type == NewAddressEvent {
@@ -125,53 +152,80 @@ func (e *eventBroker) sendHTTPCallbackNotifications() {
 			return currBroker.storage.LockHTTPCallback(event.Seq)
 		})
 		if err != nil {
-			panic(err) // TODO: retry
+			e.handleEarlyErrorPreparingHTTPCallback(
+				err,
+				"setting dirty bit for HTTP callback in DB",
+			)
+			return
 		}
 		err = e.sendDataToHTTPCallback(event)
 		e.httpCallbackRetries++
 		e.httpCallbackRetryDelay += time.Second
+
+		if err != nil {
+			retry := e.handleHTTPCallbackError(event, err)
+			if retry {
+				persistHTTPCallbackSendResultWithRetry(func() error {
+					return e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
+						return currBroker.storage.ClearHTTPCallback()
+					})
+				}, false)
+				e.httpCallbackIsRetrying = true
+				time.AfterFunc(
+					e.httpCallbackRetryDelay,
+					e.triggerHTTPNotificationRetry,
+				)
+				return
+			}
+		}
+
+		// if we're here, either sending callback was OK, or we have given up
+		// retrying to send notification
+		// in both cases, we want to stop retrying and pass on to next event
+
+		persistHTTPCallbackSendResultWithRetry(func() error {
+			return e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
+				err := currBroker.storage.StoreLastHTTPSentSeq(event.Seq)
+				if err != nil {
+					return err
+				}
+				return currBroker.storage.ClearHTTPCallback()
+			})
+		}, true)
+		e.httpCallbackRetries = 0
+		e.httpCallbackRetryDelay = 0
+	}
+}
+
+func persistHTTPCallbackSendResultWithRetry(persistFunc func() error, success bool) {
+	retries := httpCBResultSaveRetries
+	interval := httpCBResultSaveRetryBaseInterval
+
+	for {
+		err := persistFunc()
+
 		if err == nil {
-			e.httpCallbackRetries = 0
-			e.httpCallbackRetryDelay = 0
-
-			err = e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
-				err := currBroker.storage.StoreLastHTTPSentSeq(event.Seq)
-				if err != nil {
-					return err
-				}
-				return currBroker.storage.ClearHTTPCallback()
-			})
-			if err != nil {
-				panic(err) // TODO: retry
-			}
-			continue
-		}
-
-		retry := e.handleHTTPCallbackError(event, err)
-
-		if retry {
-			err = e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
-				return currBroker.storage.ClearHTTPCallback()
-			})
-			if err != nil {
-				panic(err) // TODO: retry
-			}
-			time.AfterFunc(
-				e.httpCallbackRetryDelay,
-				e.triggerHTTPNotificationSending,
-			)
 			return
-		} else {
-			err = e.MakeTransactIfAvailable(func(currBroker *eventBroker) error {
-				err := currBroker.storage.StoreLastHTTPSentSeq(event.Seq)
-				if err != nil {
-					return err
-				}
-				return currBroker.storage.ClearHTTPCallback()
-			})
-			if err != nil {
-				panic(err) // TODO: retry
-			}
 		}
+
+		log.Printf(
+			"events: CRITICAL: failed to save http callback send result to "+
+				"DB: %v", err,
+		)
+
+		if success {
+			log.Printf("(result being saved is success)")
+		} else {
+			log.Printf("(result being saved is failure)")
+		}
+
+		if retries > 0 {
+			log.Printf("Will retry after %s, %d retries left", interval, retries)
+		} else {
+			log.Panic("FATAL: given up, aborting event broker")
+		}
+		time.Sleep(interval)
+		retries--
+		interval += httpCBResultSaveRetryBaseInterval
 	}
 }
