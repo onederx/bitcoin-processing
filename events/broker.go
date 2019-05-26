@@ -11,12 +11,6 @@ type eventBrokerData struct {
 	eventBroadcaster *broadcasterWithStorage
 	database         *sql.DB
 
-	// TODO: move this comment to wallet
-	// Channel ExternalTxNotifications can be used to notify wallet that there
-	// are relevant tx updates and that it should get updates from Bitcoin node
-	// immediately (without it, updates are polled periodically). Wallet updater
-	// reads this channel to get notification
-
 	callbackURL            string
 	httpCallbackBackoff    int
 	httpCallbackRetries    int
@@ -105,14 +99,7 @@ func (e *eventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) 
 	return e.storage.GetEventsFromSeq(seq)
 }
 
-// TODO: move this comment to wallet or delete it
-// GetExternalTxNotificationChannel returns a channel that can be used to
-// subscribe on events that Bitcoin node should be checked for updates because
-// there are new relevant txns or there are updates on existing ones.
-// For every new CheckTxStatusEvent an element will be sent to this channel
-// (an element is it's data argument which should be a tx id)
-
-func (e *eventBroker) sendNotifications() {
+func (e *eventBroker) mainLoop() {
 	for {
 		select {
 		case <-e.wsNotificationTrigger:
@@ -123,9 +110,7 @@ func (e *eventBroker) sendNotifications() {
 	}
 }
 
-// Run starts event broker. Most of the broker is event-driven, routine started
-// by Run is http callback notifier, which works in background because it has
-// to retry requests with backoff and maintains a queue of requests
+// Run starts event broker.
 func (e *eventBroker) Run() {
-	e.sendNotifications()
+	e.mainLoop()
 }

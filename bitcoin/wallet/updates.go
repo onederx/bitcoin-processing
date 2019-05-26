@@ -220,7 +220,7 @@ func (w *Wallet) checkForWalletUpdates() {
 	w.checkForExistingTransactionUpdates()
 }
 
-func (w *Wallet) pollWalletUpdates() {
+func (w *Wallet) mainLoop() {
 	pollInterval := time.Duration(w.settings.GetInt("bitcoin.poll_interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
 	for {
@@ -246,10 +246,9 @@ func (w *Wallet) pollWalletUpdates() {
 	}
 }
 
-func (w *Wallet) startWatchingWalletUpdates() {
-	w.pollWalletUpdates()
-}
-
+// TriggerWalletUpdate can be used to notify wallet that there
+// are relevant tx updates and that it should get updates from Bitcoin node
+// immediately (without it, updates are polled periodically).
 func (w *Wallet) TriggerWalletUpdate() {
 	select {
 	case w.externalTxNotifications <- struct{}{}:

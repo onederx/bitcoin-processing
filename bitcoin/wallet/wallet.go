@@ -72,12 +72,11 @@ func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.
 	}
 }
 
-// Run initializes and runs wallet updater goroutine. This function does not
-// return, so should be run in a new goroutine
+// Run initializes and runs wallet.
 func (w *Wallet) Run() {
 	w.initHotWallet()
 	w.initColdWallet()
 	w.checkForWalletUpdates()
 	w.updatePendingTxns()
-	w.startWatchingWalletUpdates()
+	w.mainLoop()
 }
