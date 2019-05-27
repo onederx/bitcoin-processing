@@ -221,9 +221,19 @@ func (w *Wallet) checkForWalletUpdates() {
 }
 
 func (w *Wallet) mainLoop() {
+	defer func() {
+		r := recover()
+
+		if r != nil {
+			log.Printf("Wallet stopped by panic: %v", r)
+			w.running = false
+		}
+	}()
+
+	w.running = true
 	pollInterval := time.Duration(w.settings.GetInt("bitcoin.poll_interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
-	for {
+	for w.running {
 		select {
 		case <-ticker:
 		case <-w.externalTxNotifications:
@@ -241,6 +251,8 @@ func (w *Wallet) mainLoop() {
 			close(holdRequest.result)
 		case <-w.pendingTxUpdateTrigger:
 			w.updatePendingTxns()
+		case <-w.stopTrigger:
+			return
 		}
 		w.checkForWalletUpdates()
 	}
@@ -254,4 +266,9 @@ func (w *Wallet) TriggerWalletUpdate() {
 	case w.externalTxNotifications <- struct{}{}:
 	default:
 	}
+}
+
+func (w *Wallet) Stop() {
+	w.running = false
+	close(w.stopTrigger)
 }

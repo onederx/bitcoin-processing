@@ -29,6 +29,9 @@ type walletData struct {
 	holdQueue               chan internalHoldRequest
 	externalTxNotifications chan struct{}
 	pendingTxUpdateTrigger  chan struct{}
+
+	running     bool
+	stopTrigger chan struct{}
 }
 
 // Wallet is responsible for processing and storing payments. It stores
@@ -68,6 +71,7 @@ func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.
 			holdQueue:                            make(chan internalHoldRequest, internalQueueSize),
 			externalTxNotifications:              make(chan struct{}, 3),
 			pendingTxUpdateTrigger:               make(chan struct{}, 3),
+			stopTrigger:                          make(chan struct{}),
 		},
 	}
 }

@@ -18,6 +18,7 @@ type EventBroker interface {
 	WithTransaction(sqlTx *sql.Tx) EventBroker
 
 	Run()
+	Stop()
 }
 
 // Notification is a structure describing an event. It holds Type field telling

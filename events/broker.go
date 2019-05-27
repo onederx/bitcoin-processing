@@ -2,6 +2,7 @@ package events
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"github.com/onederx/bitcoin-processing/settings"
@@ -19,6 +20,9 @@ type eventBrokerData struct {
 	wsNotificationTrigger           chan struct{}
 	httpCallbackNotificationTrigger chan bool
 	httpCallbackIsRetrying          bool
+
+	running     bool
+	stopTrigger chan struct{}
 }
 
 // eventBroker is responsible for processing events - sending them to client
@@ -39,6 +43,7 @@ func NewEventBroker(s settings.Settings, storage EventStorage) EventBroker {
 			httpCallbackBackoff:             s.GetInt("transaction.callback.backoff"),
 			wsNotificationTrigger:           make(chan struct{}, 3),
 			httpCallbackNotificationTrigger: make(chan bool, 3),
+			stopTrigger:                     make(chan struct{}),
 		},
 	}
 }
@@ -100,12 +105,24 @@ func (e *eventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) 
 }
 
 func (e *eventBroker) mainLoop() {
-	for {
+	defer func() {
+		r := recover()
+
+		if r != nil {
+			log.Printf("Event broker stopped by panic: %v", r)
+			e.running = false
+		}
+	}()
+
+	e.running = true
+	for e.running {
 		select {
 		case <-e.wsNotificationTrigger:
 			e.sendWSNotifications()
 		case isRetry := <-e.httpCallbackNotificationTrigger:
 			e.sendHTTPCallbackNotifications(isRetry)
+		case <-e.stopTrigger:
+			return
 		}
 	}
 }
@@ -113,4 +130,9 @@ func (e *eventBroker) mainLoop() {
 // Run starts event broker.
 func (e *eventBroker) Run() {
 	e.mainLoop()
+}
+
+func (e *eventBroker) Stop() {
+	e.running = false
+	close(e.stopTrigger)
 }
