@@ -205,6 +205,12 @@ func persistHTTPCallbackSendResultWithRetry(persistFunc func() error, success bo
 		err := persistFunc()
 
 		if err == nil {
+			if retries < httpCBResultSaveRetries {
+				log.Printf(
+					"Succeeded to save http cb send result after %d attempts",
+					(httpCBResultSaveRetries-retries)+1,
+				)
+			}
 			return
 		}
 

@@ -200,8 +200,11 @@ func (w *Wallet) handleWithdrawalError(err error, tx *Transaction) error {
 
 	persistWithdrawResultWithRetry(func() error {
 		return w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+			// updatePendingTxStatus modifies tx and we want it to be the same
+			// as original in case of retry. That's why, make a copy here.
+			updateTx := *tx
 			if makePending {
-				err := currWallet.updatePendingTxStatus(tx, PendingTransaction)
+				err := currWallet.updatePendingTxStatus(&updateTx, PendingTransaction)
 				if err != nil {
 					return err
 				}
@@ -224,6 +227,12 @@ func persistWithdrawResultWithRetry(persistFunc func() error, prevError error, m
 		err := persistFunc()
 
 		if err == nil {
+			if retries < withdrawSaveRetries {
+				log.Printf(
+					"Succeeded to save http cb send result after %d attempts",
+					(withdrawSaveRetries-retries)+1,
+				)
+			}
 			return
 		}
 		logFailureToPersistWithdrawResult(
