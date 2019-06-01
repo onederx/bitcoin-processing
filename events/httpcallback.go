@@ -68,7 +68,7 @@ func (e *eventBroker) sendDataToHTTPCallback(event *NotificationWithSeq) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		log.Printf("Successfully sent HTTP notification.")
+		log.Printf("Successfully sent HTTP notification with seq %d.", event.Seq)
 		return nil
 	}
 
