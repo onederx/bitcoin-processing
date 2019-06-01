@@ -25,6 +25,7 @@ func (s *settings) initConfig(cli *cobra.Command) {
 	s.viper.SetDefault("wallet.min_fee.fixed", 0.000005)
 	s.viper.SetDefault("wallet.min_withdraw_without_manual_confirmation", 0.0)
 	s.viper.SetDefault("transaction.callback.backoff", 100)
+	s.viper.SetDefault("wallet.allow_withdrawal_without_id", true)
 }
 
 // GetString takes a string value from config. It simply calls viper.GetString.

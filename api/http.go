@@ -127,6 +127,14 @@ func (s *Server) withdraw(toColdStorage bool, response http.ResponseWriter, requ
 		return
 	}
 	if req.ID == uuid.Nil {
+		if !s.allowWithdrawalWithoutID {
+			s.respond(
+				response,
+				nil,
+				fmt.Errorf("Withdrawal without id is not allowed"),
+			)
+			return
+		}
 		req.ID = uuid.Must(uuid.NewV4())
 		log.Printf("Generated new withdrawal id %s", req.ID)
 	}

@@ -34,6 +34,7 @@ func main() {
 			loadedSettings.GetString("api.http.address"),
 			bitcoinWallet,
 			eventBroker,
+			loadedSettings.GetBool("wallet.allow_withdrawal_without_id"),
 		)
 
 		bitcoinWallet.Check()

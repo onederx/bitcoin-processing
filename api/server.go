@@ -15,23 +15,25 @@ const shutdownTimeout = 150 * time.Millisecond
 // Server runs http and websocket servers providing API. All user interaction
 // with processing app goes through it
 type Server struct {
-	wallet        *wallet.Wallet
-	eventBroker   events.EventBroker
-	listenAddress string
-	httpServer    *http.Server
+	wallet                   *wallet.Wallet
+	eventBroker              events.EventBroker
+	listenAddress            string
+	allowWithdrawalWithoutID bool
+	httpServer               *http.Server
 }
 
 // NewServer creates new instance of API server
-func NewServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker events.EventBroker) *Server {
+func NewServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker events.EventBroker, allowWithdrawalWithoutID bool) *Server {
 	httpServer := &http.Server{
 		Addr:    listenAddress,
 		Handler: http.NewServeMux(),
 	}
 	server := &Server{
-		wallet:        btcWallet,
-		eventBroker:   eventBroker,
-		listenAddress: listenAddress,
-		httpServer:    httpServer,
+		wallet:                   btcWallet,
+		eventBroker:              eventBroker,
+		listenAddress:            listenAddress,
+		allowWithdrawalWithoutID: allowWithdrawalWithoutID,
+		httpServer:               httpServer,
 	}
 	server.initHTTPAPIServer()
 	server.initWebsocketAPIServer()
