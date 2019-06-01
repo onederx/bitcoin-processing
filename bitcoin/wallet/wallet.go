@@ -26,7 +26,6 @@ type walletData struct {
 	withdrawQueue           chan internalWithdrawRequest
 	cancelQueue             chan internalCancelRequest
 	confirmQueue            chan internalConfirmRequest
-	holdQueue               chan internalHoldRequest
 	externalTxNotifications chan struct{}
 	pendingTxUpdateTrigger  chan struct{}
 
@@ -68,7 +67,6 @@ func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.
 			withdrawQueue:                        make(chan internalWithdrawRequest, internalQueueSize),
 			cancelQueue:                          make(chan internalCancelRequest, internalQueueSize),
 			confirmQueue:                         make(chan internalConfirmRequest, internalQueueSize),
-			holdQueue:                            make(chan internalHoldRequest, internalQueueSize),
 			externalTxNotifications:              make(chan struct{}, 3),
 			pendingTxUpdateTrigger:               make(chan struct{}, 3),
 			stopTrigger:                          make(chan struct{}),

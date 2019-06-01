@@ -1,7 +1,9 @@
 package wallet
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -31,13 +33,11 @@ type WithdrawRequest struct {
 	Metainfo interface{}       `json:"metainfo"`
 }
 
-type internalTxRequest struct {
+type internalWithdrawRequest struct {
 	tx     *Transaction
+	hold   bool
 	result chan error
 }
-
-type internalWithdrawRequest internalTxRequest
-type internalHoldRequest internalTxRequest
 
 func logWithdrawRequest(request *WithdrawRequest, feeType bitcoin.FeeType) {
 	log.Printf(
@@ -91,6 +91,24 @@ func (w *Wallet) checkWithdrawLimits(request *WithdrawRequest, feeType bitcoin.F
 	}
 
 	return false, nil
+}
+
+func (w *Wallet) ensureTxIDIsFree(id uuid.UUID) error {
+	_, err := w.storage.GetTransactionByID(id)
+
+	switch err {
+	case sql.ErrNoRows:
+		return nil
+	case nil:
+		return fmt.Errorf("Tx with id %s already exists", id)
+	default:
+		// XXX: Should be revised.
+		// Such error is returned by memory storage.
+		if _, ok := err.(ErrNoTxWithSuchID); ok {
+			return nil
+		}
+		return err
+	}
 }
 
 func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
@@ -240,30 +258,13 @@ func logFailureToPersistWithdrawResult(err, prevErr error, retries int, interval
 	}
 }
 
-func (w *Wallet) sendWithdrawalViaWalletUpdater(tx *Transaction) error {
+func (w *Wallet) withdrawViaWalletUpdater(tx *Transaction, hold bool) error {
 	// to prevent races, actual withdraw will be done in wallet updater
 	// goroutine
 	resultCh := make(chan error)
 	w.withdrawQueue <- internalWithdrawRequest{
 		tx:     tx,
-		result: resultCh,
-	}
-	return <-resultCh
-}
-
-func (w *Wallet) holdWithdrawalUntilConfirmedViaWalletUpdater(tx *Transaction) error {
-	// to prevent races, actual hold will be done in wallet updater
-	// goroutine
-	log.Printf(
-		"Withdrawal %v has amount %s which is more than configured max "+
-			"amount to be processed without manual confirmation. Holding it "+
-			"until confirmed manually.",
-		tx,
-		tx.Amount,
-	)
-	resultCh := make(chan error)
-	w.holdQueue <- internalHoldRequest{
-		tx:     tx,
+		hold:   hold,
 		result: resultCh,
 	}
 	return <-resultCh
@@ -281,6 +282,27 @@ func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
 	}
 	w.eventBroker.SendNotifications()
 	return nil
+}
+
+func (w *Wallet) withdraw(tx *Transaction, hold bool) error {
+	if err := w.ensureTxIDIsFree(tx.ID); err != nil {
+		log.Printf(
+			"wallet: duplicate tx id %s, refusing to withdraw", tx.ID,
+		)
+		return err
+	}
+
+	if hold {
+		log.Printf(
+			"Withdrawal %v has amount %s which is more than configured max "+
+				"amount to be processed without manual confirmation. Holding it "+
+				"until confirmed manually.",
+			tx,
+			tx.Amount,
+		)
+		return w.holdWithdrawalUntilConfirmed(tx)
+	}
+	return w.sendWithdrawal(tx, true)
 }
 
 // Withdraw makes a new withdrawal using parameters set in given WithdrawRequest
@@ -353,9 +375,8 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 		reportedConfirmations: -1,
 	}
 
-	if !needManualConfirmation || toColdStorage {
-		// withdraw to cold storage does not need confirmation
-		return w.sendWithdrawalViaWalletUpdater(outgoingTx)
-	}
-	return w.holdWithdrawalUntilConfirmedViaWalletUpdater(outgoingTx)
+	// withdraw to cold storage does not need confirmation
+	shouldHold := !toColdStorage && needManualConfirmation
+
+	return w.withdrawViaWalletUpdater(outgoingTx, shouldHold)
 }

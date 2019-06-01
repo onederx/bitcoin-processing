@@ -124,6 +124,28 @@ func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
 		env.GetNextCallbackNotificationWithTimeout(t)
 		env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 	})
+	runSubtest(t, "DuplicateFixedID", func(t *testing.T) {
+		ourBalance := getStableBalanceOrFail(t, env)
+		withdrawID := uuid.Must(uuid.FromString("e06ed38b-ff2c-4e3d-885f-135fe6c72625"))
+		req := &wallet.WithdrawRequest{
+			ID:      withdrawID,
+			Amount:  withdrawAmountSmall,
+			Address: withdrawAddress,
+			Fee:     withdrawFee,
+		}
+		_, err := env.ProcessingClient.Withdraw(req)
+		if err == nil {
+			t.Fatal(
+				"Expected duplicate tx id to cause withdraw error, but " +
+					"it did not",
+			)
+		}
+
+		// check that balances did not change
+		checkBalance(t, env, ourBalance, ourBalance)
+		testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
+		checkBalance(t, env, ourBalance, ourBalance)
+	})
 }
 
 func testMakeWithdraw(t *testing.T, env *testenv.TestEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {

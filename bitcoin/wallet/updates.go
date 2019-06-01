@@ -238,7 +238,10 @@ func (w *Wallet) mainLoop() {
 		case <-ticker:
 		case <-w.externalTxNotifications:
 		case withdrawRequest := <-w.withdrawQueue:
-			withdrawRequest.result <- w.sendWithdrawal(withdrawRequest.tx, true)
+			withdrawRequest.result <- w.withdraw(
+				withdrawRequest.tx,
+				withdrawRequest.hold,
+			)
 			close(withdrawRequest.result)
 		case cancelRequest := <-w.cancelQueue:
 			cancelRequest.result <- w.cancelPendingTx(cancelRequest.id)
@@ -246,9 +249,6 @@ func (w *Wallet) mainLoop() {
 		case confirmRequest := <-w.confirmQueue:
 			confirmRequest.result <- w.confirmPendingTx(confirmRequest.id)
 			close(confirmRequest.result)
-		case holdRequest := <-w.holdQueue:
-			holdRequest.result <- w.holdWithdrawalUntilConfirmed(holdRequest.tx)
-			close(holdRequest.result)
 		case <-w.pendingTxUpdateTrigger:
 			w.updatePendingTxns()
 		case <-w.stopTrigger:

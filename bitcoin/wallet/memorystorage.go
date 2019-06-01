@@ -9,6 +9,12 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+type ErrNoTxWithSuchID uuid.UUID
+
+func (e ErrNoTxWithSuchID) Error() string {
+	return "Transaction with id " + uuid.UUID(e).String() + " not found"
+}
+
 // InMemoryWalletStorage is a Storage implementation that stores data in memory.
 // It does not provide any kind of persistence, safety or efficiency (all
 // methods are implemented naively) and exists only for testing purposes (to get
@@ -76,7 +82,7 @@ func (s *InMemoryWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, 
 			return transaction, nil
 		}
 	}
-	return nil, errors.New("Transaction with id " + id.String() + " not found")
+	return nil, ErrNoTxWithSuchID(id)
 }
 
 // StoreTransaction stores new tx or updates existing one in storage.
