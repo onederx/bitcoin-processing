@@ -36,6 +36,9 @@ func main() {
 			eventBroker,
 		)
 
+		bitcoinWallet.Check()
+		eventBroker.Check()
+
 		eventBrokerStopped := make(chan struct{})
 		walletStopped := make(chan struct{})
 		apiServerStopped := make(chan struct{})

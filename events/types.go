@@ -17,6 +17,7 @@ type EventBroker interface {
 
 	WithTransaction(sqlTx *sql.Tx) EventBroker
 
+	Check()
 	Run()
 	Stop()
 }
