@@ -75,10 +75,10 @@ func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.
 }
 
 // Run initializes and runs wallet.
-func (w *Wallet) Run() {
+func (w *Wallet) Run() error {
 	w.initHotWallet()
 	w.initColdWallet()
 	w.checkForWalletUpdates()
 	w.updatePendingTxns()
-	w.mainLoop()
+	return w.mainLoop()
 }

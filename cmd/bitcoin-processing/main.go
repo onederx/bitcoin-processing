@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	"github.com/onederx/bitcoin-processing/api"
@@ -44,6 +43,8 @@ func main() {
 		walletStopped := make(chan struct{})
 		apiServerStopped := make(chan struct{})
 
+		runner := newProcessingComponentRunner()
+
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
@@ -65,29 +66,16 @@ func main() {
 			apiServer.Stop()
 		}()
 
-		wg := sync.WaitGroup{}
-		wg.Add(3)
+		runner.run(apiServer, "API server", apiServerStopped)
+		runner.run(bitcoinWallet, "Wallet", walletStopped)
+		runner.run(eventBroker, "Event broker", eventBrokerStopped)
 
-		go func() {
-			apiServer.Run()
-			log.Print("API server has stopped")
-			close(eventBrokerStopped)
-			wg.Done()
-		}()
-		go func() {
-			bitcoinWallet.Run()
-			log.Print("Wallet has stopped")
-			close(walletStopped)
-			wg.Done()
-		}()
-		go func() {
-			eventBroker.Run()
-			log.Print("Event broker has stopped")
-			close(apiServerStopped)
-			wg.Done()
-		}()
+		runner.wait()
 
-		wg.Wait()
-		log.Printf("Bitcoin processing has stopped")
+		if runner.failed {
+			log.Fatal("Bitcoin processing has stopped abnormally")
+		}
+
+		log.Printf("Bitcoin processing has normally stopped")
 	})
 }

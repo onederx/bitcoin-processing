@@ -2,7 +2,7 @@ package events
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/onederx/bitcoin-processing/settings"
@@ -104,13 +104,18 @@ func (e *eventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) 
 	return e.storage.GetEventsFromSeq(seq)
 }
 
-func (e *eventBroker) mainLoop() {
+func (e *eventBroker) mainLoop() (err error) {
 	defer func() {
+		e.running = false
 		r := recover()
 
 		if r != nil {
-			log.Printf("Event broker stopped by panic: %v", r)
-			e.running = false
+
+			var ok bool
+			if err, ok = r.(error); ok {
+				return
+			}
+			err = fmt.Errorf("Event broker stopped by panic: %v", r)
 		}
 	}()
 
@@ -125,11 +130,12 @@ func (e *eventBroker) mainLoop() {
 			return
 		}
 	}
+	return
 }
 
 // Run starts event broker.
-func (e *eventBroker) Run() {
-	e.mainLoop()
+func (e *eventBroker) Run() error {
+	return e.mainLoop()
 }
 
 func (e *eventBroker) Stop() {

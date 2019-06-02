@@ -41,14 +41,13 @@ func NewServer(listenAddress string, btcWallet *wallet.Wallet, eventBroker event
 }
 
 // Run starts HTTP and websocket server
-func (s *Server) Run() {
+func (s *Server) Run() error {
 	log.Printf("Starting API server on %s", s.listenAddress)
 	err := s.httpServer.ListenAndServe()
 	if err == http.ErrServerClosed {
-		log.Printf("api: HTTP server stopped")
-	} else {
-		log.Printf("api: http server ListenAndServe exited with error %s", err)
+		return nil
 	}
+	return err
 }
 
 func (s *Server) Stop() {

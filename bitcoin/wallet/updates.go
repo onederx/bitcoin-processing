@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -220,13 +221,17 @@ func (w *Wallet) checkForWalletUpdates() {
 	w.checkForExistingTransactionUpdates()
 }
 
-func (w *Wallet) mainLoop() {
+func (w *Wallet) mainLoop() (err error) {
 	defer func() {
+		w.running = false
 		r := recover()
 
 		if r != nil {
-			log.Printf("Wallet stopped by panic: %v", r)
-			w.running = false
+			var ok bool
+			if err, ok = r.(error); ok {
+				return
+			}
+			err = fmt.Errorf("Wallet broker stopped by panic: %v", r)
 		}
 	}()
 
@@ -256,6 +261,7 @@ func (w *Wallet) mainLoop() {
 		}
 		w.checkForWalletUpdates()
 	}
+	return
 }
 
 // TriggerWalletUpdate can be used to notify wallet that there
