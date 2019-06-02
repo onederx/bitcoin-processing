@@ -95,7 +95,7 @@ func (b *broadcasterWithStorage) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	for ch, _ := range b.subs {
+	for ch := range b.subs {
 		close(ch)
 		delete(b.subs, ch)
 	}

@@ -153,8 +153,8 @@ func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*Transaction,
 	return transactionFromDatabaseRow(row)
 }
 
-// GetTransactionByDetails fetches tx which same bitcoin tx hash, direction and
-// address as given one
+// GetTransactionByHashDirectionAndAddress fetches tx which same bitcoin tx
+// hash, direction and address as given one
 func (s *PostgresWalletStorage) GetTransactionByHashDirectionAndAddress(tx *Transaction) (*Transaction, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE hash = $1 and direction = $2 and
