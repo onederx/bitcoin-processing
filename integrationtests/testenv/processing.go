@@ -30,7 +30,7 @@ api:
 storage:
   type: postgres
   dsn: >
-    host=bitcoin-processing-integration-test-db dbname=bitcoin_processing
+    host={{.PostgresAddress}} dbname=bitcoin_processing
     user=bitcoin_processing sslmode=disable
 bitcoin:
   node:
@@ -47,12 +47,14 @@ type processingSettings struct {
 	CallbackURL                          string
 	MinWithdrawWithoutManualConfirmation string
 	AdditionalWalletSettings             string
+	PostgresAddress                      string
 }
 
 var DefaultSettings = processingSettings{
 	MaxConfirmations:                     1,
 	CallbackURL:                          "http://127.0.0.1:9000" + DefaultCallbackURLPath,
 	MinWithdrawWithoutManualConfirmation: "0.1",
+	PostgresAddress:                      "bitcoin-processing-integration-test-db",
 }
 
 func (e *TestEnvironment) StartProcessingWithDefaultSettings(ctx context.Context) error {
