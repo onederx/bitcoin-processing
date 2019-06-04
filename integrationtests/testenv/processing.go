@@ -40,6 +40,7 @@ bitcoin:
     user: bitcoinrpc
     password: TEST_BITCOIN_NODE_PASSWORD
 wallet:
+   allow_withdrawal_without_id: {{.AllowWithdrawalWithoutID}}
    min_withdraw_without_manual_confirmation: {{.MinWithdrawWithoutManualConfirmation}}
    {{.AdditionalWalletSettings}}`
 )
@@ -51,6 +52,7 @@ type ProcessingSettings struct {
 	AdditionalWalletSettings             string
 	PostgresAddress                      string
 	PostgresPort                         string
+	AllowWithdrawalWithoutID             bool
 }
 
 var DefaultSettings = ProcessingSettings{
@@ -59,6 +61,7 @@ var DefaultSettings = ProcessingSettings{
 	MinWithdrawWithoutManualConfirmation: "0.1",
 	PostgresAddress:                      "bitcoin-processing-integration-test-db",
 	PostgresPort:                         "5432",
+	AllowWithdrawalWithoutID:             true,
 }
 
 func (e *TestEnvironment) StartProcessingWithDefaultSettings(ctx context.Context) error {

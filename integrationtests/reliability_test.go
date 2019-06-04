@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gofrs/uuid"
 	"github.com/jackc/pgx/pgproto3"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
@@ -113,6 +114,68 @@ func TestWithdrawReliability(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestDisallowAnonymousWithdraw(t *testing.T) {
+	ctx := context.Background()
+	env, err := testenv.NewTestEnvironment(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = env.Start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer env.Stop(ctx)
+	env.WaitForLoad()
+
+	depositBig := bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
+
+	processingSettings := testenv.DefaultSettings
+	processingSettings.CallbackURL = env.CallbackURL
+	processingSettings.AllowWithdrawalWithoutID = false
+
+	err = env.StartProcessing(ctx, &processingSettings)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer env.StopProcessing(ctx)
+	env.WaitForProcessing()
+	_, err = env.NewWebsocketListener(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// deposit some money so there is what to withdraw
+	ourBalance := getStableBalanceOrFail(t, env)
+	clientAccount := testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, -1)
+	tx := testMakeDeposit(t, env, clientAccount.Address, depositBig, initialTestMetainfo)
+	checkDepositCompletedNormally(t, env, tx, ourBalance, depositBig)
+
+	clientBalance := getStableClientBalanceOrFail(t, env)
+	withdrawAddress := getNewAddressForWithdrawOrFail(t, env)
+
+	req := &wallet.WithdrawRequest{
+		Address: withdrawAddress,
+		Amount:  withdrawAmountSmall,
+		Fee:     withdrawFee,
+	}
+
+	_, err = env.ProcessingClient.Withdraw(req)
+
+	if err == nil {
+		t.Fatal("Expected that withdraw without id would cause an error")
+	}
+
+	req.ID = uuid.Must(uuid.NewV4())
+
+	resp, err := env.ProcessingClient.Withdraw(req)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkWithdrawCompletedNormally(t, env, req, resp, clientBalance)
 }
 
 func runDepositReliabilityCase(t *testing.T, env *testenv.TestEnvironment, ctx context.Context, failure failureType, moment failureMoment, eventSeq int) int {
