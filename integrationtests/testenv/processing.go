@@ -2,6 +2,7 @@ package testenv
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/strslice"
 
 	"github.com/onederx/bitcoin-processing/api/client"
+	"github.com/onederx/bitcoin-processing/integrationtests/util"
 )
 
 const (
@@ -30,7 +32,7 @@ api:
 storage:
   type: postgres
   dsn: >
-    host={{.PostgresAddress}} dbname=bitcoin_processing
+    host={{.PostgresAddress}} port={{.PostgresPort}} dbname=bitcoin_processing
     user=bitcoin_processing sslmode=disable
 bitcoin:
   node:
@@ -42,19 +44,21 @@ wallet:
    {{.AdditionalWalletSettings}}`
 )
 
-type processingSettings struct {
+type ProcessingSettings struct {
 	MaxConfirmations                     int
 	CallbackURL                          string
 	MinWithdrawWithoutManualConfirmation string
 	AdditionalWalletSettings             string
 	PostgresAddress                      string
+	PostgresPort                         string
 }
 
-var DefaultSettings = processingSettings{
+var DefaultSettings = ProcessingSettings{
 	MaxConfirmations:                     1,
 	CallbackURL:                          "http://127.0.0.1:9000" + DefaultCallbackURLPath,
 	MinWithdrawWithoutManualConfirmation: "0.1",
 	PostgresAddress:                      "bitcoin-processing-integration-test-db",
+	PostgresPort:                         "5432",
 }
 
 func (e *TestEnvironment) StartProcessingWithDefaultSettings(ctx context.Context) error {
@@ -65,7 +69,7 @@ func (e *TestEnvironment) StartProcessingWithDefaultSettings(ctx context.Context
 	return e.StartProcessing(ctx, &settings)
 }
 
-func (e *TestEnvironment) StartProcessing(ctx context.Context, s *processingSettings) error {
+func (e *TestEnvironment) StartProcessing(ctx context.Context, s *ProcessingSettings) error {
 	log.Printf("Starting bitcoin processing container")
 
 	configTempFile, err := ioutil.TempFile("", "")
@@ -89,7 +93,6 @@ func (e *TestEnvironment) StartProcessing(ctx context.Context, s *processingSett
 
 	hostConfig := &container.HostConfig{
 		NetworkMode: container.NetworkMode(e.network),
-		AutoRemove:  true,
 		Binds: []string{
 			getFullSourcePath("cmd/bitcoin-processing/bitcoin-processing") + ":/bitcoin-processing",
 			configTempFilePath + ":/config.yml",
@@ -106,9 +109,9 @@ func (e *TestEnvironment) StartProcessing(ctx context.Context, s *processingSett
 	if err != nil {
 		return err
 	}
-	e.Processing.ip = e.getContainerIP(ctx, resp.ID)
+	e.Processing.IP = e.getContainerIP(ctx, resp.ID)
 
-	e.setProcessingAddressForNotifications(e.Processing.ip)
+	e.setProcessingAddressForNotifications(e.Processing.IP)
 
 	e.ProcessingClient = client.NewClient(e.processingURL("/"))
 
@@ -137,13 +140,69 @@ func (e *TestEnvironment) StopProcessing(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("bitcoin processing container stopped: id=%v", e.Processing.ID)
+	err := util.WaitForEvent(func() error {
+		info, err := e.cli.ContainerInspect(ctx, e.Processing.ID)
+		if err != nil {
+			return err
+		}
+		switch info.State.Status {
+		case "exited":
+			return nil
+		case "dead":
+			return nil
+		default:
+			return errors.New("Processing container unexpectedly still running")
+		}
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Printf("bitcoin processing container stopped: id=%v, now removing it", e.Processing.ID)
+
+	err = e.cli.ContainerRemove(ctx, e.Processing.ID, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		Force:         true,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	util.WaitForEvent(func() error {
+		_, err := e.cli.ContainerInspect(ctx, e.Processing.ID)
+		if err != nil {
+			return nil
+		}
+		return errors.New("Processing container unexpectedly still exists")
+	})
+
+	log.Printf("bitcoin processing container stopped and removed: id=%v", e.Processing.ID)
 	e.Processing = nil
 	return nil
 }
 
 func (e *TestEnvironment) WaitForProcessing() {
 	log.Printf("waiting for processing to start")
-	waitForPort(e.Processing.ip, 8000)
+	waitForPort(e.Processing.IP, 8000)
 	log.Printf("processing started")
+}
+
+func (e *TestEnvironment) KillProcessing(ctx context.Context) error {
+	processing := e.Processing
+	e.Processing = nil
+	return e.cli.ContainerRemove(ctx, processing.ID, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		Force:         true,
+	})
+}
+
+func (e *TestEnvironment) GetProcessingContainerState(ctx context.Context) (*types.ContainerState, error) {
+	info, err := e.cli.ContainerInspect(ctx, e.Processing.ID)
+
+	if err != nil {
+		return nil, err
+	}
+	return info.State, nil
 }

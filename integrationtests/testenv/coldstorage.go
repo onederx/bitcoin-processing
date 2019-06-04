@@ -58,7 +58,7 @@ func (e *TestEnvironment) StartColdStorage(ctx context.Context) error {
 		return err
 	}
 	e.Regtest[coldStorageContainerName] = nodeContainerInfo
-	nodeContainerInfo.ip = e.getContainerIP(ctx, resp.ID)
+	nodeContainerInfo.IP = e.getContainerIP(ctx, resp.ID)
 	log.Printf("cold storage node started: id=%v", resp.ID)
 	return nil
 }
@@ -86,7 +86,7 @@ func (e *TestEnvironment) StopColdStorage(ctx context.Context) error {
 }
 
 func (e *TestEnvironment) ColdStorageLoadAndGenerateAddress() string {
-	csNode, err := connectToNodeWithBackoff(e.Regtest[coldStorageContainerName].ip)
+	csNode, err := connectToNodeWithBackoff(e.Regtest[coldStorageContainerName].IP)
 	if err != nil {
 		panic(err)
 	}

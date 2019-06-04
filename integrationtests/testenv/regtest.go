@@ -132,7 +132,7 @@ func (e *TestEnvironment) startRegtest(ctx context.Context) error {
 			return err
 		}
 		e.Regtest[node] = nodeContainerInfo
-		nodeContainerInfo.ip = e.getContainerIP(ctx, resp.ID)
+		nodeContainerInfo.IP = e.getContainerIP(ctx, resp.ID)
 
 		err = e.writeContainerLogs(ctx, &nodeContainerInfo.containerInfo, node+".log")
 
@@ -230,7 +230,7 @@ func sendRequestToNodeWithBackoff(n nodeapi.NodeAPI, method string, params []int
 }
 
 func (e *TestEnvironment) initRegtest() {
-	clientNode, err := connectToNodeWithBackoff(e.Regtest["node-client"].ip)
+	clientNode, err := connectToNodeWithBackoff(e.Regtest["node-client"].IP)
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
@@ -247,7 +247,7 @@ func (e *TestEnvironment) initRegtest() {
 		panic(fmt.Sprintf("Client node API returned malformed JSON %s", nodeOutput))
 	}
 	log.Printf("Client node generated %d blocks", len(blocks))
-	minerNode, err := connectToNodeWithBackoff(e.Regtest["node-miner"].ip)
+	minerNode, err := connectToNodeWithBackoff(e.Regtest["node-miner"].IP)
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
@@ -263,7 +263,7 @@ func (e *TestEnvironment) initRegtest() {
 		panic(fmt.Sprintf("Miner node API returned malformed JSON %s", nodeOutput))
 	}
 	log.Printf("Miner node generated %d blocks", len(blocks))
-	ourNode, err := connectToNodeWithBackoff(e.Regtest["node-our"].ip)
+	ourNode, err := connectToNodeWithBackoff(e.Regtest["node-our"].IP)
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return

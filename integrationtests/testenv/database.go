@@ -13,14 +13,13 @@ const (
 	dbContainerName = "bitcoin-processing-integration-test-db"
 )
 
-func (e *TestEnvironment) startDatabase(ctx context.Context) error {
+func (e *TestEnvironment) StartDatabase(ctx context.Context) error {
 	log.Printf("Starting postgres")
 
 	containerConfig := &container.Config{Image: dbImageName}
 
 	hostConfig := &container.HostConfig{
 		NetworkMode: container.NetworkMode(e.network),
-		AutoRemove:  true,
 		Binds: []string{
 			getFullSourcePath("tools/create-user-and-db.sql") + ":/create-user-and-db.sql",
 			getFullSourcePath("tools/init-db.sql") + ":/init-db.sql",
@@ -33,46 +32,64 @@ func (e *TestEnvironment) startDatabase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	e.db = &containerInfo{
+	e.DB = &containerInfo{
 		name: "db",
 		ID:   resp.ID,
 	}
 
-	err = e.cli.ContainerStart(ctx, e.db.ID, types.ContainerStartOptions{})
-	if err != nil {
-		return err
-	}
-	e.db.ip = e.getContainerIP(ctx, resp.ID)
-
-	log.Printf("db container started: id=%v", e.db.ID)
-
-	err = e.writeContainerLogs(ctx, e.db, "postgres.log")
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return e.LaunchDatabaseContainer(ctx)
 }
 
 func (e *TestEnvironment) stopDatabase(ctx context.Context) error {
 	log.Printf("trying to stop db container")
-	if e.db == nil {
+	if e.DB == nil {
 		log.Printf("seems that db is not running")
 		return nil
 	}
 
-	if err := e.cli.ContainerStop(ctx, e.db.ID, nil); err != nil {
+	if err := e.cli.ContainerStop(ctx, e.DB.ID, nil); err != nil {
 		return err
 	}
 
-	log.Printf("db container stopped: id=%v", e.db.ID)
-	e.db = nil
+	log.Printf("db container stopped: id=%v", e.DB.ID)
+
+	err := e.cli.ContainerRemove(ctx, e.DB.ID, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		Force:         true,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	log.Printf("db container removed: id=%v", e.DB.ID)
+
+	e.DB = nil
 	return nil
 }
 
-func (e *TestEnvironment) waitForDatabase() {
+func (e *TestEnvironment) WaitForDatabase() {
 	log.Printf("waiting for postgres to start")
-	waitForPort(e.db.ip, 5432)
+	waitForPort(e.DB.IP, 5432)
 	log.Printf("postgres started")
+}
+
+func (e *TestEnvironment) KillDatabase(ctx context.Context, removeInfo bool) error {
+	db := e.DB
+	if removeInfo {
+		e.DB = nil
+	}
+	return e.cli.ContainerKill(ctx, db.ID, "SIGKILL")
+}
+
+func (e *TestEnvironment) LaunchDatabaseContainer(ctx context.Context) error {
+	err := e.cli.ContainerStart(ctx, e.DB.ID, types.ContainerStartOptions{})
+	if err != nil {
+		return err
+	}
+	e.DB.IP = e.getContainerIP(ctx, e.DB.ID)
+
+	log.Printf("db container started: id=%v", e.DB.ID)
+
+	return e.writeContainerLogs(ctx, e.DB, "postgres.log")
 }

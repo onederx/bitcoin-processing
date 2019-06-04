@@ -29,7 +29,7 @@ const (
 type containerInfo struct {
 	ID   string
 	name string
-	ip   string
+	IP   string
 }
 
 type bitcoinNodeContainerInfo struct {
@@ -40,16 +40,16 @@ type bitcoinNodeContainerInfo struct {
 type TestEnvironment struct {
 	cli            *dockerclient.Client
 	network        string
-	networkGateway string
+	NetworkGateway string
 
-	db *containerInfo
+	DB *containerInfo
 
 	Regtest          map[string]*bitcoinNodeContainerInfo
 	regtestIsLoaded  chan error
 	notifyScriptFile *os.File
 
 	Processing           *containerInfo
-	ProcessingSettings   *processingSettings
+	ProcessingSettings   *ProcessingSettings
 	processingConfigPath string
 	ProcessingClient     *processingapiclient.Client
 
@@ -94,7 +94,7 @@ func (e *TestEnvironment) setupNetwork(ctx context.Context) error {
 
 	for i := range resp {
 		if resp[i].Name == networkName {
-			e.networkGateway = resp[i].IPAM.Config[0].Gateway
+			e.NetworkGateway = resp[i].IPAM.Config[0].Gateway
 			return nil
 		}
 	}
@@ -111,7 +111,7 @@ func (e *TestEnvironment) setupNetwork(ctx context.Context) error {
 		return err
 	}
 
-	e.networkGateway = netResource.IPAM.Config[0].Gateway
+	e.NetworkGateway = netResource.IPAM.Config[0].Gateway
 
 	return nil
 }
@@ -132,7 +132,7 @@ func (e *TestEnvironment) getContainerIP(ctx context.Context, id string) string 
 }
 
 func (e *TestEnvironment) Start(ctx context.Context) error {
-	err := e.startDatabase(ctx)
+	err := e.StartDatabase(ctx)
 	if err != nil {
 		return err
 	}
@@ -177,14 +177,14 @@ func (e *TestEnvironment) Stop(ctx context.Context) error {
 }
 
 func (e *TestEnvironment) WaitForLoad() {
-	e.waitForDatabase()
+	e.WaitForDatabase()
 	e.waitForRegtest()
 }
 
 func (e *TestEnvironment) processingURL(relative string) string {
 	return (&url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:8000", e.Processing.ip),
+		Host:   fmt.Sprintf("%s:8000", e.Processing.IP),
 		Path:   relative,
 	}).String()
 }

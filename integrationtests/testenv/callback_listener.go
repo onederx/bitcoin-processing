@@ -62,7 +62,7 @@ func (e *TestEnvironment) startCallbackListener() {
 		}
 		e.callbackMessageQueue <- &cbRequest
 	}))
-	server.Listener = newTestRandomFreePortListener(e.networkGateway)
+	server.Listener = newTestRandomFreePortListener(e.NetworkGateway)
 	server.Start()
 	e.CallbackURL = server.URL + DefaultCallbackURLPath
 	e.callbackListener = server
