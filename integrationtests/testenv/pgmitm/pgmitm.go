@@ -15,6 +15,7 @@ import (
 type PgMITM struct {
 	BindAddr     string
 	UpstreamAddr string
+	AllowUpstreamConnFailure bool
 
 	listener      net.Listener
 	connections   map[*Connection]struct{}
@@ -28,13 +29,14 @@ type PgMITM struct {
 	serverMsgHandlersMu sync.Mutex
 }
 
-func NewPgMITM(bindAddr, upstreamAddr string) (*PgMITM, error) {
+func NewPgMITM(bindAddr, upstreamAddr string, allowUpstreamConnFailure bool) (*PgMITM, error) {
 	if upstreamAddr == "" {
 		return nil, errors.New("UpstreamAddr can't be empty")
 	}
 	return &PgMITM{
 		BindAddr:     bindAddr,
 		UpstreamAddr: upstreamAddr,
+		AllowUpstreamConnFailure: allowUpstreamConnFailure,
 		connections:  make(map[*Connection]struct{}),
 	}, nil
 }
@@ -73,6 +75,10 @@ func (p *PgMITM) runProxyConnection(clientConn net.Conn) {
 	serverConn, err := net.Dial("tcp", p.UpstreamAddr)
 
 	if err != nil {
+		if p.AllowUpstreamConnFailure {
+			log.Printf("Failed to connect to upstream: %v", err)
+			return
+		}
 		panic(err)
 	}
 	defer serverConn.Close()
@@ -143,4 +149,8 @@ func (p *PgMITM) AddServerMsgHandler(f func(pgproto3.BackendMessage, *Connection
 	defer p.serverMsgHandlersMu.Unlock()
 
 	p.serverMsgHandlers = append(p.serverMsgHandlers, f)
+}
+
+func (p *PgMITM) Addr() string {
+	return p.listener.Addr().String()
 }
