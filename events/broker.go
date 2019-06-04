@@ -135,6 +135,7 @@ func (e *eventBroker) mainLoop() (err error) {
 
 // Run starts event broker.
 func (e *eventBroker) Run() error {
+	e.sendHTTPCallbackNotifications(false)
 	return e.mainLoop()
 }
 
