@@ -3,6 +3,7 @@
 package integrationtests
 
 import (
+	"net"
 	"runtime/debug"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	"github.com/onederx/bitcoin-processing/integrationtests/testenv/pgmitm"
 	"github.com/onederx/bitcoin-processing/integrationtests/util"
 )
 
@@ -151,4 +153,28 @@ func stableBalanceOrFail(t *testing.T, name string, bal *api.BalanceInfo) bitcoi
 			bal.BalanceWithUnconf)
 	}
 	return bal.Balance
+}
+
+func addPgMITMOrFail(env *testenv.TestEnvironment, settings *testenv.ProcessingSettings, t *testing.T, allowUpstreamConnFailure bool) *pgmitm.PgMITM {
+	mitm, err := pgmitm.NewPgMITM(
+		env.NetworkGateway+":",
+		env.DB.IP+":5432",
+		allowUpstreamConnFailure,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = mitm.Start()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	mitmAddr := mitm.Addr()
+
+	settings.PostgresAddress, settings.PostgresPort, err = net.SplitHostPort(mitmAddr)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	return mitm
 }
