@@ -79,8 +79,8 @@ type Transaction struct {
 	// If tx is a withdrawal to cold storage, this is true. Otherwise false
 	ColdStorage bool `json:"cold_storage"`
 
-	Fresh                 bool
-	ReportedConfirmations int64
+	Fresh                 bool  `json:"-"`
+	ReportedConfirmations int64 `json:"-"`
 }
 
 func (td TransactionDirection) String() string {
