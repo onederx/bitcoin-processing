@@ -6,6 +6,8 @@ import (
 	"log"
 	"sync"
 
+	"github.com/gofrs/uuid"
+
 	"github.com/onederx/bitcoin-processing/util"
 )
 
@@ -87,4 +89,15 @@ func (s *InMemoryEventStorage) ClearHTTPCallback() error {
 
 func (s *InMemoryEventStorage) CheckHTTPCallbackLock() (bool, string, error) {
 	return s.httpCallbackOperation == "", s.httpCallbackOperation, nil
+}
+
+func (s *InMemoryEventStorage) GetNextEventFromSeq(seq int) (*storedEvent, error) {
+	if seq >= len(s.events) {
+		return nil, ErrNoSuchEvent
+	}
+	return s.events[seq], nil
+}
+
+func (s *InMemoryEventStorage) MuteEventsWithTxID(id uuid.UUID) error {
+	panic("In-memory storage does not support muting events for now")
 }

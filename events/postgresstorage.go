@@ -3,7 +3,11 @@ package events
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strconv"
+
+	"github.com/gofrs/uuid"
+	"github.com/lib/pq"
 
 	"github.com/onederx/bitcoin-processing/storage"
 )
@@ -60,7 +64,9 @@ func (s *PostgresEventStorage) GetEventsFromSeq(seq int) ([]*storedEvent, error)
 	result := make([]*storedEvent, 0, 20)
 
 	rows, err := s.db.Query(`SELECT seq, type, data FROM events
-        WHERE seq >= $1 ORDER BY seq`, seq,
+		LEFT JOIN muted_events
+		    ON ((data::jsonb)->>'id')::uuid = muted_events.tx_id
+        WHERE seq >= $1 AND muted_events.tx_id is NULL ORDER BY seq`, seq,
 	)
 	if err != nil {
 		return result, err
@@ -148,4 +154,55 @@ func (s *PostgresEventStorage) ClearHTTPCallback() error {
 func (s *PostgresEventStorage) CheckHTTPCallbackLock() (bool, string, error) {
 	operation, err := s.getMeta("http_callback_operation", "")
 	return operation == "", operation, err
+}
+
+func (s *PostgresEventStorage) GetNextEventFromSeq(seq int) (*storedEvent, error) {
+	var (
+		eventSeq                    int
+		eventTypeStr, marshaledData string
+		event                       storedEvent
+	)
+
+	row := s.db.QueryRow(
+		`SELECT seq, type, data FROM events
+		LEFT JOIN muted_events
+		    ON ((data::jsonb)->>'id')::uuid = muted_events.tx_id
+        WHERE seq >= $1 AND muted_events.tx_id is NULL
+        ORDER BY seq
+        LIMIT 1`, seq)
+
+	err := row.Scan(&eventSeq, &eventTypeStr, &marshaledData)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNoSuchEvent
+		}
+		return nil, err
+	}
+
+	notificationJSON := fmt.Sprintf(`{"seq": %d, "type": "%s", "data": %s}`,
+		eventSeq, eventTypeStr, marshaledData)
+	fmt.Printf("%s\n", notificationJSON)
+
+	err = json.Unmarshal([]byte(notificationJSON), &event)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, err
+}
+
+func (s *PostgresEventStorage) MuteEventsWithTxID(id uuid.UUID) error {
+	const uniqConstrViolated = pq.ErrorCode("23505")
+
+	_, err := s.db.Exec(`INSERT INTO muted_events (tx_id) values ($1)`, id)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == uniqConstrViolated {
+			return ErrAlreadyMuted
+		}
+	}
+
+	return err
 }

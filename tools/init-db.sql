@@ -30,4 +30,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS metadata (
     key TEXT PRIMARY KEY,
     value TEXT
-)
+);
+
+CREATE TABLE IF NOT EXISTS muted_events (
+    tx_id uuid PRIMARY KEY
+);

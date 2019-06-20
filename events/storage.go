@@ -2,11 +2,19 @@ package events
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"sync"
+
+	"github.com/gofrs/uuid"
 )
 
 type storedEvent = NotificationWithSeq
+
+var (
+	ErrAlreadyMuted = errors.New("This tx id is already muted")
+	ErrNoSuchEvent  = errors.New("There is no event with given seqnum")
+)
 
 // EventStorage is an interface that should be implemented by types that store
 // events for EventBroker.
@@ -30,6 +38,8 @@ type EventStorage interface {
 	// sequence number in storage, empty slice should be returned.
 	GetEventsFromSeq(seq int) ([]*storedEvent, error)
 
+	GetNextEventFromSeq(seq int) (*storedEvent, error)
+
 	GetLastHTTPSentSeq() (int, error)
 	StoreLastHTTPSentSeq(seq int) error
 
@@ -39,6 +49,8 @@ type EventStorage interface {
 
 	WithTransaction(sqlTX *sql.Tx) EventStorage
 	GetDB() *sql.DB
+
+	MuteEventsWithTxID(txID uuid.UUID) error
 }
 
 func NewEventStorage(db *sql.DB) EventStorage {

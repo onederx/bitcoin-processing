@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+
+	"github.com/gofrs/uuid"
 )
 
 // EventBroker is responsible for processing events - sending them to client
@@ -16,6 +18,8 @@ type EventBroker interface {
 	SendNotifications()
 
 	WithTransaction(sqlTx *sql.Tx) EventBroker
+
+	MuteEventsWithTxID(txID uuid.UUID) error
 
 	Check()
 	Run() error

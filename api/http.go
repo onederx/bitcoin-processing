@@ -25,6 +25,7 @@ const (
 	WithdrawToColdStorageURL      = "/withdraw_to_cold_storage"
 	ConfirmURL                    = "/confirm"
 	GetEventsURL                  = "/get_events"
+	MuteEventsURL                 = "/mute_events"
 )
 
 // GetTransactionsFilter describes data sent by client to set up filters in
@@ -246,6 +247,26 @@ func (s *Server) getEvents(response http.ResponseWriter, request *http.Request) 
 	s.respond(response, events, err)
 }
 
+func (s *Server) muteEvents(response http.ResponseWriter, request *http.Request) {
+	var body []byte
+	var err error
+	var id uuid.UUID
+
+	if body, err = ioutil.ReadAll(request.Body); err != nil {
+		s.respond(response, nil, err)
+		return
+	}
+
+	if string(body) != "\"current_problematic\"" {
+		if err = json.Unmarshal(body, &id); err != nil {
+			s.respond(response, nil, err)
+			return
+		}
+	}
+	err = s.eventBroker.MuteEventsWithTxID(id)
+	s.respond(response, nil, err)
+}
+
 func (s *Server) initHTTPAPIServer() {
 	m := s.httpServer.Handler.(*http.ServeMux)
 	m.HandleFunc(NewWalletURL, s.newBitcoinAddress)
@@ -259,4 +280,5 @@ func (s *Server) initHTTPAPIServer() {
 	m.HandleFunc(WithdrawToColdStorageURL, s.withdrawToColdStorage)
 	m.HandleFunc(ConfirmURL, s.confirmPendingTransaction)
 	m.HandleFunc(GetEventsURL, s.getEvents)
+	m.HandleFunc(MuteEventsURL, s.muteEvents)
 }

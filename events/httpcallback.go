@@ -128,6 +128,7 @@ func (e *eventBroker) sendHTTPCallbackNotifications(isRetry bool) {
 			return
 		}
 		e.httpCallbackIsRetrying = false
+		e.httpCallbackRetryingSeq = -1
 	}
 
 	seq, err := e.storage.GetLastHTTPSentSeq()
@@ -171,6 +172,7 @@ func (e *eventBroker) sendHTTPCallbackNotifications(isRetry bool) {
 					})
 				}, false)
 				e.httpCallbackIsRetrying = true
+				e.httpCallbackRetryingSeq = event.Seq
 				time.AfterFunc(
 					e.httpCallbackRetryDelay,
 					e.triggerHTTPNotificationRetry,

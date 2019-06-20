@@ -20,6 +20,9 @@ type eventBrokerData struct {
 	wsNotificationTrigger           chan struct{}
 	httpCallbackNotificationTrigger chan bool
 	httpCallbackIsRetrying          bool
+	httpCallbackRetryingSeq         int
+
+	muteRequests chan internalMuteRequest
 
 	running     bool
 	stopTrigger chan struct{}
@@ -44,6 +47,8 @@ func NewEventBroker(s settings.Settings, storage EventStorage) EventBroker {
 			wsNotificationTrigger:           make(chan struct{}, 3),
 			httpCallbackNotificationTrigger: make(chan bool, 3),
 			stopTrigger:                     make(chan struct{}),
+			muteRequests:                    make(chan internalMuteRequest, 3),
+			httpCallbackRetryingSeq:         -1,
 		},
 	}
 }
@@ -126,6 +131,9 @@ func (e *eventBroker) mainLoop() (err error) {
 			e.sendWSNotifications()
 		case isRetry := <-e.httpCallbackNotificationTrigger:
 			e.sendHTTPCallbackNotifications(isRetry)
+		case muteRequest := <-e.muteRequests:
+			muteRequest.result <- e.mute(muteRequest.txID)
+			close(muteRequest.result)
 		case <-e.stopTrigger:
 			return
 		}
