@@ -6,6 +6,8 @@ import (
 	"log"
 
 	"github.com/gofrs/uuid"
+
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 var ErrHotWalletAddressNotGeneratedYet = errors.New("Hot wallet address not generated yet")
@@ -17,13 +19,13 @@ var ErrHotWalletAddressNotGeneratedYet = errors.New("Hot wallet address not gene
 type Storage interface {
 	GetLastSeenBlockHash() (string, error)
 	SetLastSeenBlockHash(blockHash string) error
-	StoreTransaction(transaction *Transaction) (*Transaction, error)
-	GetTransactionByHash(hash string) (*Transaction, error)
-	GetTransactionByID(id uuid.UUID) (*Transaction, error)
-	GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error)
-	GetPendingTransactions() ([]*Transaction, error)
-	updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error
-	GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error)
+	StoreTransaction(transaction *types.Transaction) (*types.Transaction, error)
+	GetTransactionByHash(hash string) (*types.Transaction, error)
+	GetTransactionByID(id uuid.UUID) (*types.Transaction, error)
+	GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*types.Transaction, error)
+	GetPendingTransactions() ([]*types.Transaction, error)
+	updateReportedConfirmations(transaction *types.Transaction, reportedConfirmations int64) error
+	GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*types.Transaction, error)
 
 	GetAccountByAddress(address string) (*Account, error)
 	StoreAccount(account *Account) error
@@ -49,7 +51,7 @@ func NewStorage(db *sql.DB) Storage {
 			"connection is passed. Note it should not be used in production")
 		return &InMemoryWalletStorage{
 			accounts:     make([]*Account, 0),
-			transactions: make([]*Transaction, 0),
+			transactions: make([]*types.Transaction, 0),
 		}
 	}
 

@@ -7,6 +7,8 @@ import (
 	"log"
 
 	"github.com/gofrs/uuid"
+
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 type ErrNoTxWithSuchID uuid.UUID
@@ -26,7 +28,7 @@ func (e ErrNoTxWithSuchID) Error() string {
 type InMemoryWalletStorage struct {
 	lastSeenBlockHash            string
 	accounts                     []*Account
-	transactions                 []*Transaction
+	transactions                 []*types.Transaction
 	hotWalletAddress             string
 	moneyRequiredFromColdStorage uint64
 	walletOperationLock          string
@@ -65,7 +67,7 @@ func (s *InMemoryWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) e
 // transfer, when one exchange client transfers money to another. From the
 // wallet's point of view, it is a transfer from one in-wallet address to
 // another and will create both incoming and outgoing tx.
-func (s *InMemoryWalletStorage) GetTransactionByHash(hash string) (*Transaction, error) {
+func (s *InMemoryWalletStorage) GetTransactionByHash(hash string) (*types.Transaction, error) {
 	for _, transaction := range s.transactions {
 		if transaction.Hash == hash {
 			return transaction, nil
@@ -76,7 +78,7 @@ func (s *InMemoryWalletStorage) GetTransactionByHash(hash string) (*Transaction,
 
 // GetTransactionByID fetches tx given it's internal id (uuid assigned by
 // exchange or processing app)
-func (s *InMemoryWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, error) {
+func (s *InMemoryWalletStorage) GetTransactionByID(id uuid.UUID) (*types.Transaction, error) {
 	for _, transaction := range s.transactions {
 		if transaction.ID == id {
 			return transaction, nil
@@ -89,21 +91,21 @@ func (s *InMemoryWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, 
 // For the update case txns are matched using bitcoin tx hash
 // This method is most probably outdated and may work incorrectly for internal
 // transfers or other txns
-func (s *InMemoryWalletStorage) StoreTransaction(transaction *Transaction) (*Transaction, error) {
+func (s *InMemoryWalletStorage) StoreTransaction(transaction *types.Transaction) (*types.Transaction, error) {
 	existingTransaction, err := s.GetTransactionByHash(transaction.Hash)
 	if err != nil {
 		return nil, err
 	}
 
 	if existingTransaction != nil {
-		transaction.fresh = false
-		existingTransaction.update(transaction)
+		transaction.Fresh = false
+		existingTransaction.Update(transaction)
 		return existingTransaction, nil
 	}
 
-	transaction.fresh = true
+	transaction.Fresh = true
 	if transaction.ID == uuid.Nil {
-		if transaction.Direction == OutgoingDirection {
+		if transaction.Direction == types.OutgoingDirection {
 			log.Printf(
 				"Warning: generating new id for new unseen outgoing tx. "+
 					"This should not happen because outgoing transactions are"+
@@ -141,14 +143,14 @@ func (s *InMemoryWalletStorage) StoreAccount(account *Account) error {
 // Bitcoin node. When tx reaches max confirmations (this value is set in
 // config as 'transaction.max_confirmations', 6 by default), it is considered
 // fully confirmed and updater won't request further updates on it
-func (s *InMemoryWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error) {
-	result := make([]*Transaction, 0)
+func (s *InMemoryWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*types.Transaction, error) {
+	result := make([]*types.Transaction, 0)
 
 	for _, transaction := range s.transactions {
 		if transaction.Hash == "" {
 			continue
 		}
-		if transaction.reportedConfirmations < confirmations {
+		if transaction.ReportedConfirmations < confirmations {
 			result = append(result, transaction)
 		}
 	}
@@ -156,13 +158,13 @@ func (s *InMemoryWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(
 	return result, nil
 }
 
-func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error {
+func (s *InMemoryWalletStorage) updateReportedConfirmations(transaction *types.Transaction, reportedConfirmations int64) error {
 	storedTransaction, err := s.GetTransactionByHash(transaction.Hash)
 	if err != nil {
 		return err
 	}
 
-	storedTransaction.reportedConfirmations = reportedConfirmations
+	storedTransaction.ReportedConfirmations = reportedConfirmations
 	return nil
 }
 
@@ -189,12 +191,12 @@ func (s *InMemoryWalletStorage) setHotWalletAddress(address string) error {
 // used by wallet updater to update their statuses and compute money required
 // from cold storage. Txns with status 'pending-manual-confirmation' are NOT
 // returned by this call.
-func (s *InMemoryWalletStorage) GetPendingTransactions() ([]*Transaction, error) {
-	result := make([]*Transaction, 0)
+func (s *InMemoryWalletStorage) GetPendingTransactions() ([]*types.Transaction, error) {
+	result := make([]*types.Transaction, 0)
 
 	for _, transaction := range s.transactions {
 		status := transaction.Status
-		if status == PendingTransaction || status == PendingColdStorageTransaction {
+		if status == types.PendingTransaction || status == types.PendingColdStorageTransaction {
 			result = append(result, transaction)
 		}
 	}
@@ -206,8 +208,8 @@ func (s *InMemoryWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 // Empty values of filters mean do not use this filter, with non-empty filter
 // only txns that have equal value of corresponding parameter will be included
 // in resulting slice
-func (s *InMemoryWalletStorage) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error) {
-	result := make([]*Transaction, 0)
+func (s *InMemoryWalletStorage) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*types.Transaction, error) {
+	result := make([]*types.Transaction, 0)
 
 	for _, transaction := range s.transactions {
 		if directionFilter != "" && directionFilter != transaction.Direction.String() {

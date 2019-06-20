@@ -9,19 +9,20 @@ import (
 
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/util"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 var unknownAccountError = map[string]interface{}{"error": "account not found"}
 var hotStorageMeta = map[string]interface{}{"kind": "input to hot storage"}
 
-func getTransactionNotificationType(confirmations int64, tx *Transaction) events.EventType {
+func getTransactionNotificationType(confirmations int64, tx *types.Transaction) events.EventType {
 	switch tx.Direction {
-	case IncomingDirection:
+	case types.IncomingDirection:
 		if confirmations == 0 {
 			return events.NewIncomingTxEvent
 		}
 		return events.IncomingTxConfirmedEvent
-	case OutgoingDirection:
+	case types.OutgoingDirection:
 		if confirmations == 0 {
 			return events.NewOutgoingTxEvent
 		}
@@ -31,7 +32,7 @@ func getTransactionNotificationType(confirmations int64, tx *Transaction) events
 	}
 }
 
-func (w *Wallet) getAccountMetainfo(tx *Transaction) (map[string]interface{}, error) {
+func (w *Wallet) getAccountMetainfo(tx *types.Transaction) (map[string]interface{}, error) {
 	account, err := w.storage.GetAccountByAddress(tx.Address)
 	if err != nil {
 		return nil, err
@@ -42,10 +43,10 @@ func (w *Wallet) getAccountMetainfo(tx *Transaction) (map[string]interface{}, er
 	return account.Metainfo, nil
 }
 
-func (w *Wallet) notifyTransaction(tx *Transaction) error {
+func (w *Wallet) notifyTransaction(tx *types.Transaction) error {
 	confirmationsToNotify := util.Min64(tx.Confirmations, w.maxConfirmations)
 
-	for i := tx.reportedConfirmations + 1; i <= confirmationsToNotify; i++ {
+	for i := tx.ReportedConfirmations + 1; i <= confirmationsToNotify; i++ {
 		eventType := getTransactionNotificationType(i, tx)
 
 		// make a copy of tx here, otherwise it may get modified while
@@ -73,11 +74,11 @@ func (w *Wallet) notifyTransaction(tx *Transaction) error {
 	return nil
 }
 
-func (w *Wallet) updateTxInfo(tx *Transaction) (bool, error) {
+func (w *Wallet) updateTxInfo(tx *types.Transaction) (bool, error) {
 	var err error
 
 	isHotStorageTx := tx.Address == w.hotWalletAddress
-	if tx.Direction == IncomingDirection {
+	if tx.Direction == types.IncomingDirection {
 		if !isHotStorageTx {
 			tx.Metainfo, err = w.getAccountMetainfo(tx)
 			if err != nil {
@@ -96,11 +97,11 @@ func (w *Wallet) updateTxInfo(tx *Transaction) (bool, error) {
 		return false, err
 	}
 
-	txInfoChanged := tx.fresh || (oldStatus != tx.Status)
-	if tx.fresh {
+	txInfoChanged := tx.Fresh || (oldStatus != tx.Status)
+	if tx.Fresh {
 		log.Printf("New tx %s", tx.Hash)
 	}
-	if isHotStorageTx && tx.fresh {
+	if isHotStorageTx && tx.Fresh {
 		log.Printf(
 			"Got transfer to hot wallet: %d satoshi (%s) tx %s (%s)",
 			tx.Amount,
@@ -135,7 +136,7 @@ func (w *Wallet) checkForNewTransactions() {
 			)
 		}
 		for _, btcNodeTransaction := range lastTxData.Transactions {
-			tx := newTransaction(&btcNodeTransaction)
+			tx := types.NewTransactionFromBTCJSON(&btcNodeTransaction)
 			currentTxInfoChanged, err := currWallet.updateTxInfo(tx)
 			if err != nil {
 				return err
@@ -156,9 +157,9 @@ func (w *Wallet) checkForNewTransactions() {
 	}
 }
 
-func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
+func (w *Wallet) setTxStatusByConfirmations(tx *types.Transaction) {
 	switch {
-	case tx.Status != NewTransaction && tx.Status != ConfirmedTransaction && tx.Status != FullyConfirmedTransaction:
+	case tx.Status != types.NewTransaction && tx.Status != types.ConfirmedTransaction && tx.Status != types.FullyConfirmedTransaction:
 		// only "new" and "confirmed" statuses can be changed based on
 		// number of confirmations ("new" can become "confirmed", "confirmed"
 		// can become "fully-confirmed"). We also allow "fully-confirmed" to
@@ -168,11 +169,11 @@ func (w *Wallet) setTxStatusByConfirmations(tx *Transaction) {
 		// actual status "fully-confirmed"
 		return
 	case tx.Confirmations <= 0:
-		tx.Status = NewTransaction
+		tx.Status = types.NewTransaction
 	case tx.Confirmations > 0 && tx.Confirmations < w.maxConfirmations:
-		tx.Status = ConfirmedTransaction
+		tx.Status = types.ConfirmedTransaction
 	case tx.Confirmations >= w.maxConfirmations:
-		tx.Status = FullyConfirmedTransaction
+		tx.Status = types.FullyConfirmedTransaction
 	}
 }
 
@@ -192,7 +193,7 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 			if err != nil {
 				return err
 			}
-			tx.updateFromFullTxInfo(fullTxInfo)
+			tx.UpdateFromFullTxInfo(fullTxInfo)
 			currentTxInfoChanged, err := currWallet.updateTxInfo(tx)
 			if err != nil {
 				return err

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/wallet"
 )
 
 const shutdownTimeout = 150 * time.Millisecond

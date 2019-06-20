@@ -10,6 +10,7 @@ import (
 	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 func testDeposit(t *testing.T, env *testenv.TestEnvironment, clientAddress string) {
@@ -34,7 +35,7 @@ func testDeposit(t *testing.T, env *testenv.TestEnvironment, clientAddress strin
 		})
 
 		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
-		data := event.Data.(*wallet.TxNotification)
+		data := event.Data.(*wallettypes.TxNotification)
 		if got, want := event.Type, events.NewIncomingTxEvent; got != want {
 			t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
 				want, got)
@@ -88,7 +89,7 @@ func testDepositPartiallyConfirmed(t *testing.T, env *testenv.TestEnvironment, t
 		t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
 			want, got)
 	}
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 	if data.ID != tx.id {
 		t.Errorf("Expected that tx id for confirmed tx in websocket "+
 			"notification will match one for initial tx, but they are %s %s",
@@ -113,7 +114,7 @@ func testDepositFullyConfirmed(t *testing.T, env *testenv.TestEnvironment, tx *t
 		t.Errorf("Unexpected event type for confirmed deposit, wanted %s, got %s:",
 			want, got)
 	}
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 	if data.ID != tx.id {
 		t.Errorf("Expected that tx id for confirmed tx in websocket "+
 			"notification will match one for initial tx, but they are %s %s",
@@ -131,7 +132,7 @@ func testDepositSeveralConfirmations(t *testing.T, env *testenv.TestEnvironment,
 		checkNotificationFieldsForNewDeposit(t, notification, tx)
 
 		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
-		data := event.Data.(*wallet.TxNotification)
+		data := event.Data.(*wallettypes.TxNotification)
 		if got, want := event.Type, events.NewIncomingTxEvent; got != want {
 			t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
 				want, got)
@@ -277,14 +278,14 @@ func testDepositMultipleInterleaved(t *testing.T, env *testenv.TestEnvironment, 
 				notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
 				checkNotificationFieldsForFullyConfirmedDeposit(t, notification, txOlder)
 				event := findEventWithTypeOrFail(t, wsEvents, events.IncomingTxConfirmedEvent)
-				checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data.(*wallet.TxNotification), txOlder)
+				checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data.(*wallettypes.TxNotification), txOlder)
 			}
 
 			notification := findNotificationForTxOrFail(t, cbNotifications, txYounger)
 			txYounger.id = notification.ID
 			checkNotificationFieldsForNewDeposit(t, notification, txYounger)
 			event := findEventWithTypeOrFail(t, wsEvents, events.NewIncomingTxEvent)
-			eventData := event.Data.(*wallet.TxNotification)
+			eventData := event.Data.(*wallettypes.TxNotification)
 			if eventData.ID != txYounger.id {
 				t.Errorf("Expected tx id from cb and ws notification to be "+
 					"equal, but they are %s %s", txYounger.id, eventData.ID)
@@ -297,7 +298,7 @@ func testDepositMultipleInterleaved(t *testing.T, env *testenv.TestEnvironment, 
 		notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
 		checkNotificationFieldsForFullyConfirmedDeposit(t, notification, txOlder)
 		event := findEventWithTypeOrFail(t, wsEvents, events.IncomingTxConfirmedEvent)
-		checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data.(*wallet.TxNotification), txOlder)
+		checkNotificationFieldsForFullyConfirmedDeposit(t, event.Data.(*wallettypes.TxNotification), txOlder)
 
 		wantBalance := balanceByNow + bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.6"))
 		checkBalance(t, env, wantBalance, wantBalance)

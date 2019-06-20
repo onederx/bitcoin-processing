@@ -9,6 +9,7 @@ import (
 	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 func testDepositAndWithdrawMultipleMixed(t *testing.T, env *testenv.TestEnvironment, accounts []*wallet.Account) {
@@ -105,13 +106,13 @@ func testDepositAndWithdrawMultipleMixed(t *testing.T, env *testenv.TestEnvironm
 	n = findNotificationForTxOrFail(t, cbNotifications, newDeposit)
 	checkNotificationFieldsForFullyConfirmedDeposit(t, n, newDeposit)
 	checkNotificationFieldsForFullyConfirmedDeposit(t,
-		findEventWithTypeOrFail(t, wsEvents, events.IncomingTxConfirmedEvent).Data.(*wallet.TxNotification),
+		findEventWithTypeOrFail(t, wsEvents, events.IncomingTxConfirmedEvent).Data.(*wallettypes.TxNotification),
 		newDeposit)
 
 	n = findNotificationForTxOrFail(t, cbNotifications, newWithdraw)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, n, newWithdraw)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t,
-		findEventWithTypeOrFail(t, wsEvents, events.OutgoingTxConfirmedEvent).Data.(*wallet.TxNotification),
+		findEventWithTypeOrFail(t, wsEvents, events.OutgoingTxConfirmedEvent).Data.(*wallettypes.TxNotification),
 		newWithdraw)
 
 	checkBalance(t, env, balanceAfterAllTxns, balanceAfterAllTxns)

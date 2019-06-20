@@ -10,6 +10,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 type internalTxIDRequest struct {
@@ -20,7 +21,7 @@ type internalTxIDRequest struct {
 type internalCancelRequest internalTxIDRequest
 type internalConfirmRequest internalTxIDRequest
 
-func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus) error {
+func (w *Wallet) updatePendingTxStatus(tx *types.Transaction, status types.TransactionStatus) error {
 	if status == tx.Status {
 		return nil
 	}
@@ -31,7 +32,7 @@ func (w *Wallet) updatePendingTxStatus(tx *Transaction, status TransactionStatus
 	}
 
 	var eventType events.EventType
-	if status == CancelledTransaction {
+	if status == types.CancelledTransaction {
 		eventType = events.PendingTxCancelledEvent
 	} else {
 		eventType = events.PendingStatusUpdatedEvent
@@ -109,7 +110,7 @@ func (w *Wallet) tryToUpdatePendingTxns() error {
 					availableBalance -= amount
 					err = currWallet.updatePendingTxStatus(
 						tx,
-						PendingTransaction,
+						types.PendingTransaction,
 					)
 					if err != nil {
 						return err
@@ -129,7 +130,7 @@ func (w *Wallet) tryToUpdatePendingTxns() error {
 			availableBalance -= int64(tx.Amount)
 			err = currWallet.updatePendingTxStatus(
 				tx,
-				PendingColdStorageTransaction,
+				types.PendingColdStorageTransaction,
 			)
 			if err != nil {
 				return err
@@ -149,14 +150,14 @@ func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
 		}
 
 		switch tx.Status {
-		case PendingTransaction:
-		case PendingColdStorageTransaction:
-		case PendingManualConfirmationTransaction:
+		case types.PendingTransaction:
+		case types.PendingColdStorageTransaction:
+		case types.PendingManualConfirmationTransaction:
 		default:
 			return errors.New("Transaction is not pending")
 		}
 
-		return currWallet.updatePendingTxStatus(tx, CancelledTransaction)
+		return currWallet.updatePendingTxStatus(tx, types.CancelledTransaction)
 	})
 
 	if err != nil {
@@ -171,7 +172,7 @@ func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
 
 func (w *Wallet) confirmPendingTx(id uuid.UUID) error {
 	var (
-		tx  *Transaction
+		tx  *types.Transaction
 		err error
 	)
 
@@ -184,7 +185,7 @@ func (w *Wallet) confirmPendingTx(id uuid.UUID) error {
 		return err
 	}
 
-	if tx.Status != PendingManualConfirmationTransaction {
+	if tx.Status != types.PendingManualConfirmationTransaction {
 		return fmt.Errorf(
 			"Tx %s is not pending manual confirmation. Its status is %s",
 			id,

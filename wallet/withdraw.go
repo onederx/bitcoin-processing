@@ -11,6 +11,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 const (
@@ -34,7 +35,7 @@ type WithdrawRequest struct {
 }
 
 type internalWithdrawRequest struct {
-	tx     *Transaction
+	tx     *types.Transaction
 	hold   bool
 	result chan error
 }
@@ -111,7 +112,7 @@ func (w *Wallet) ensureTxIDIsFree(id uuid.UUID) error {
 	}
 }
 
-func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
+func (w *Wallet) sendWithdrawal(tx *types.Transaction, updatePending bool) error {
 	var sendMoneyFunc func(string, bitcoin.BTCAmount, bitcoin.BTCAmount, bool) (string, error)
 
 	switch tx.FeeType {
@@ -162,8 +163,8 @@ func (w *Wallet) sendWithdrawal(tx *Transaction, updatePending bool) error {
 	return nil
 }
 
-func (w *Wallet) handleWithdrawalSuccess(tx *Transaction, txHash string) {
-	tx.Status = NewTransaction
+func (w *Wallet) handleWithdrawalSuccess(tx *types.Transaction, txHash string) {
+	tx.Status = types.NewTransaction
 	tx.Hash = txHash
 
 	log.Printf(
@@ -189,7 +190,7 @@ func (w *Wallet) handleWithdrawalSuccess(tx *Transaction, txHash string) {
 	}, nil, false)
 }
 
-func (w *Wallet) handleWithdrawalError(err error, tx *Transaction) error {
+func (w *Wallet) handleWithdrawalError(err error, tx *types.Transaction) error {
 	makePending := false
 	if isInsufficientFundsError(err) && !tx.ColdStorage {
 		// this is a regular withdrawal and we got response that we
@@ -204,7 +205,7 @@ func (w *Wallet) handleWithdrawalError(err error, tx *Transaction) error {
 			// as original in case of retry. That's why, make a copy here.
 			updateTx := *tx
 			if makePending {
-				err := currWallet.updatePendingTxStatus(&updateTx, PendingTransaction)
+				err := currWallet.updatePendingTxStatus(&updateTx, types.PendingTransaction)
 				if err != nil {
 					return err
 				}
@@ -267,7 +268,7 @@ func logFailureToPersistWithdrawResult(err, prevErr error, retries int, interval
 	}
 }
 
-func (w *Wallet) withdrawViaWalletUpdater(tx *Transaction, hold bool) error {
+func (w *Wallet) withdrawViaWalletUpdater(tx *types.Transaction, hold bool) error {
 	// to prevent races, actual withdraw will be done in wallet updater
 	// goroutine
 	resultCh := make(chan error)
@@ -279,11 +280,11 @@ func (w *Wallet) withdrawViaWalletUpdater(tx *Transaction, hold bool) error {
 	return <-resultCh
 }
 
-func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
+func (w *Wallet) holdWithdrawalUntilConfirmed(tx *types.Transaction) error {
 	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
 		return currWallet.updatePendingTxStatus(
 			tx,
-			PendingManualConfirmationTransaction,
+			types.PendingManualConfirmationTransaction,
 		)
 	})
 	if err != nil {
@@ -293,7 +294,7 @@ func (w *Wallet) holdWithdrawalUntilConfirmed(tx *Transaction) error {
 	return nil
 }
 
-func (w *Wallet) withdraw(tx *Transaction, hold bool) error {
+func (w *Wallet) withdraw(tx *types.Transaction, hold bool) error {
 	if err := w.ensureTxIDIsFree(tx.ID); err != nil {
 		log.Printf(
 			"wallet: duplicate tx id %s, refusing to withdraw", tx.ID,
@@ -370,18 +371,18 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 		)
 	}
 
-	outgoingTx := &Transaction{
+	outgoingTx := &types.Transaction{
 		ID:                    request.ID,
 		Confirmations:         0,
 		Address:               request.Address,
-		Direction:             OutgoingDirection,
+		Direction:             types.OutgoingDirection,
 		Amount:                request.Amount,
 		Metainfo:              request.Metainfo,
 		Fee:                   request.Fee,
 		FeeType:               feeType,
 		ColdStorage:           toColdStorage,
-		fresh:                 true,
-		reportedConfirmations: -1,
+		Fresh:                 true,
+		ReportedConfirmations: -1,
 	}
 
 	// withdraw to cold storage does not need confirmation

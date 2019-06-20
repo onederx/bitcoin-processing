@@ -13,6 +13,7 @@ import (
 	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
@@ -114,7 +115,7 @@ func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
 				"to requested one %s, but got %s", withdrawID, notification.ID)
 		}
 		event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
-		data := event.Data.(*wallet.TxNotification)
+		data := event.Data.(*wallettypes.TxNotification)
 		if data.ID != req.ID {
 			t.Errorf("Expected withdraw id in http notification to be equal "+
 				"to requested one %s, but got %s", withdrawID, data.ID)
@@ -209,7 +210,7 @@ func testWithdrawInsufficientFundsPending(t *testing.T, env *testenv.TestEnviron
 	clientBalance := getStableClientBalanceOrFail(t, env)
 
 	runSubtest(t, "GetTransactionsPending", func(t *testing.T) {
-		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallet.PendingTransaction)
+		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallettypes.PendingTransaction)
 	})
 
 	if cancel {
@@ -265,7 +266,7 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testenv.
 	checkRequiredFromColdStorage(t, env, overflowAmount)
 
 	runSubtest(t, "GetTransactionsPendingColdStorage", func(t *testing.T) {
-		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallet.PendingColdStorageTransaction)
+		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallettypes.PendingColdStorageTransaction)
 	})
 
 	if cancel {
@@ -300,10 +301,10 @@ func testWithdrawInsufficientFundsPendingColdStorage(t *testing.T, env *testenv.
 	testWithdrawTransactionPending(t, env, tx, zeroBTC, false)
 
 	runSubtest(t, "GetTransactionsNotPendingColdStorage", func(t *testing.T) {
-		testGetTransactionsTxNotFoundByStatus(t, env, tx.id, wallet.PendingColdStorageTransaction)
+		testGetTransactionsTxNotFoundByStatus(t, env, tx.id, wallettypes.PendingColdStorageTransaction)
 	})
 	runSubtest(t, "GetTransactionsPending", func(t *testing.T) {
-		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallet.PendingTransaction)
+		testGetTransactionsTxFoundByStatus(t, env, tx.id, wallettypes.PendingTransaction)
 	})
 	checkRequiredFromColdStorage(t, env, zeroBTC)
 
@@ -359,7 +360,7 @@ func testWithdrawPartiallyConfirmed(t *testing.T, env *testenv.TestEnvironment, 
 		t.Errorf("Expected type of event for confirmed successful withdraw "+
 			"to be %s, instead got %s", want, got)
 	}
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 	checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t, data, tx)
 	checkClientBalanceBecame(t, env,
 		expectedClientBalanceAfterWithdraw,
@@ -375,7 +376,7 @@ func testWithdrawFullyConfirmed(t *testing.T, env *testenv.TestEnvironment, tx *
 		t.Errorf("Expected type of event for confirmed successful withdraw "+
 			"to be %s, instead got %s", want, got)
 	}
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, data, tx)
 	checkClientBalanceBecame(t, env,
 		expectedClientBalanceAfterWithdraw,
@@ -393,7 +394,7 @@ func testWithdrawTransactionPendingManualConfirmation(t *testing.T, env *testenv
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
 	}
 
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 
 	checkNotificationFieldsForWithdrawPendingManualConfirmation(t, data, tx)
 
@@ -414,7 +415,7 @@ func testWithdrawTransactionPendingColdStorage(t *testing.T, env *testenv.TestEn
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
 	}
 
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 
 	checkNotificationFieldsForWithdrawPendingColdStorage(t, data, tx)
 
@@ -435,7 +436,7 @@ func testWithdrawTransactionPending(t *testing.T, env *testenv.TestEnvironment, 
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
 	}
 
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 
 	checkNotificationFieldsForWithdrawPending(t, data, tx)
 
@@ -456,7 +457,7 @@ func testWithdrawTransactionCancelled(t *testing.T, env *testenv.TestEnvironment
 		t.Errorf("Expected event type to be %s, but got %s", want, got)
 	}
 
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 
 	checkNotificationFieldsForCancelledWithdrawal(t, data, tx)
 }
@@ -501,7 +502,7 @@ func testWithdrawSeveralConfirmations(t *testing.T, env *testenv.TestEnvironment
 	})
 }
 
-func testGetTransactionsTxFoundByStatus(t *testing.T, env *testenv.TestEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
+func testGetTransactionsTxFoundByStatus(t *testing.T, env *testenv.TestEnvironment, txID uuid.UUID, status wallettypes.TransactionStatus) {
 	statusStr := status.String()
 	txns, err := env.ProcessingClient.GetTransactions(&api.GetTransactionsFilter{
 		Status: statusStr,
@@ -518,7 +519,7 @@ func testGetTransactionsTxFoundByStatus(t *testing.T, env *testenv.TestEnvironme
 		"status %s", statusStr)
 }
 
-func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testenv.TestEnvironment, txID uuid.UUID, status wallet.TransactionStatus) {
+func testGetTransactionsTxNotFoundByStatus(t *testing.T, env *testenv.TestEnvironment, txID uuid.UUID, status wallettypes.TransactionStatus) {
 	statusStr := status.String()
 	txns, err := env.ProcessingClient.GetTransactions(&api.GetTransactionsFilter{
 		Status: statusStr,
@@ -670,14 +671,14 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testenv.TestEnvironment,
 			notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
 			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, txOlder)
 			event := findEventWithTypeOrFail(t, wsEvents, events.OutgoingTxConfirmedEvent)
-			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallet.TxNotification), txOlder)
+			checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallettypes.TxNotification), txOlder)
 		}
 
 		notification := findNotificationForTxOrFail(t, cbNotifications, txYounger)
 		txYounger.hash = notification.Hash
 		checkNotificationFieldsForNewClientWithdraw(t, notification, txYounger)
 		event := findEventWithTypeOrFail(t, wsEvents, events.NewOutgoingTxEvent)
-		eventData := event.Data.(*wallet.TxNotification)
+		eventData := event.Data.(*wallettypes.TxNotification)
 		if eventData.ID != txYounger.id {
 			t.Errorf("Expected tx id from cb and ws notification to be "+
 				"equal, but they are %s %s", txYounger.id, eventData.ID)
@@ -690,7 +691,7 @@ func testWithdrawMultipleInterleaved(t *testing.T, env *testenv.TestEnvironment,
 	notification := findNotificationForTxOrFail(t, cbNotifications, txOlder)
 	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, txOlder)
 	event := findEventWithTypeOrFail(t, wsEvents, events.OutgoingTxConfirmedEvent)
-	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallet.TxNotification), txOlder)
+	checkNotificationFieldsForFullyConfirmedClientWithdraw(t, event.Data.(*wallettypes.TxNotification), txOlder)
 
 	checkBalance(t, env, balanceAfterWithdraw, balanceAfterWithdraw)
 }

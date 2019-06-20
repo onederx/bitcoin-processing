@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onederx/bitcoin-processing/wallet"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 type callbackRequest struct {
@@ -21,13 +21,13 @@ type callbackRequest struct {
 	body   []byte
 }
 
-func (c *callbackRequest) unmarshal() (*wallet.TxNotification, error) {
-	var notification wallet.TxNotification
+func (c *callbackRequest) unmarshal() (*types.TxNotification, error) {
+	var notification types.TxNotification
 	err := json.Unmarshal(c.body, &notification)
 	return &notification, err
 }
 
-func (c *callbackRequest) UnmarshalOrFail(t *testing.T) *wallet.TxNotification {
+func (c *callbackRequest) UnmarshalOrFail(t *testing.T) *types.TxNotification {
 	notification, err := c.unmarshal()
 	if err != nil {
 		t.Fatalf("Failed to deserialize notification data from http "+
@@ -87,7 +87,7 @@ func (e *TestEnvironment) GetNextCallbackRequestWithTimeout(t *testing.T) *callb
 	return nil
 }
 
-func (e *TestEnvironment) GetNextCallbackNotificationWithTimeout(t *testing.T) *wallet.TxNotification {
+func (e *TestEnvironment) GetNextCallbackNotificationWithTimeout(t *testing.T) *types.TxNotification {
 	req := e.GetNextCallbackRequestWithTimeout(t)
 	return req.UnmarshalOrFail(t)
 }

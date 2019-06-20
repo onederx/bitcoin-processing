@@ -11,14 +11,14 @@ import (
 
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin"
-	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv/pgmitm"
 	"github.com/onederx/bitcoin-processing/integrationtests/util"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
-func findNotificationForTxOrFail(t *testing.T, notifications []*wallet.TxNotification, tx *txTestData) *wallet.TxNotification {
+func findNotificationForTxOrFail(t *testing.T, notifications []*wallettypes.TxNotification, tx *txTestData) *wallettypes.TxNotification {
 	for _, n := range notifications {
 		if tx.id != uuid.Nil {
 			if n.ID == tx.id {
@@ -88,7 +88,7 @@ func getNewAddressForWithdrawOrFail(t *testing.T, env *testenv.TestEnvironment) 
 	return addressDecoded
 }
 
-func collectNotificationsAndEvents(t *testing.T, env *testenv.TestEnvironment, n int) (httpNotifications []*wallet.TxNotification, wsEvents []*events.NotificationWithSeq) {
+func collectNotificationsAndEvents(t *testing.T, env *testenv.TestEnvironment, n int) (httpNotifications []*wallettypes.TxNotification, wsEvents []*events.NotificationWithSeq) {
 	t.Helper()
 	for i := 0; i < n; i++ {
 		httpNotifications = append(httpNotifications, env.GetNextCallbackNotificationWithTimeout(t))
@@ -97,10 +97,10 @@ func collectNotificationsAndEvents(t *testing.T, env *testenv.TestEnvironment, n
 	return
 }
 
-func findAllWsNotificationsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType, n int) (wsNotifications []*wallet.TxNotification) {
+func findAllWsNotificationsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSeq, et events.EventType, n int) (wsNotifications []*wallettypes.TxNotification) {
 	t.Helper()
 	for _, event := range findAllEventsWithTypeOrFail(t, evts, et, n) {
-		wsNotifications = append(wsNotifications, event.Data.(*wallet.TxNotification))
+		wsNotifications = append(wsNotifications, event.Data.(*wallettypes.TxNotification))
 	}
 	return
 }
@@ -130,7 +130,7 @@ func findAllEventsWithTypeOrFail(t *testing.T, evts []*events.NotificationWithSe
 	return nil
 }
 
-func collectNotifications(t *testing.T, env *testenv.TestEnvironment, eventType events.EventType, n int) (httpNotifications []*wallet.TxNotification, wsNotifications []*wallet.TxNotification) {
+func collectNotifications(t *testing.T, env *testenv.TestEnvironment, eventType events.EventType, n int) (httpNotifications []*wallettypes.TxNotification, wsNotifications []*wallettypes.TxNotification) {
 	t.Helper()
 	for i := 0; i < n; i++ {
 		httpNotifications = append(httpNotifications, env.GetNextCallbackNotificationWithTimeout(t))
@@ -140,7 +140,7 @@ func collectNotifications(t *testing.T, env *testenv.TestEnvironment, eventType 
 			t.Fatalf("Unexpected event type for event, wanted %s, got %s:",
 				want, got)
 		}
-		wsNotifications = append(wsNotifications, event.Data.(*wallet.TxNotification))
+		wsNotifications = append(wsNotifications, event.Data.(*wallettypes.TxNotification))
 	}
 	return
 }

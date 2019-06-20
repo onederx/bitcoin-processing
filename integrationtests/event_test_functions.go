@@ -13,6 +13,7 @@ import (
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 	"github.com/onederx/bitcoin-processing/util"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 func testProcessingCatchesMissedEvents(t *testing.T, env *testenv.TestEnvironment, ctx context.Context, accounts []*wallet.Account) {
@@ -48,7 +49,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testenv.TestEnvironmen
 
 	maxSeq := 0
 
-	testNotificationsAboutMissedEvents := func(t *testing.T, depositNotifications map[string][]*wallet.TxNotification, withdrawNotification *wallet.TxNotification) {
+	testNotificationsAboutMissedEvents := func(t *testing.T, depositNotifications map[string][]*wallettypes.TxNotification, withdrawNotification *wallettypes.TxNotification) {
 		for _, tx := range deposits {
 			notifications := depositNotifications[tx.hash]
 
@@ -57,7 +58,7 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testenv.TestEnvironmen
 					"about new tx and 1 about confirmation. instead got %d",
 					len(notifications))
 			}
-			if notifications[0].StatusCode != 0 || notifications[0].StatusStr != wallet.NewTransaction.String() {
+			if notifications[0].StatusCode != 0 || notifications[0].StatusStr != wallettypes.NewTransaction.String() {
 				t.Fatal("Notification order error: expected notification about " +
 					"new tx to come before notification about confirmatios")
 			}
@@ -69,8 +70,8 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testenv.TestEnvironmen
 	}
 
 	runSubtest(t, "HTTPCallbackNotifications", func(t *testing.T) {
-		var withdrawNotification *wallet.TxNotification
-		depositNotifications := make(map[string][]*wallet.TxNotification)
+		var withdrawNotification *wallettypes.TxNotification
+		depositNotifications := make(map[string][]*wallettypes.TxNotification)
 
 		for i := 0; i < 5; i++ {
 			httpNotification := env.GetNextCallbackNotificationWithTimeout(t)
@@ -94,10 +95,10 @@ func testProcessingCatchesMissedEvents(t *testing.T, env *testenv.TestEnvironmen
 		testNotificationsAboutMissedEvents(t, depositNotifications, withdrawNotification)
 	})
 	testWebsocketEvents := func(t *testing.T, evts []*events.NotificationWithSeq) {
-		var withdrawNotification *wallet.TxNotification
-		depositNotifications := make(map[string][]*wallet.TxNotification)
+		var withdrawNotification *wallettypes.TxNotification
+		depositNotifications := make(map[string][]*wallettypes.TxNotification)
 		for _, ev := range evts {
-			data := ev.Data.(*wallet.TxNotification)
+			data := ev.Data.(*wallettypes.TxNotification)
 			switch ev.Type {
 			case events.OutgoingTxConfirmedEvent:
 				withdrawNotification = data
@@ -205,7 +206,7 @@ func testWebsocketListeners(t *testing.T, env *testenv.TestEnvironment) {
 				t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
 					want, got)
 			}
-			checkNotificationFieldsForNewDeposit(t, event.Data.(*wallet.TxNotification), deposit1)
+			checkNotificationFieldsForNewDeposit(t, event.Data.(*wallettypes.TxNotification), deposit1)
 
 			// stop this listener to simulate situation that client has gone away
 			// while some events are happening
@@ -240,7 +241,7 @@ func testWebsocketListeners(t *testing.T, env *testenv.TestEnvironment) {
 					events.PendingStatusUpdatedEvent, withdrawEvent.Type)
 			}
 			checkNotificationFieldsForWithdrawPendingManualConfirmation(t,
-				withdrawEvent.Data.(*wallet.TxNotification), withdraw)
+				withdrawEvent.Data.(*wallettypes.TxNotification), withdraw)
 
 			newAccountEvent := listener.GetNextMessageWithTimeout(t)
 
@@ -264,7 +265,7 @@ func testWebsocketListeners(t *testing.T, env *testenv.TestEnvironment) {
 				t.Errorf("Unexpected event type: wanted %s, got %s", want, got)
 			}
 			checkNotificationFieldsForFullyConfirmedDeposit(t,
-				deposit1ConfirmedEvent.Data.(*wallet.TxNotification), deposit1)
+				deposit1ConfirmedEvent.Data.(*wallettypes.TxNotification), deposit1)
 		})
 	})
 	runSubtest(t, "ParallelListeners", func(t *testing.T) {

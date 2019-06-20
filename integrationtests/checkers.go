@@ -15,6 +15,7 @@ import (
 	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 type txTestData struct {
@@ -143,7 +144,7 @@ func checkClientBalanceBecame(t *testing.T, e *testenv.TestEnvironment, balance,
 	checkBalanceBecame(t, e.GetClientBalance, balance, balanceWithUnconf)
 }
 
-func checkTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkTxNotificationFields(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	if got, want := n.Amount, tx.amount; got != want {
 		t.Errorf("Incorrect amount for tx: expected %s, got %s", want, got)
@@ -159,7 +160,7 @@ func checkTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTes
 	compareMetainfo(t, n.Metainfo, tx.metainfo)
 }
 
-func checkUnconfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkUnconfirmedTxNotificationFields(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	if got, want := n.BlockHash, ""; got != want {
 		t.Errorf("Expected that block hash for new tx will be empty, instead got %s", got)
@@ -169,7 +170,7 @@ func checkUnconfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification
 	}
 }
 
-func checkNewTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNewTxNotificationFields(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkUnconfirmedTxNotificationFields(t, n, tx)
 	if got, want := n.StatusCode, 0; got != want {
@@ -177,7 +178,7 @@ func checkNewTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *tx
 	}
 }
 
-func checkConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkConfirmedTxNotificationFields(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	if got, want := n.ID, tx.id; got != want {
 		t.Errorf("Expected that tx id will be %s, instead got %s", want, got)
@@ -193,36 +194,36 @@ func checkConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, 
 	}
 }
 
-func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkFullyConfirmedTxNotificationFields(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkConfirmedTxNotificationFields(t, n, tx)
 	if got, want := n.StatusCode, 100; got != want {
 		t.Errorf("Expected status code %d for fully confirmed tx, instead got %d", want, got)
 	}
-	if got, want := n.StatusStr, wallet.FullyConfirmedTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.FullyConfirmedTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for fully confirmed tx, instead got %s", want, got)
 	}
 }
 
-func checkPartiallyConfirmedTxNotificationFields(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkPartiallyConfirmedTxNotificationFields(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkConfirmedTxNotificationFields(t, n, tx)
 	if !(n.StatusCode > 0 && n.StatusCode < 100) {
 		t.Errorf("Expected status code for partially confirmed tx to be more "+
 			"than 0, but less than 100. Instead got %d", n.StatusCode)
 	}
-	if got, want := n.StatusStr, wallet.ConfirmedTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.ConfirmedTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for confirmed tx, instead got %s", want, got)
 	}
 }
 
-func checkNotificationFieldsForDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForDeposit(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkTxNotificationFields(t, n, tx)
 	if got, want := n.Address, tx.address; got != want {
 		t.Errorf("Incorrect address for deposit: expected %s, got %s", want, got)
 	}
-	if got, want := n.Direction, wallet.IncomingDirection; got != want {
+	if got, want := n.Direction, wallettypes.IncomingDirection; got != want {
 		t.Errorf("Incorrect direction for deposit: expected %s, got %s", want, got)
 	}
 	if got, want := n.Hash, tx.hash; got != want {
@@ -236,22 +237,22 @@ func checkNotificationFieldsForDeposit(t *testing.T, n *wallet.TxNotification, t
 	}
 }
 
-func checkNotificationFieldsForNewDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForNewDeposit(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkNewTxNotificationFields(t, n, tx)
-	if got, want := n.StatusStr, wallet.NewTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.NewTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for new incoming tx, instead got %s", want, got)
 	}
 }
 
-func checkNotificationFieldsForFullyConfirmedDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForFullyConfirmedDeposit(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkFullyConfirmedTxNotificationFields(t, n, tx)
 }
 
-func checkNotificationFieldsForPartiallyConfirmedDeposit(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForPartiallyConfirmedDeposit(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForDeposit(t, n, tx)
 	checkPartiallyConfirmedTxNotificationFields(t, n, tx)
@@ -298,10 +299,10 @@ func checkCSWithdrawRequest(t *testing.T, gotRequest *wallet.WithdrawRequest, wa
 	}
 }
 
-func checkNotificationFieldsForWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkTxNotificationFields(t, n, tx)
-	if got, want := n.Direction, wallet.OutgoingDirection; got != want {
+	if got, want := n.Direction, wallettypes.OutgoingDirection; got != want {
 		t.Errorf("Incorrect direction for withdraw: expected %s, got %s", want, got)
 	}
 	if got, want := n.IpnType, "withdrawal"; got != want {
@@ -312,13 +313,13 @@ func checkNotificationFieldsForWithdraw(t *testing.T, n *wallet.TxNotification, 
 	}
 }
 
-func checkNotificationFieldsForNewWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForNewWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkNewTxNotificationFields(t, n, tx)
 }
 
-func checkNotificationFieldsForClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForClientWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	if got, want := n.Address, tx.address; got != want {
 		t.Errorf("Incorrect address for regular withdraw: expected %s, got %s", want, got)
@@ -328,7 +329,7 @@ func checkNotificationFieldsForClientWithdraw(t *testing.T, n *wallet.TxNotifica
 	}
 }
 
-func checkNotificationFieldsForNewClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForNewClientWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForNewWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
@@ -339,31 +340,31 @@ func checkNotificationFieldsForNewClientWithdraw(t *testing.T, n *wallet.TxNotif
 	}
 }
 
-func checkNotificationFieldsForFullyConfirmedWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForFullyConfirmedWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkFullyConfirmedTxNotificationFields(t, n, tx)
 }
 
-func checkNotificationFieldsForPartiallyConfirmedWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForPartiallyConfirmedWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkPartiallyConfirmedTxNotificationFields(t, n, tx)
 }
 
-func checkNotificationFieldsForFullyConfirmedClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForFullyConfirmedClientWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForFullyConfirmedWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 }
 
-func checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForPartiallyConfirmedClientWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForPartiallyConfirmedWithdraw(t, n, tx)
 	checkNotificationFieldsForClientWithdraw(t, n, tx)
 }
 
-func checkNotificationFieldsForAnyPendingWithdraw(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForAnyPendingWithdraw(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkUnconfirmedTxNotificationFields(t, n, tx)
@@ -385,34 +386,34 @@ func checkNotificationFieldsForAnyPendingWithdraw(t *testing.T, n *wallet.TxNoti
 	}
 }
 
-func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForWithdrawPendingManualConfirmation(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
 
-	if got, want := n.StatusStr, wallet.PendingManualConfirmationTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.PendingManualConfirmationTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
 	}
 }
 
-func checkNotificationFieldsForWithdrawPending(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForWithdrawPending(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
 
-	if got, want := n.StatusStr, wallet.PendingTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.PendingTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
 	}
 }
 
-func checkNotificationFieldsForWithdrawPendingColdStorage(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForWithdrawPendingColdStorage(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForAnyPendingWithdraw(t, n, tx)
 
-	if got, want := n.StatusStr, wallet.PendingColdStorageTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.PendingColdStorageTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
 	}
 }
 
-func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNotification, tx *txTestData) {
+func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallettypes.TxNotification, tx *txTestData) {
 	t.Helper()
 	checkNotificationFieldsForWithdraw(t, n, tx)
 	checkUnconfirmedTxNotificationFields(t, n, tx)
@@ -423,7 +424,7 @@ func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNot
 			"but got %s", n.ID, tx.id)
 	}
 
-	if got, want := n.StatusStr, wallet.CancelledTransaction.String(); got != want {
+	if got, want := n.StatusStr, wallettypes.CancelledTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for tx, instead got %s", want, got)
 	}
 
@@ -439,12 +440,12 @@ func checkNotificationFieldsForCancelledWithdrawal(t *testing.T, n *wallet.TxNot
 }
 
 func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testenv.TestEnvironment,
-	notification *wallet.TxNotification, event *events.NotificationWithSeq,
+	notification *wallettypes.TxNotification, event *events.NotificationWithSeq,
 	tx *txTestData, clientBalance, expectedClientBalanceAfterWithdraw bitcoin.BTCAmount) {
 	t.Helper()
 	checkNotificationFieldsForNewClientWithdraw(t, notification, tx)
 
-	if got, want := notification.StatusStr, wallet.NewTransaction.String(); got != want {
+	if got, want := notification.StatusStr, wallettypes.NewTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for new outgoing tx, instead got %s", want, got)
 	}
 
@@ -455,11 +456,11 @@ func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testenv.
 			"to be %s, instead got %s", want, got)
 	}
 
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 
 	checkNotificationFieldsForNewClientWithdraw(t, data, tx)
 
-	if got, want := data.StatusStr, wallet.NewTransaction.String(); got != want {
+	if got, want := data.StatusStr, wallettypes.NewTransaction.String(); got != want {
 		t.Errorf("Expected status name %s for new outgoing tx, instead got %s", want, got)
 	}
 

@@ -4,17 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/onederx/bitcoin-processing/events"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
-
-type TxNotification struct {
-	Transaction
-	StatusCode int    `json:"status"`
-	StatusStr  string `json:"status_name"`
-	IpnType    string `json:"ipn_type"`
-	Currency   string `json:"currency"`
-	IpnID      string `json:"ipn_id"`
-	Seq        int    `json:"seq,omitempty"`
-}
 
 func init() {
 	txEvents := []events.EventType{
@@ -27,7 +18,7 @@ func init() {
 	}
 	for _, et := range txEvents {
 		events.RegisterNotificationUnmarshaler(et, func(b []byte) (interface{}, error) {
-			var notification TxNotification
+			var notification types.TxNotification
 
 			err := json.Unmarshal(b, &notification)
 			return &notification, err
@@ -41,8 +32,8 @@ func init() {
 // format, EventBroker.Notify was called directly and this may become the case
 // in future after API change (Transaction itself is JSON-serializable and can
 // act as data field of event)
-func (w *Wallet) NotifyTransaction(eventType events.EventType, tx Transaction) error {
-	return w.eventBroker.Notify(eventType, TxNotification{
+func (w *Wallet) NotifyTransaction(eventType events.EventType, tx types.Transaction) error {
+	return w.eventBroker.Notify(eventType, types.TxNotification{
 		Transaction: tx,
 		StatusCode:  tx.Status.ToCoinpaymentsLikeCode(),
 		StatusStr:   tx.Status.String(),

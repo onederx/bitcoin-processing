@@ -9,6 +9,7 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/events"
 	settingstestutil "github.com/onederx/bitcoin-processing/settings/testutil"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 type eventBrokerNotifyCheckMock struct {
@@ -28,8 +29,8 @@ func TestNotify(t *testing.T) {
 		amount        bitcoin.BTCAmount
 		blockHash     string
 		confirmations int64
-		direction     TransactionDirection
-		status        TransactionStatus
+		direction     types.TransactionDirection
+		status        types.TransactionStatus
 		metainfo      interface{}
 		eventType     events.EventType
 		ipnType       string
@@ -45,13 +46,13 @@ func TestNotify(t *testing.T) {
 			amount:        bitcoin.BTCAmount(100000000),
 			blockHash:     "",
 			confirmations: 0,
-			direction:     IncomingDirection,
-			status:        NewTransaction,
+			direction:     types.IncomingDirection,
+			status:        types.NewTransaction,
 			metainfo:      testMetainfo,
 			eventType:     events.NewIncomingTxEvent,
 			ipnType:       "deposit",
 			statusCode:    0,
-			statusStr:     NewTransaction.String(),
+			statusStr:     types.NewTransaction.String(),
 		},
 		{
 			idStr:         "1a5f3fb4-81f2-43e0-b661-77e4def4218f",
@@ -60,13 +61,13 @@ func TestNotify(t *testing.T) {
 			amount:        bitcoin.BTCAmount(231400000),
 			blockHash:     "0fe641842f5eef2be8b90d71bbb9fe8b1be97adbceff04447c5f4809a0765e68",
 			confirmations: 1,
-			direction:     OutgoingDirection,
-			status:        FullyConfirmedTransaction,
+			direction:     types.OutgoingDirection,
+			status:        types.FullyConfirmedTransaction,
 			metainfo:      testMetainfo,
 			eventType:     events.OutgoingTxConfirmedEvent,
 			ipnType:       "withdrawal",
 			statusCode:    100,
-			statusStr:     FullyConfirmedTransaction.String(),
+			statusStr:     types.FullyConfirmedTransaction.String(),
 			fee:           bitcoin.BTCAmount(40000),
 			feeType:       bitcoin.FixedFee,
 		},
@@ -85,7 +86,7 @@ func TestNotify(t *testing.T) {
 				if got, want := eventType, test.eventType; got != want {
 					t.Errorf("Expected event type %v for notification, got %v", want, got)
 				}
-				notification := data.(TxNotification)
+				notification := data.(types.TxNotification)
 				if got, want := notification.Address, test.address; got != want {
 					t.Errorf("Expected address %s in notification, got %s", want, got)
 				}
@@ -137,7 +138,7 @@ func TestNotify(t *testing.T) {
 		}
 
 		w := NewWallet(s, nil, brokerMock, NewStorage(nil))
-		w.NotifyTransaction(test.eventType, Transaction{
+		w.NotifyTransaction(test.eventType, types.Transaction{
 			ID:            txid,
 			BlockHash:     test.blockHash,
 			Hash:          test.hash,

@@ -8,10 +8,10 @@ import (
 
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
-	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 	"github.com/onederx/bitcoin-processing/settings"
 	"github.com/onederx/bitcoin-processing/storage"
+	"github.com/onederx/bitcoin-processing/wallet"
 )
 
 func main() {

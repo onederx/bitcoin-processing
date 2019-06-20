@@ -1,4 +1,4 @@
-package wallet
+package types
 
 import (
 	"encoding/json"
@@ -79,108 +79,8 @@ type Transaction struct {
 	// If tx is a withdrawal to cold storage, this is true. Otherwise false
 	ColdStorage bool `json:"cold_storage"`
 
-	fresh                 bool
-	reportedConfirmations int64
-}
-
-// TransactionDirection is a enum describing whether transaction is incoming
-// or outgoing.
-type TransactionDirection int
-
-// Possible values of TransactionDirection enum.
-// For txns we first see from updates from Bitcoin node, status is
-// converted from it's Category field. UnknownDirection is for cases when
-// Bitcoin node reported some unexpected category. This may happen if we
-// suddenly start mining bitcoins and create a coinbase transaction for our
-// wallet.
-// InvalidDirection is for cases when direction is converted from other types
-// and invalid value of source type is provided.
-const (
-	IncomingDirection TransactionDirection = iota
-	OutgoingDirection
-	UnknownDirection
-	InvalidDirection
-)
-
-// TransactionStatus is a enum describing current state of transaction.
-type TransactionStatus int
-
-const (
-	// NewTransaction is a status for txns that have been broadcasted to
-	// Bitcoin network, but not yet mined (have 0 confirmations)
-	NewTransaction TransactionStatus = iota
-
-	// ConfirmedTransaction is a status received by transaction that has at
-	// least 1 confirmation, but still less than maximum number of confirmations
-	// (this number is set by config param 'transaction.max_confirmations' and
-	// is 6 by default)
-	ConfirmedTransaction
-
-	// FullyConfirmedTransaction is a status received by transaction that
-	// has maximum number of confirmations or more. Such txns are considered
-	// fully trusted and updates on them are not further checked by processing
-	// app
-	FullyConfirmedTransaction
-
-	// PendingTransaction is an outgoing transaction for which there is not
-	// enough confirmed balance to send. There still may be enough money to
-	// send it after some unconfirmed incoming txns are confirmed, in which case
-	// processing app will automatically send such tx (and it's status will
-	// change)
-	PendingTransaction
-
-	// PendingColdStorageTransaction is an outgoing transaction for which
-	// there won't be enough balance to send even if all incoming txns are
-	// confirmed. Additional money should be sent to current wallet in order to
-	// fund such tx
-	PendingColdStorageTransaction
-
-	// PendingManualConfirmationTransaction is a withdrawal which is waiting to
-	// be manually confirmed. Withdrawals of amounts higher than a certain value
-	// (set by config parameter wallet.min_withdraw_without_manual_confirmation)
-	// automatically become pending manual confirmation. By default ALL
-	// withdrawals will require manual confirmation. Such tx can be confirmed
-	// by making API request to /confirm
-	PendingManualConfirmationTransaction
-
-	// CancelledTransaction is a status tx receives when it is cancelled.
-	// Pending tx can be cancelled by a call to /cancel_pending. Such txns
-	// can be requested from DB with /get_transactions, but not processed in
-	// any other way by processing app
-	CancelledTransaction
-
-	// InvalidTransaction is a status value generated when converting status
-	// from other type and value of source type is invalid
-	InvalidTransaction
-)
-
-var transactionDirectionToStringMap = map[TransactionDirection]string{
-	IncomingDirection: "incoming",
-	OutgoingDirection: "outgoing",
-	UnknownDirection:  "unknown",
-}
-
-var stringToTransactionDirectionMap = make(map[string]TransactionDirection)
-
-var transactionStatusToStringMap = map[TransactionStatus]string{
-	NewTransaction:                       "new",
-	ConfirmedTransaction:                 "confirmed",
-	FullyConfirmedTransaction:            "fully-confirmed",
-	PendingTransaction:                   "pending",
-	PendingColdStorageTransaction:        "pending-cold-storage",
-	PendingManualConfirmationTransaction: "pending-manual-confirmation",
-	CancelledTransaction:                 "cancelled",
-}
-
-var stringToTransactionStatusMap = make(map[string]TransactionStatus)
-
-func init() {
-	for txDirection, txDirectionStr := range transactionDirectionToStringMap {
-		stringToTransactionDirectionMap[txDirectionStr] = txDirection
-	}
-	for txStatus, txStatusStr := range transactionStatusToStringMap {
-		stringToTransactionStatusMap[txStatusStr] = txStatus
-	}
+	Fresh                 bool
+	ReportedConfirmations int64
 }
 
 func (td TransactionDirection) String() string {
@@ -259,7 +159,7 @@ func (ts *TransactionStatus) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func (tx *Transaction) update(other *Transaction) {
+func (tx *Transaction) Update(other *Transaction) {
 	if tx.Hash != "" && tx.Hash != other.Hash {
 		panic("Tx update called for transaction with other hash")
 	}
@@ -269,7 +169,7 @@ func (tx *Transaction) update(other *Transaction) {
 	tx.Status = other.Status
 }
 
-func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult) {
+func (tx *Transaction) UpdateFromFullTxInfo(other *btcjson.GetTransactionResult) {
 	if tx.Hash != "" && tx.Hash != other.TxID {
 		panic("Tx update called for transaction with other hash")
 	}
@@ -277,7 +177,7 @@ func (tx *Transaction) updateFromFullTxInfo(other *btcjson.GetTransactionResult)
 	tx.Confirmations = other.Confirmations
 }
 
-func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transaction {
+func NewTransactionFromBTCJSON(btcNodeTransaction *btcjson.ListTransactionsResult) *Transaction {
 	var direction TransactionDirection
 	if btcNodeTransaction.Category == "receive" {
 		direction = IncomingDirection
@@ -334,8 +234,8 @@ func newTransaction(btcNodeTransaction *btcjson.ListTransactionsResult) *Transac
 		Status:                NewTransaction,
 		Amount:                amount,
 		ColdStorage:           false,
-		fresh:                 true,
-		reportedConfirmations: -1,
+		Fresh:                 true,
+		ReportedConfirmations: -1,
 	}
 }
 

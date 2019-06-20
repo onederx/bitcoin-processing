@@ -13,6 +13,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/storage"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 // PostgresWalletStorage is a Storage implementation that stores data in
@@ -73,7 +74,7 @@ func (s *PostgresWalletStorage) SetLastSeenBlockHash(hash string) error {
 	return s.setMeta("last_seen_block_hash", hash)
 }
 
-func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
+func transactionFromDatabaseRow(row queryResult) (*types.Transaction, error) {
 	var id uuid.UUID
 	var hash, blockHash, address, direction, status, feeType string
 	var metainfoJSON *string
@@ -101,11 +102,11 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		return nil, err
 	}
 
-	transactionDirection, err := TransactionDirectionFromString(direction)
+	transactionDirection, err := types.TransactionDirectionFromString(direction)
 	if err != nil {
 		return nil, err
 	}
-	transactionStatus, err := TransactionStatusFromString(status)
+	transactionStatus, err := types.TransactionStatusFromString(status)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +120,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		metainfo = nil
 	}
 
-	tx := &Transaction{
+	tx := &types.Transaction{
 		ID:                    id,
 		Hash:                  hash,
 		BlockHash:             blockHash,
@@ -132,8 +133,8 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 		Fee:                   bitcoin.BTCAmount(fee),
 		FeeType:               transactionFeeType,
 		ColdStorage:           coldStorage,
-		fresh:                 false,
-		reportedConfirmations: reportedConfirmations,
+		Fresh:                 false,
+		ReportedConfirmations: reportedConfirmations,
 	}
 	return tx, nil
 }
@@ -144,7 +145,7 @@ func transactionFromDatabaseRow(row queryResult) (*Transaction, error) {
 // transfer, when one exchange client transfers money to another. From the
 // wallet's point of view, it is a transfer from one in-wallet address to
 // another and will create both incoming and outgoing tx.
-func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*Transaction, error) {
+func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*types.Transaction, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE hash = $1`,
 		transactionFields,
@@ -155,7 +156,7 @@ func (s *PostgresWalletStorage) GetTransactionByHash(hash string) (*Transaction,
 
 // GetTransactionByHashDirectionAndAddress fetches tx which same bitcoin tx
 // hash, direction and address as given one
-func (s *PostgresWalletStorage) GetTransactionByHashDirectionAndAddress(tx *Transaction) (*Transaction, error) {
+func (s *PostgresWalletStorage) GetTransactionByHashDirectionAndAddress(tx *types.Transaction) (*types.Transaction, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE hash = $1 and direction = $2 and
 		address = $3`,
@@ -172,7 +173,7 @@ func (s *PostgresWalletStorage) GetTransactionByHashDirectionAndAddress(tx *Tran
 
 // GetTransactionByID fetches tx given it's internal id (uuid assigned by
 // exchange or processing app), which is a private key in transactions table
-func (s *PostgresWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, error) {
+func (s *PostgresWalletStorage) GetTransactionByID(id uuid.UUID) (*types.Transaction, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE id = $1`,
 		transactionFields,
@@ -193,8 +194,8 @@ func (s *PostgresWalletStorage) GetTransactionByID(id uuid.UUID) (*Transaction, 
 // new uuid is generated. This only normal for incoming txns, interface for
 // outgoing txns assumes ID is already provided by client (if it was not sent
 // in /withdraw request, api package should have generated it itself)
-func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Transaction, error) {
-	var existingTransaction *Transaction
+func (s *PostgresWalletStorage) StoreTransaction(transaction *types.Transaction) (*types.Transaction, error) {
+	var existingTransaction *types.Transaction
 	var err error
 
 	txIsNew := true
@@ -234,12 +235,12 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 			return nil, fmt.Errorf("Update of tx data in DB failed: %s. Tx %#v",
 				err, transaction)
 		}
-		existingTransaction.update(transaction)
+		existingTransaction.Update(transaction)
 		return existingTransaction, nil
 	}
 
 	if transaction.ID == uuid.Nil {
-		if transaction.Direction == OutgoingDirection {
+		if transaction.Direction == types.OutgoingDirection {
 			log.Printf(
 				"Warning: generating new id for new unseen outgoing tx. "+
 					"This should not happen because outgoing transactions are"+
@@ -272,7 +273,7 @@ func (s *PostgresWalletStorage) StoreTransaction(transaction *Transaction) (*Tra
 		transaction.Fee,
 		transaction.FeeType.String(),
 		transaction.ColdStorage,
-		transaction.reportedConfirmations,
+		transaction.ReportedConfirmations,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to insert new tx into DB: %s. Tx %#v",
@@ -331,8 +332,8 @@ func (s *PostgresWalletStorage) StoreAccount(account *Account) error {
 // Bitcoin node. When tx reaches max confirmations (this value is set in
 // config as 'transaction.max_confirmations', 6 by default), it is considered
 // fully confirmed and updater won't request further updates on it
-func (s *PostgresWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*Transaction, error) {
-	result := make([]*Transaction, 0, 20)
+func (s *PostgresWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(confirmations int64) ([]*types.Transaction, error) {
+	result := make([]*types.Transaction, 0, 20)
 
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE confirmations < $1 and hash != ''`,
@@ -354,7 +355,7 @@ func (s *PostgresWalletStorage) GetBroadcastedTransactionsWithLessConfirmations(
 	return result, rows.Err()
 }
 
-func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transaction, reportedConfirmations int64) error {
+func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *types.Transaction, reportedConfirmations int64) error {
 	_, err := s.db.Exec(
 		`UPDATE transactions SET reported_confirmations = $1 WHERE id = $2`,
 		reportedConfirmations,
@@ -363,7 +364,7 @@ func (s *PostgresWalletStorage) updateReportedConfirmations(transaction *Transac
 	if err != nil {
 		return err
 	}
-	transaction.reportedConfirmations = reportedConfirmations
+	transaction.ReportedConfirmations = reportedConfirmations
 	return nil
 }
 
@@ -394,8 +395,8 @@ func (s *PostgresWalletStorage) setHotWalletAddress(address string) error {
 // used by wallet updater to update their statuses and compute money required
 // from cold storage. Txns with status 'pending-manual-confirmation' are NOT
 // returned by this call.
-func (s *PostgresWalletStorage) GetPendingTransactions() ([]*Transaction, error) {
-	result := make([]*Transaction, 0, 20)
+func (s *PostgresWalletStorage) GetPendingTransactions() ([]*types.Transaction, error) {
+	result := make([]*types.Transaction, 0, 20)
 
 	query := fmt.Sprintf(
 		`SELECT %s FROM transactions WHERE status = $1 OR status = $2`,
@@ -403,8 +404,8 @@ func (s *PostgresWalletStorage) GetPendingTransactions() ([]*Transaction, error)
 	)
 	rows, err := s.db.Query(
 		query,
-		PendingTransaction.String(),
-		PendingColdStorageTransaction.String(),
+		types.PendingTransaction.String(),
+		types.PendingColdStorageTransaction.String(),
 	)
 	if err != nil {
 		return result, err
@@ -448,12 +449,12 @@ func (s *PostgresWalletStorage) SetMoneyRequiredFromColdStorage(amount uint64) e
 // Empty values of filters mean do not use this filter, with non-empty filter
 // only txns that have equal value of corresponding parameter will be included
 // in resulting slice
-func (s *PostgresWalletStorage) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*Transaction, error) {
+func (s *PostgresWalletStorage) GetTransactionsWithFilter(directionFilter string, statusFilter string) ([]*types.Transaction, error) {
 	query := fmt.Sprintf("SELECT %s FROM transactions", transactionFields)
 	queryArgs := make([]interface{}, 0, 2)
 	whereClause := make([]string, 0, 2)
 	argc := 0
-	result := make([]*Transaction, 0, 20)
+	result := make([]*types.Transaction, 0, 20)
 
 	if directionFilter != "" {
 		argc++

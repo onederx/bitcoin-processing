@@ -10,9 +10,10 @@ import (
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
-func getTransactionsOrFail(t *testing.T, env *testenv.TestEnvironment, directionFilter, statusFilter string) []*wallet.Transaction {
+func getTransactionsOrFail(t *testing.T, env *testenv.TestEnvironment, directionFilter, statusFilter string) []*wallettypes.Transaction {
 	resp, err := env.ProcessingClient.GetTransactions(&api.GetTransactionsFilter{
 		Direction: directionFilter, Status: statusFilter,
 	})
@@ -41,7 +42,7 @@ func testGetTransactions(t *testing.T, env *testenv.TestEnvironment, clientAccou
 	env.GetNextCallbackNotificationWithTimeout(t)
 	env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
-	checkThereIsDepositTx := func(t *testing.T, txns []*wallet.Transaction) *wallet.Transaction {
+	checkThereIsDepositTx := func(t *testing.T, txns []*wallettypes.Transaction) *wallettypes.Transaction {
 		for _, tx := range txns {
 			if tx.Hash == deposit.hash {
 				if tx.Address != deposit.address || tx.Amount != deposit.amount || !reflect.DeepEqual(tx.Metainfo, deposit.metainfo) {
@@ -80,11 +81,11 @@ func testGetTransactions(t *testing.T, env *testenv.TestEnvironment, clientAccou
 			}
 		})
 		runSubtest(t, "Direction", func(t *testing.T) {
-			txns := getTransactionsOrFail(t, env, wallet.IncomingDirection.String(), "")
+			txns := getTransactionsOrFail(t, env, wallettypes.IncomingDirection.String(), "")
 			checkThereIsDepositTx(t, txns)
 		})
 		runSubtest(t, "Status", func(t *testing.T) {
-			txns := getTransactionsOrFail(t, env, "", wallet.NewTransaction.String())
+			txns := getTransactionsOrFail(t, env, "", wallettypes.NewTransaction.String())
 			checkThereIsDepositTx(t, txns)
 		})
 	})

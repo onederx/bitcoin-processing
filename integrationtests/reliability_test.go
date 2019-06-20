@@ -18,6 +18,7 @@ import (
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv/pgmitm"
 	"github.com/onederx/bitcoin-processing/integrationtests/util"
+	wallettypes "github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 type failureType int
@@ -395,7 +396,7 @@ func checkDepositCompletedNormally(t *testing.T, env *testenv.TestEnvironment, t
 	checkNotificationFieldsForNewDeposit(t, notification, tx)
 	event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
 
-	data := event.Data.(*wallet.TxNotification)
+	data := event.Data.(*wallettypes.TxNotification)
 	if got, want := event.Type, events.NewIncomingTxEvent; got != want {
 		t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
 			want, got)

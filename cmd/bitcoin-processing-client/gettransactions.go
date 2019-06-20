@@ -5,7 +5,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/api/client"
-	"github.com/onederx/bitcoin-processing/wallet"
+	"github.com/onederx/bitcoin-processing/wallet/types"
 )
 
 func init() {
@@ -17,13 +17,13 @@ func init() {
 		Short: "Get list of transactions, optionally filtered by status or direction",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if directionFilter != "" {
-				_, err := wallet.TransactionDirectionFromString(directionFilter)
+				_, err := types.TransactionDirectionFromString(directionFilter)
 				if err != nil {
 					return err
 				}
 			}
 			if statusFilter != "" {
-				_, err := wallet.TransactionStatusFromString(statusFilter)
+				_, err := types.TransactionStatusFromString(statusFilter)
 				if err != nil {
 					return err
 				}
