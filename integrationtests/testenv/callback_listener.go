@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/wallet"
 )
 
 type callbackRequest struct {

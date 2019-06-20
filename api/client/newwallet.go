@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/onederx/bitcoin-processing/api"
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/wallet"
 )
 
 func (cli *Client) NewWallet(metainfo interface{}) (*wallet.Account, error) {

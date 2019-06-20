@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/events"
 )
 

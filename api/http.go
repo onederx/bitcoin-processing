@@ -10,7 +10,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/wallet"
 )
 
 const (

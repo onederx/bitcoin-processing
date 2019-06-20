@@ -8,7 +8,7 @@ import (
 
 	"github.com/onederx/bitcoin-processing/api"
 	"github.com/onederx/bitcoin-processing/bitcoin"
-	"github.com/onederx/bitcoin-processing/bitcoin/wallet"
+	"github.com/onederx/bitcoin-processing/wallet"
 	"github.com/onederx/bitcoin-processing/integrationtests/testenv"
 )
 
