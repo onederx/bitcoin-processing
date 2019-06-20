@@ -472,3 +472,35 @@ func checkNewWithdrawTransactionNotificationAndEvent(t *testing.T, env *testenv.
 	checkClientBalanceBecame(t, env, clientBalance,
 		expectedClientBalanceAfterWithdraw)
 }
+
+func checkNewInternalWithdrawTransactionNotificationAndEvent(t *testing.T, env *testenv.TestEnvironment,
+	notification *wallettypes.TxNotification, event *events.NotificationWithSeq,
+	tx *txTestData) {
+	t.Helper()
+	checkNotificationFieldsForNewClientWithdraw(t, notification, tx)
+
+	if got, want := notification.StatusStr, wallettypes.NewTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for new outgoing tx, instead got %s", want, got)
+	}
+
+	tx.hash = notification.Hash
+
+	if got, want := event.Type, events.NewOutgoingTxEvent; got != want {
+		t.Errorf("Expected type of event for fresh successful withdraw "+
+			"to be %s, instead got %s", want, got)
+	}
+
+	data := event.Data.(*wallettypes.TxNotification)
+
+	checkNotificationFieldsForNewClientWithdraw(t, data, tx)
+
+	if got, want := data.StatusStr, wallettypes.NewTransaction.String(); got != want {
+		t.Errorf("Expected status name %s for new outgoing tx, instead got %s", want, got)
+	}
+
+	if got, want := data.Hash, tx.hash; got != want {
+		t.Errorf("Expected bitcoin tx hash to be equal in http and "+
+			"websocket notification, instead they are %s %s",
+			tx.hash, data.Hash)
+	}
+}

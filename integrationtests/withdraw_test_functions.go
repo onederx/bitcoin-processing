@@ -147,6 +147,78 @@ func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
 		testenv.GenerateBlocks(env.Regtest["node-miner"].NodeAPI, 1)
 		checkBalance(t, env, ourBalance, ourBalance)
 	})
+
+	runSubtest(t, "Internal", func(t *testing.T) {
+		clientAccount := testGenerateClientWalletWithMetainfo(t, env, initialTestMetainfo, -1)
+		ourInitialBalance := getStableBalanceOrFail(t, env)
+		withdrawAddress := clientAccount.Address
+
+		tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountSmall, nil)
+		tx.fee = 0
+		runSubtest(t, "Outgoing", func(t *testing.T) {
+			runSubtest(t, "NewTransaction", func(t *testing.T) {
+				notification := env.GetNextCallbackNotificationWithTimeout(t)
+				event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
+				checkNewInternalWithdrawTransactionNotificationAndEvent(t, env,
+					notification,event, tx)
+			})
+			checkBalance(t, env, ourInitialBalance, ourInitialBalance)
+
+			tx.confirmations = 1
+
+			runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
+				notification := env.GetNextCallbackNotificationWithTimeout(t)
+				checkNotificationFieldsForFullyConfirmedClientWithdraw(t, notification, tx)
+				event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
+
+				if got, want := event.Type, events.OutgoingTxConfirmedEvent; got != want {
+					t.Errorf("Expected type of event for confirmed successful withdraw "+
+						"to be %s, instead got %s", want, got)
+				}
+				data := event.Data.(*wallettypes.TxNotification)
+				checkNotificationFieldsForFullyConfirmedClientWithdraw(t, data, tx)
+			})
+		})
+		runSubtest(t, "Incoming", func(t *testing.T) {
+			tx := &txTestData{
+				address:  withdrawAddress,
+				amount:   withdrawAmountSmall,
+				hash:     "",
+				metainfo: initialTestMetainfo,
+			}
+			runSubtest(t, "NewTransaction", func(t *testing.T) {
+				req := env.GetNextCallbackRequestWithTimeout(t)
+
+				runSubtest(t, "CallbackNewDepositData", func(t *testing.T) {
+					notification := req.UnmarshalOrFail(t)
+
+					tx.id = notification.ID
+					checkNotificationFieldsForNewDeposit(t, notification, tx)
+				})
+
+				event := env.WebsocketListeners[0].GetNextMessageWithTimeout(t)
+				data := event.Data.(*wallettypes.TxNotification)
+				if got, want := event.Type, events.NewIncomingTxEvent; got != want {
+					t.Errorf("Unexpected event type for new deposit, wanted %s, got %s:",
+						want, got)
+				}
+				if data.ID != tx.id {
+					t.Errorf("Expected that tx id in websocket and http callback "+
+						"notification will be the same, but they are %s %s",
+						tx.id, data.ID)
+				}
+				checkNotificationFieldsForNewDeposit(t, data, tx)
+
+				checkBalance(t, env, ourInitialBalance, ourInitialBalance)
+			})
+
+			tx.confirmations = 1
+
+			runSubtest(t, "ConfirmedTransaction", func(t *testing.T) {
+				testDepositFullyConfirmed(t, env, tx)
+			})
+		})
+	})
 }
 
 func testMakeWithdraw(t *testing.T, env *testenv.TestEnvironment, address string, amount bitcoin.BTCAmount, metainfo interface{}) *txTestData {

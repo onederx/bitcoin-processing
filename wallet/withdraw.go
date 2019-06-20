@@ -112,8 +112,53 @@ func (w *Wallet) ensureTxIDIsFree(id uuid.UUID) error {
 	}
 }
 
+func (w *Wallet) internalWithdrawBetweenOurAccounts(tx *types.Transaction, account *Account) error {
+	log.Printf("Performing internal withdraw to account %+v", account)
+	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+		tx.Confirmations = w.maxConfirmations
+		tx.Status = types.FullyConfirmedTransaction
+		tx.Fee = 0
+
+		tx, err := currWallet.storage.StoreTransaction(tx)
+
+		if err != nil {
+			return err
+		}
+
+		err = currWallet.notifyTransaction(tx)
+
+		if err != nil {
+			return err
+		}
+
+		// notifyTransaction kindly makes copies of tx, so modify the original
+		tx.ReportedConfirmations = -1
+		tx.Direction = types.IncomingDirection
+		tx.Metainfo = account.Metainfo
+		tx.ID = uuid.Nil
+
+		tx, err = currWallet.storage.StoreTransaction(tx)
+
+		return currWallet.notifyTransaction(tx)
+	})
+	if err == nil {
+		w.schedulePendingTxUpdate()
+	}
+	return err
+}
+
 func (w *Wallet) sendWithdrawal(tx *types.Transaction, updatePending bool) error {
 	var sendMoneyFunc func(string, bitcoin.BTCAmount, bitcoin.BTCAmount, bool) (string, error)
+
+	ourAccount, err := w.storage.GetAccountByAddress(tx.Address)
+
+	if err != nil {
+		return err
+	}
+
+	if ourAccount != nil {
+		return w.internalWithdrawBetweenOurAccounts(tx, ourAccount)
+	}
 
 	switch tx.FeeType {
 	case bitcoin.PerKBRateFee:
@@ -124,7 +169,7 @@ func (w *Wallet) sendWithdrawal(tx *types.Transaction, updatePending bool) error
 		return errors.New("Fee type not supported: " + tx.FeeType.String())
 	}
 
-	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
+	err = w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
 		return currWallet.storage.LockWallet(map[string]interface{}{
 			"operation": "withdraw",
 			"tx":        tx,
