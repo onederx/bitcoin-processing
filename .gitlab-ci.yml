@@ -60,7 +60,7 @@ integration_test:
   after_script: *integration_test_docker_cleanup
   script:
     - docker pull kylemanna/bitcoind && docker pull debian:stretch && docker pull postgres:10.5
-    - (cd integrationtests && ./integration.test -test.v)
+    - (cd integrationtests && ./integration.test -test.v -test.timeout=20m )
   artifacts:
     paths:
       - integrationtests/*.log
