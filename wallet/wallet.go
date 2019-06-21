@@ -29,7 +29,6 @@ type walletData struct {
 	externalTxNotifications chan struct{}
 	pendingTxUpdateTrigger  chan struct{}
 
-	running     bool
 	stopTrigger chan struct{}
 }
 

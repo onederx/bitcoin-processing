@@ -24,7 +24,6 @@ type eventBrokerData struct {
 
 	muteRequests chan internalMuteRequest
 
-	running     bool
 	stopTrigger chan struct{}
 }
 
@@ -111,7 +110,6 @@ func (e *eventBroker) GetEventsFromSeq(seq int) ([]*NotificationWithSeq, error) 
 
 func (e *eventBroker) mainLoop() (err error) {
 	defer func() {
-		e.running = false
 		r := recover()
 
 		if r != nil {
@@ -124,8 +122,7 @@ func (e *eventBroker) mainLoop() (err error) {
 		}
 	}()
 
-	e.running = true
-	for e.running {
+	for {
 		select {
 		case <-e.wsNotificationTrigger:
 			e.sendWSNotifications()
@@ -136,6 +133,13 @@ func (e *eventBroker) mainLoop() (err error) {
 			close(muteRequest.result)
 		case <-e.stopTrigger:
 			return
+		}
+		// check stopTrigger again to avoid executing any other requested
+		// operation if stop was requested
+		select {
+		case <-e.stopTrigger:
+			return
+		default:
 		}
 	}
 	return
@@ -148,6 +152,5 @@ func (e *eventBroker) Run() error {
 }
 
 func (e *eventBroker) Stop() {
-	e.running = false
 	close(e.stopTrigger)
 }

@@ -224,7 +224,6 @@ func (w *Wallet) checkForWalletUpdates() {
 
 func (w *Wallet) mainLoop() (err error) {
 	defer func() {
-		w.running = false
 		r := recover()
 
 		if r != nil {
@@ -236,10 +235,9 @@ func (w *Wallet) mainLoop() (err error) {
 		}
 	}()
 
-	w.running = true
 	pollInterval := time.Duration(w.settings.GetInt("bitcoin.poll_interval"))
 	ticker := time.NewTicker(pollInterval * time.Millisecond).C
-	for w.running {
+	for {
 		select {
 		case <-ticker:
 		case <-w.externalTxNotifications:
@@ -260,7 +258,24 @@ func (w *Wallet) mainLoop() (err error) {
 		case <-w.stopTrigger:
 			return
 		}
+
+		// check stopTrigger again to avoid checking wallet updates if stop
+		// was requested
+		select {
+		case <-w.stopTrigger:
+			return
+		default:
+		}
+
 		w.checkForWalletUpdates()
+
+		// check stopTrigger again to avoid executing any other requested
+		// operation if stop was requested
+		select {
+		case <-w.stopTrigger:
+			return
+		default:
+		}
 	}
 	return
 }
@@ -276,6 +291,5 @@ func (w *Wallet) TriggerWalletUpdate() {
 }
 
 func (w *Wallet) Stop() {
-	w.running = false
 	close(w.stopTrigger)
 }
