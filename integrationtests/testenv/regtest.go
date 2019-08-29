@@ -34,6 +34,7 @@ rpcuser=bitcoinrpc
 rpcpassword=TEST_BITCOIN_NODE_PASSWORD
 regtest=1
 rpcallowip=0.0.0.0/0
+rpcbind=0.0.0.0
 {{.Additional}}
 
 [regtest]
