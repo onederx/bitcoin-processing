@@ -34,10 +34,10 @@ rpcuser=bitcoinrpc
 rpcpassword=TEST_BITCOIN_NODE_PASSWORD
 regtest=1
 rpcallowip=0.0.0.0/0
-rpcbind=0.0.0.0
 {{.Additional}}
 
 [regtest]
+rpcbind=0.0.0.0
 {{.Peers}}
 `
 
@@ -237,7 +237,8 @@ func (e *TestEnvironment) initRegtest() {
 		return
 	}
 	e.Regtest["node-client"].NodeAPI = clientNode
-	nodeOutput, err := sendRequestToNodeWithBackoff(clientNode, "generate", []interface{}{3})
+	nodeOutput, err := sendRequestToNodeWithBackoff(clientNode, "generatetoaddress",
+		[]interface{}{3, generateNewAddress(clientNode)})
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
@@ -254,7 +255,8 @@ func (e *TestEnvironment) initRegtest() {
 		return
 	}
 	e.Regtest["node-miner"].NodeAPI = minerNode
-	nodeOutput, err = sendRequestToNodeWithBackoff(minerNode, "generate", []interface{}{110})
+	nodeOutput, err = sendRequestToNodeWithBackoff(minerNode, "generatetoaddress",
+		[]interface{}{110, generateNewAddress(minerNode)})
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return
@@ -320,7 +322,7 @@ func GenerateBlocks(nodeAPI nodeapi.NodeAPI, amount int) ([]string, error) {
 		Error  *nodeapi.JSONRPCError
 	}
 	responseJSON, err := nodeAPI.SendRequestToNode(
-		"generate", []interface{}{amount},
+		"generatetoaddress", []interface{}{amount, generateNewAddress(nodeAPI)},
 	)
 	if err != nil {
 		return nil, err
@@ -456,4 +458,12 @@ func (e *TestEnvironment) GetNodeBalance(node nodeapi.NodeAPI) (*api.BalanceInfo
 
 func (e *TestEnvironment) GetClientBalance() (*api.BalanceInfo, error) {
 	return e.GetNodeBalance(e.Regtest["node-client"].NodeAPI)
+}
+
+func generateNewAddress(nodeAPI nodeapi.NodeAPI) string {
+	nodeOutput, err := sendRequestToNodeWithBackoff(nodeAPI, "getnewaddress", nil)
+	if err != nil {
+		panic(err)
+	}
+	return string(nodeOutput[1 : len(nodeOutput)-1])
 }
