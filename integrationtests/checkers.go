@@ -129,11 +129,11 @@ func checkBalanceBecame(t *testing.T, balanceFunc func() (*api.BalanceInfo, erro
 		}
 		if currentBalance.Balance != balance {
 			return fmt.Errorf("Expected confirmed balance to be %s, "+
-				"but it it %s", balance, currentBalance.Balance)
+				"but it is %s", balance, currentBalance.Balance)
 		}
 		if currentBalance.BalanceWithUnconf != balanceWithUnconf {
 			return fmt.Errorf("Expected balance including unconfirmed to be %s, "+
-				"but it it %s", balanceWithUnconf, currentBalance.BalanceWithUnconf)
+				"but it is %s", balanceWithUnconf, currentBalance.BalanceWithUnconf)
 		}
 		return nil
 	})
