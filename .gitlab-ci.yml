@@ -10,6 +10,7 @@ variables:
   GOPATH: $CI_PROJECT_DIR/.gotree
   PKG_DIR: $CI_PROJECT_DIR/.gotree/src/github.com/onederx
   PKG: $CI_PROJECT_DIR/.gotree/src/github.com/onederx/bitcoin-processing
+  GO111MODULE: "on"
 
 cache:
   paths:
