@@ -159,7 +159,7 @@ func TestInternalWithdraw(t *testing.T) {
 					ID:            testTxID,
 					Address:       testAddress,
 					Amount:        amount,
-					Fee:           0,
+					Fee:           fee,
 					FeeType:       feeType,
 					Direction:     types.OutgoingDirection,
 					Confirmations: 0,
@@ -175,7 +175,7 @@ func TestInternalWithdraw(t *testing.T) {
 					ID:            testTxID,
 					Address:       testAddress,
 					Amount:        amount,
-					Fee:           0,
+					Fee:           fee,
 					FeeType:       feeType,
 					Direction:     types.OutgoingDirection,
 					Confirmations: 1,
@@ -189,8 +189,8 @@ func TestInternalWithdraw(t *testing.T) {
 			Data: types.TxNotification{
 				Transaction: types.Transaction{
 					Address:       testAddress,
-					Amount:        amount,
-					Fee:           0,
+					Amount:        amount - fee,
+					Fee:           fee,
 					FeeType:       feeType,
 					Direction:     types.IncomingDirection,
 					Confirmations: 0,
@@ -204,8 +204,8 @@ func TestInternalWithdraw(t *testing.T) {
 			Data: types.TxNotification{
 				Transaction: types.Transaction{
 					Address:       testAddress,
-					Amount:        amount,
-					Fee:           0,
+					Amount:        amount - fee,
+					Fee:           fee,
 					FeeType:       feeType,
 					Direction:     types.IncomingDirection,
 					Confirmations: 1,
@@ -224,7 +224,6 @@ func TestInternalWithdrawToColdStorage(t *testing.T) {
 
 	var (
 		amount = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
-		fee    = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.0001"))
 	)
 	s := &settingstestutil.SettingsMock{
 		Data: map[string]interface{}{
@@ -245,7 +244,7 @@ func TestInternalWithdrawToColdStorage(t *testing.T) {
 		Direction:             types.OutgoingDirection,
 		Amount:                amount,
 		Metainfo:              nil,
-		Fee:                   fee,
+		Fee:                   0,
 		FeeType:               feeType,
 		ColdStorage:           true,
 		Fresh:                 true,
@@ -293,4 +292,50 @@ func TestInternalWithdrawToColdStorage(t *testing.T) {
 	}
 
 	e.assertExpectedEvents(t, expectedEvents)
+}
+
+func TestInternalWithdrawWhenFeeExceedsAmount(t *testing.T) {
+	const feeType = bitcoin.FixedFee
+
+	var (
+		amount = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.0001"))
+		fee    = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.001"))
+	)
+	s := &settingstestutil.SettingsMock{
+		Data: map[string]interface{}{
+			"transaction.max_confirmations": 1,
+		},
+	}
+	n := &nodeAPIBalanceAndAddressMock{}
+	e := &loggingEventBrokerMock{}
+	ws := NewStorage(nil)
+	w := NewWallet(s, n, e, ws)
+
+	acct, _ := w.CreateAccount(nil)
+
+	tx := &types.Transaction{
+		ID:                    testTxID,
+		Confirmations:         0,
+		Address:               acct.Address,
+		Direction:             types.OutgoingDirection,
+		Amount:                amount,
+		Metainfo:              nil,
+		Fee:                   fee,
+		FeeType:               feeType,
+		ColdStorage:           false,
+		Fresh:                 true,
+		ReportedConfirmations: -1,
+	}
+
+	e.flushEvents()
+	err := w.internalWithdrawBetweenOurAccounts(tx, acct)
+
+	if err == nil {
+		t.Error("Expected internal withdraw to return error, but it did not")
+	}
+
+	if len(e.log) > 0 {
+		t.Errorf("Expected broken internal withdraw to generate no events, "+
+			"but it generated %d events", len(e.log))
+	}
 }

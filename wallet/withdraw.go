@@ -114,10 +114,22 @@ func (w *Wallet) ensureTxIDIsFree(id uuid.UUID) error {
 
 func (w *Wallet) internalWithdrawBetweenOurAccounts(tx *types.Transaction, account *Account) error {
 	log.Printf("Performing internal withdraw to account %+v", account)
+
+	if tx.FeeType != bitcoin.FixedFee {
+		log.Printf("Got internal withdraw with non-fixed fee type (%s), "+
+			"treating this as a zero fee", tx.FeeType)
+		tx.Fee = 0
+	}
+
+	if tx.Amount < tx.Fee {
+		return fmt.Errorf(
+			"Internal withdraw fee %s is larger than withdraw amount %s",
+			tx.Fee, tx.Amount)
+	}
+
 	err := w.MakeTransactIfAvailable(func(currWallet *Wallet) error {
 		tx.Confirmations = w.maxConfirmations
 		tx.Status = types.FullyConfirmedTransaction
-		tx.Fee = 0
 
 		// do not send outgoing tx notifications for cold storage tx
 		if !tx.ColdStorage {
@@ -139,6 +151,7 @@ func (w *Wallet) internalWithdrawBetweenOurAccounts(tx *types.Transaction, accou
 		tx.Direction = types.IncomingDirection
 		tx.Metainfo = account.Metainfo
 		tx.ID = uuid.Nil
+		tx.Amount -= tx.Fee
 
 		tx, err := currWallet.storage.StoreTransaction(tx)
 
