@@ -393,9 +393,14 @@ func (w *Wallet) Withdraw(request *WithdrawRequest, toColdStorage bool) error {
 
 	logWithdrawRequest(request, feeType)
 
-	needManualConfirmation, err := w.checkWithdrawLimits(request, feeType)
-	if err != nil {
-		return err
+	needManualConfirmation := false
+
+	// do not check limits for cold storage withdrawals
+	if !toColdStorage {
+		needManualConfirmation, err = w.checkWithdrawLimits(request, feeType)
+		if err != nil {
+			return err
+		}
 	}
 
 	if request.Address == "" {
