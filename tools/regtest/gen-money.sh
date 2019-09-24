@@ -1,5 +1,5 @@
 #!/bin/bash -e
 
-node2/bitcoin-cli generate 3
+node2/bitcoin-cli generatetoaddress 3 `node2/bitcoin-cli getnewaddress`
 sleep 1
-node3/bitcoin-cli generate 110
+node3/bitcoin-cli generatetoaddress 110 `node3/bitcoin-cli getnewaddress`

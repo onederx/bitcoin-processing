@@ -6,4 +6,4 @@ if [ -z "$N" ] ; then
     N=1
 fi
 
-node3/bitcoin-cli generate $N
+node3/bitcoin-cli generatetoaddress $N `node3/bitcoin-cli getnewaddress`
