@@ -51,7 +51,7 @@ func (l *loggingEventBrokerMock) flushEvents() {
 }
 
 func (l *loggingEventBrokerMock) assertExpectedEvents(t *testing.T, expected []*events.Notification) {
-	if got, want := len(l.log), len(expected); got < want {
+	if got, want := len(l.log), len(expected); got != want {
 		t.Fatalf("Expected to have %d events, but have only %d", want, got)
 	}
 
@@ -164,6 +164,7 @@ func TestInternalWithdraw(t *testing.T) {
 					Direction:     types.OutgoingDirection,
 					Confirmations: 0,
 					Status:        types.NewTransaction,
+					ColdStorage:   false,
 				},
 			},
 		},
@@ -179,6 +180,7 @@ func TestInternalWithdraw(t *testing.T) {
 					Direction:     types.OutgoingDirection,
 					Confirmations: 1,
 					Status:        types.FullyConfirmedTransaction,
+					ColdStorage:   false,
 				},
 			},
 		},
@@ -193,6 +195,7 @@ func TestInternalWithdraw(t *testing.T) {
 					Direction:     types.IncomingDirection,
 					Confirmations: 0,
 					Status:        types.NewTransaction,
+					ColdStorage:   false,
 				},
 			},
 		},
@@ -207,6 +210,83 @@ func TestInternalWithdraw(t *testing.T) {
 					Direction:     types.IncomingDirection,
 					Confirmations: 1,
 					Status:        types.FullyConfirmedTransaction,
+					ColdStorage:   false,
+				},
+			},
+		},
+	}
+
+	e.assertExpectedEvents(t, expectedEvents)
+}
+
+func TestInternalWithdrawToColdStorage(t *testing.T) {
+	const feeType = bitcoin.FixedFee
+
+	var (
+		amount = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("1"))
+		fee    = bitcoin.Must(bitcoin.BTCAmountFromStringedFloat("0.0001"))
+	)
+	s := &settingstestutil.SettingsMock{
+		Data: map[string]interface{}{
+			"transaction.max_confirmations": 1,
+		},
+	}
+	n := &nodeAPIBalanceAndAddressMock{}
+	e := &loggingEventBrokerMock{}
+	ws := NewStorage(nil)
+	w := NewWallet(s, n, e, ws)
+
+	acct, _ := w.CreateAccount(nil)
+
+	tx := &types.Transaction{
+		ID:                    testTxID,
+		Confirmations:         0,
+		Address:               acct.Address,
+		Direction:             types.OutgoingDirection,
+		Amount:                amount,
+		Metainfo:              nil,
+		Fee:                   fee,
+		FeeType:               feeType,
+		ColdStorage:           true,
+		Fresh:                 true,
+		ReportedConfirmations: -1,
+	}
+
+	e.flushEvents()
+	err := w.internalWithdrawBetweenOurAccounts(tx, acct)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEvents := []*events.Notification{
+		&events.Notification{
+			Type: events.NewIncomingTxEvent,
+			Data: types.TxNotification{
+				Transaction: types.Transaction{
+					Address:       testAddress,
+					Amount:        amount,
+					Fee:           0,
+					FeeType:       feeType,
+					Direction:     types.IncomingDirection,
+					Confirmations: 0,
+					Status:        types.NewTransaction,
+					ColdStorage:   true,
+				},
+			},
+		},
+		&events.Notification{
+			Type: events.IncomingTxConfirmedEvent,
+			Data: types.TxNotification{
+				Transaction: types.Transaction{
+					Address:       testAddress,
+					Amount:        amount,
+					Fee:           0,
+					FeeType:       feeType,
+					Direction:     types.IncomingDirection,
+					Confirmations: 1,
+					Status:        types.FullyConfirmedTransaction,
+					ColdStorage:   true,
 				},
 			},
 		},

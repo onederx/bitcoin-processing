@@ -119,16 +119,19 @@ func (w *Wallet) internalWithdrawBetweenOurAccounts(tx *types.Transaction, accou
 		tx.Status = types.FullyConfirmedTransaction
 		tx.Fee = 0
 
-		tx, err := currWallet.storage.StoreTransaction(tx)
+		// do not send outgoing tx notifications for cold storage tx
+		if !tx.ColdStorage {
+			tx, err := currWallet.storage.StoreTransaction(tx)
 
-		if err != nil {
-			return err
-		}
+			if err != nil {
+				return err
+			}
 
-		err = currWallet.notifyTransaction(tx)
+			err = currWallet.notifyTransaction(tx)
 
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 
 		// notifyTransaction kindly makes copies of tx, so modify the original
@@ -137,7 +140,11 @@ func (w *Wallet) internalWithdrawBetweenOurAccounts(tx *types.Transaction, accou
 		tx.Metainfo = account.Metainfo
 		tx.ID = uuid.Nil
 
-		tx, err = currWallet.storage.StoreTransaction(tx)
+		tx, err := currWallet.storage.StoreTransaction(tx)
+
+		if err != nil {
+			return err
+		}
 
 		return currWallet.notifyTransaction(tx)
 	})
