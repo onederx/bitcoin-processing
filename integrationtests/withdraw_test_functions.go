@@ -154,7 +154,6 @@ func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
 		withdrawAddress := clientAccount.Address
 
 		tx := testMakeWithdraw(t, env, withdrawAddress, withdrawAmountSmall, nil)
-		tx.fee = 0
 		runSubtest(t, "Outgoing", func(t *testing.T) {
 			runSubtest(t, "NewTransaction", func(t *testing.T) {
 				notification := env.GetNextCallbackNotificationWithTimeout(t)
@@ -182,7 +181,7 @@ func testWithdraw(t *testing.T, env *testenv.TestEnvironment) {
 		runSubtest(t, "Incoming", func(t *testing.T) {
 			tx := &txTestData{
 				address:  withdrawAddress,
-				amount:   withdrawAmountSmall,
+				amount:   withdrawAmountSmall - withdrawFee,
 				hash:     "",
 				metainfo: initialTestMetainfo,
 			}
