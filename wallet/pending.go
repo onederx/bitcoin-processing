@@ -164,6 +164,8 @@ func (w *Wallet) cancelPendingTx(id uuid.UUID) error {
 		return err
 	}
 
+	w.txnsWaitingManualConfirmationCount.Dec()
+
 	w.updatePendingTxns()
 	w.eventBroker.SendNotifications()
 
@@ -193,7 +195,14 @@ func (w *Wallet) confirmPendingTx(id uuid.UUID) error {
 		)
 	}
 
-	return w.sendWithdrawal(tx, true)
+	err = w.sendWithdrawal(tx, true)
+
+	if err != nil {
+		return err
+	}
+
+	w.txnsWaitingManualConfirmationCount.Dec()
+	return nil
 }
 
 // CancelPendingTx changes status of pending tx to 'cancelled'. Txns with this
@@ -233,4 +242,14 @@ func (w *Wallet) ConfirmPendingTransaction(id uuid.UUID) error {
 		result: resultCh,
 	}
 	return <-resultCh
+}
+
+func (w *Wallet) initPendingManualConfirmationsTxMetric() error {
+	txns, err := w.GetTransactionsWithFilter("",
+		types.PendingManualConfirmationTransaction.String())
+	if err != nil {
+		return err
+	}
+	w.txnsWaitingManualConfirmationCount.Set(float64(len(txns)))
+	return nil
 }

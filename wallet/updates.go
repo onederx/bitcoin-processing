@@ -188,6 +188,8 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 			return err
 		}
 
+		w.txnsWaitingBlockchainConfirmationCount.Set(float64(len(transactionsToCheck)))
+
 		for _, tx := range transactionsToCheck {
 			fullTxInfo, err := currWallet.nodeAPI.GetTransaction(tx.Hash)
 			if err != nil {
@@ -197,6 +199,9 @@ func (w *Wallet) checkForExistingTransactionUpdates() {
 			currentTxInfoChanged, err := currWallet.updateTxInfo(tx)
 			if err != nil {
 				return err
+			}
+			if tx.Status != types.NewTransaction && tx.Status != types.ConfirmedTransaction {
+				w.txnsWaitingBlockchainConfirmationCount.Dec()
 			}
 			anyTxInfoChanged = anyTxInfoChanged || currentTxInfoChanged
 		}

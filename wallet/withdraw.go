@@ -355,6 +355,7 @@ func (w *Wallet) holdWithdrawalUntilConfirmed(tx *types.Transaction) error {
 	if err != nil {
 		return err
 	}
+	w.txnsWaitingManualConfirmationCount.Inc()
 	w.eventBroker.SendNotifications()
 	return nil
 }

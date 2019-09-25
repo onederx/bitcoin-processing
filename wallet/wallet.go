@@ -3,6 +3,8 @@ package wallet
 import (
 	"database/sql"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 	"github.com/onederx/bitcoin-processing/events"
@@ -30,6 +32,9 @@ type walletData struct {
 	pendingTxUpdateTrigger  chan struct{}
 
 	stopTrigger chan struct{}
+
+	txnsWaitingManualConfirmationCount     prometheus.Gauge
+	txnsWaitingBlockchainConfirmationCount prometheus.Gauge
 }
 
 // Wallet is responsible for processing and storing payments. It stores
@@ -51,7 +56,7 @@ type Wallet struct {
 func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.EventBroker, storage Storage) *Wallet {
 	maxConfirmations := int64(s.GetInt("transaction.max_confirmations"))
 	minWithdrawWithoutManualConfirmation := s.GetBTCAmount("wallet.min_withdraw_without_manual_confirmation")
-	return &Wallet{
+	w := &Wallet{
 		storage:     storage,
 		eventBroker: eventBroker,
 		walletData: &walletData{
@@ -71,10 +76,41 @@ func NewWallet(s settings.Settings, nodeAPI nodeapi.NodeAPI, eventBroker events.
 			stopTrigger:                          make(chan struct{}),
 		},
 	}
+	w.initMetrics()
+	return w
+}
+
+func (w *Wallet) initMetrics() {
+	w.txnsWaitingManualConfirmationCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "bitcoin_processing",
+		Subsystem: "wallet",
+		Name:      "txns_waiting_manual_confirmation",
+		Help:      "Current number of transactions waiting to be manually confirmed.",
+	})
+	w.txnsWaitingBlockchainConfirmationCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "bitcoin_processing",
+		Subsystem: "wallet",
+		Name:      "txns_waiting_blockchain_confirmation",
+		Help:      "Current number of transactions waiting for bitcoin confirmations.",
+	})
+}
+
+func (w *Wallet) registerMetrics() {
+	prometheus.DefaultRegisterer.MustRegister(
+		w.txnsWaitingManualConfirmationCount,
+		w.txnsWaitingBlockchainConfirmationCount,
+	)
 }
 
 // Run initializes and runs wallet.
 func (w *Wallet) Run() error {
+	w.registerMetrics()
+
+	err := w.initPendingManualConfirmationsTxMetric()
+	if err != nil {
+		return err
+	}
+
 	w.initHotWallet()
 	w.initColdWallet()
 	w.checkForWalletUpdates()
