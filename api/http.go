@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gofrs/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/wallet"
@@ -26,6 +27,8 @@ const (
 	ConfirmURL                    = "/confirm"
 	GetEventsURL                  = "/get_events"
 	MuteEventsURL                 = "/mute_events"
+
+	metricsEndpoint = "/metrics"
 )
 
 // GetTransactionsFilter describes data sent by client to set up filters in
@@ -281,4 +284,6 @@ func (s *Server) initHTTPAPIServer() {
 	m.HandleFunc(ConfirmURL, s.confirmPendingTransaction)
 	m.HandleFunc(GetEventsURL, s.getEvents)
 	m.HandleFunc(MuteEventsURL, s.muteEvents)
+
+	m.Handle(metricsEndpoint, promhttp.Handler())
 }
