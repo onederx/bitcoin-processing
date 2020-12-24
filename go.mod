@@ -9,7 +9,7 @@ require (
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/containerd/containerd v1.2.8 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker v1.13.1
+	github.com/docker/docker v17.12.0-ce-rc1.0.20190826074503-38ab9da00309+incompatible
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible
@@ -26,5 +26,3 @@ require (
 	github.com/spf13/viper v1.4.0
 	gotest.tools v2.2.0+incompatible // indirect
 )
-
-replace github.com/docker/docker v1.13.1 => github.com/docker/docker v0.0.0-20190827000000-38ab9da0030917f154f4d1b05962d48de149d47c
