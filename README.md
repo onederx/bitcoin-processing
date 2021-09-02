@@ -122,5 +122,5 @@ Also, there are **integration tests**. They require binaries to be built first,
 also, they require Docker - they will start several Docker containers.
 They can be run with
 ```bash
-go test -v -tags integration ./integrationtests
+go test -v -timeout=20m -tags integration ./integrationtests
 ```
