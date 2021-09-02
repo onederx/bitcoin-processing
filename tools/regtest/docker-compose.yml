@@ -5,14 +5,14 @@ services:
     ports:
     - "127.0.0.1:18443:18443"
     volumes:
-    - ./node1:/bitcoin
+    - ./node1/.bitcoin:/bitcoin/.bitcoin
   node2:
     image: kylemanna/bitcoind
     ports:
     - "127.0.0.1:18445:18443"
     volumes:
-    - ./node2:/bitcoin
+    - ./node2/.bitcoin:/bitcoin/.bitcoin
   node3:
     image: kylemanna/bitcoind
     volumes:
-    - ./node3:/bitcoin
+    - ./node3/.bitcoin:/bitcoin/.bitcoin
