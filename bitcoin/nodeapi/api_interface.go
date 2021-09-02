@@ -9,6 +9,7 @@ import (
 // NodeAPI is responsible for communication with Bitcoin node
 type NodeAPI interface {
 	CreateNewAddress() (string, error)
+	CreateWallet(name string) error
 	ListTransactionsSinceBlock(blockHash string) (*btcjson.ListSinceBlockResult, error)
 	GetTransaction(hash string) (*btcjson.GetTransactionResult, error)
 	GetRawTransaction(hash string) (*btcjson.TxRawResult, error)
@@ -19,4 +20,5 @@ type NodeAPI interface {
 	GetConfirmedAndUnconfirmedBalance() (uint64, uint64, error)
 
 	SendRequestToNode(method string, params []interface{}) ([]byte, error)
+	SendRequestToNodeWithNamedParams(method string, params map[string]interface{}) ([]byte, error)
 }

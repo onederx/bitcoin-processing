@@ -16,6 +16,7 @@ import (
 	dockerclient "github.com/docker/docker/client"
 
 	processingapiclient "github.com/onederx/bitcoin-processing/api/client"
+	"github.com/onederx/bitcoin-processing/bitcoin"
 	"github.com/onederx/bitcoin-processing/bitcoin/nodeapi"
 )
 
@@ -59,10 +60,12 @@ type TestEnvironment struct {
 	CallbackHandler      func(http.ResponseWriter, *http.Request)
 
 	WebsocketListeners []*WebsocketListener
+
+	depositFee bitcoin.BTCAmount
 }
 
-func NewTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
-	env := &TestEnvironment{}
+func NewTestEnvironment(ctx context.Context, depositFee bitcoin.BTCAmount) (*TestEnvironment, error) {
+	env := &TestEnvironment{depositFee: depositFee}
 
 	err := env.setupDockerClient(ctx)
 	if err != nil {
@@ -136,7 +139,7 @@ func (e *TestEnvironment) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = e.startRegtest(ctx)
+	err = e.startRegtest(ctx, e.depositFee)
 	if err != nil {
 		return err
 	}

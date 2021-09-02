@@ -23,7 +23,10 @@ func (e *TestEnvironment) StartColdStorage(ctx context.Context) error {
 	for i, otherNode := range bitcoinNodes {
 		peers[i] = "addnode=" + nodeNamePrefix + otherNode
 	}
-	nodeConfigParams := nodeConfig{Peers: strings.Join(peers, "\n")}
+	nodeConfigParams := nodeConfig{
+		Peers:      strings.Join(peers, "\n"),
+		DepositFee: e.depositFee.Float64(),
+	}
 
 	configTempFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -87,6 +90,10 @@ func (e *TestEnvironment) StopColdStorage(ctx context.Context) error {
 
 func (e *TestEnvironment) ColdStorageLoadAndGenerateAddress() string {
 	csNode, err := connectToNodeWithBackoff(e.Regtest[coldStorageContainerName].IP)
+	if err != nil {
+		panic(err)
+	}
+	err = createWallet(csNode, "default")
 	if err != nil {
 		panic(err)
 	}

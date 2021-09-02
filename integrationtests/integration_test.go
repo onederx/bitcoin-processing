@@ -38,7 +38,7 @@ var initialTestMetainfo = testMetainfo{
 
 func TestSmoke(t *testing.T) {
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestSmoke(t *testing.T) {
 
 func TestCommonUsage(t *testing.T) {
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestMoreConfirmations(t *testing.T) {
 	const neededConfirmations = 4
 
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestMoreConfirmations(t *testing.T) {
 
 func TestMultipleExits(t *testing.T) {
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}

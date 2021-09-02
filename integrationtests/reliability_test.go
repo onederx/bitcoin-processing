@@ -65,7 +65,7 @@ const (
 
 func TestDepositReliability(t *testing.T) {
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestDepositReliability(t *testing.T) {
 
 func TestWithdrawReliability(t *testing.T) {
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestWithdrawReliability(t *testing.T) {
 
 func TestDisallowAnonymousWithdraw(t *testing.T) {
 	ctx := context.Background()
-	env, err := testenv.NewTestEnvironment(ctx)
+	env, err := testenv.NewTestEnvironment(ctx, depositFee)
 	if err != nil {
 		t.Fatal(err)
 	}

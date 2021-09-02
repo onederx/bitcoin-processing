@@ -34,6 +34,7 @@ rpcuser=bitcoinrpc
 rpcpassword=TEST_BITCOIN_NODE_PASSWORD
 regtest=1
 rpcallowip=0.0.0.0/0
+fallbackfee={{.DepositFee}}
 {{.Additional}}
 
 [regtest]
@@ -50,6 +51,7 @@ echo -e "GET /notify_wallet HTTP/1.1\r\nhost: {{.ProcessingAddress}}\r\nConnecti
 type nodeConfig struct {
 	Peers      string
 	Additional string
+	DepositFee float64
 }
 
 type rawMempoolResponse struct {
@@ -63,7 +65,7 @@ var bitcoinNodes = []string{
 	"node-miner",
 }
 
-func (e *TestEnvironment) startRegtest(ctx context.Context) error {
+func (e *TestEnvironment) startRegtest(ctx context.Context, depositFee bitcoin.BTCAmount) error {
 	log.Printf("Starting Regtest nodes")
 
 	containerConfig := &container.Config{Image: bitcoinNodeImageName}
@@ -77,6 +79,7 @@ func (e *TestEnvironment) startRegtest(ctx context.Context) error {
 			}
 		}
 		nodeConfigParams := nodeConfig{Peers: strings.Join(peers, "\n")}
+		nodeConfigParams.DepositFee = depositFee.Float64()
 		if node == "node-our" {
 			nodeConfigParams.Additional = "walletnotify=/bin/bash /usr/share/notify-processing.sh %s"
 		}
@@ -230,6 +233,12 @@ func sendRequestToNodeWithBackoff(n nodeapi.NodeAPI, method string, params []int
 	return result, err
 }
 
+func createWallet(n nodeapi.NodeAPI, name string) error {
+	return util.WaitForEvent(func() error {
+		return n.CreateWallet(name)
+	})
+}
+
 func (e *TestEnvironment) initRegtest() {
 	clientNode, err := connectToNodeWithBackoff(e.Regtest["node-client"].IP)
 	if err != nil {
@@ -237,6 +246,11 @@ func (e *TestEnvironment) initRegtest() {
 		return
 	}
 	e.Regtest["node-client"].NodeAPI = clientNode
+	err = createWallet(clientNode, "default")
+	if err != nil {
+		e.regtestIsLoaded <- err
+		return
+	}
 	nodeOutput, err := sendRequestToNodeWithBackoff(clientNode, "generatetoaddress",
 		[]interface{}{3, generateNewAddress(clientNode)})
 	if err != nil {
@@ -254,6 +268,11 @@ func (e *TestEnvironment) initRegtest() {
 		e.regtestIsLoaded <- err
 		return
 	}
+	err = createWallet(minerNode, "default")
+	if err != nil {
+		e.regtestIsLoaded <- err
+		return
+	}
 	e.Regtest["node-miner"].NodeAPI = minerNode
 	nodeOutput, err = sendRequestToNodeWithBackoff(minerNode, "generatetoaddress",
 		[]interface{}{110, generateNewAddress(minerNode)})
@@ -267,6 +286,11 @@ func (e *TestEnvironment) initRegtest() {
 	}
 	log.Printf("Miner node generated %d blocks", len(blocks))
 	ourNode, err := connectToNodeWithBackoff(e.Regtest["node-our"].IP)
+	if err != nil {
+		e.regtestIsLoaded <- err
+		return
+	}
+	err = createWallet(ourNode, "default")
 	if err != nil {
 		e.regtestIsLoaded <- err
 		return

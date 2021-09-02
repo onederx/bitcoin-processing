@@ -85,6 +85,12 @@ type jsonRPCRequest struct {
 	Params         []interface{} `json:"params"`
 }
 
+type jsonRPCRequestWithNamedParams struct {
+	JSONRPCVersion string                 `json:"jsonrpc"`
+	Method         string                 `json:"method"`
+	Params         map[string]interface{} `json:"params"`
+}
+
 type jsonRPCStringResponse struct {
 	Result string
 	Error  *JSONRPCError
@@ -216,6 +222,59 @@ func (n *bitcoinNodeRPCAPI) SendRequestToNode(method string, params []interface{
 	defer response.Body.Close()
 
 	return ioutil.ReadAll(response.Body)
+}
+
+func (n *bitcoinNodeRPCAPI) SendRequestToNodeWithNamedParams(method string, params map[string]interface{}) ([]byte, error) {
+	rpcRequest := jsonRPCRequestWithNamedParams{
+		JSONRPCVersion: "1.0",
+		Method:         method,
+		Params:         params,
+	}
+	rpcRequestJSON, err := json.Marshal(rpcRequest)
+	if err != nil {
+		return nil, err
+	}
+	httpRequest, err := http.NewRequest(
+		"POST",
+		n.nodeURL,
+		bytes.NewReader(rpcRequestJSON),
+	)
+	if err != nil {
+		return nil, err
+	}
+	httpRequest.Header["Content-Type"] = []string{"application/json"}
+	httpRequest.SetBasicAuth(n.user, n.pass)
+
+	response, err := http.DefaultClient.Do(httpRequest)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	return ioutil.ReadAll(response.Body)
+}
+
+// CreateWallet creates new wallet in bitcoin node. Wallet is automatically
+// set to auto-load on startup
+func (n *bitcoinNodeRPCAPI) CreateWallet(name string) error {
+	responseJSON, err := n.SendRequestToNodeWithNamedParams("createwallet", map[string]interface{}{
+		"wallet_name":     name,
+		"load_on_startup": true,
+	})
+	if err != nil {
+		return err
+	}
+	var response struct {
+		Error *JSONRPCError
+	}
+	err = json.Unmarshal(responseJSON, &response)
+	if err != nil {
+		return err
+	}
+	if response.Error != nil {
+		return response.Error
+	}
+	return nil
 }
 
 func (n *bitcoinNodeRPCAPI) sendToAddress(address string, amount uint64, recipientPaysFee bool) (hash string, err error) {
