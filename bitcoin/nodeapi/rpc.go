@@ -76,10 +76,7 @@ type AddressInfo struct {
 	HdKeyPath     string `json:"hdkeypath"`
 	HdSeedID      string `json:"hdseedid"`
 	HdMasterKeyID string `json:"hdmasterkeyid"`
-	Labels        []struct {
-		Name    string
-		Purpose string
-	}
+	Labels        []string
 }
 
 type jsonRPCRequest struct {
